@@ -2,7 +2,7 @@
 // deadline. The API key is only ever put in the Authorization header, never in a message.
 import { readEnv } from "../env";
 
-export type MultiBaasErrorKind = "timeout" | "network" | "http" | "envelope";
+export type MultiBaasErrorKind = "timeout" | "network" | "http" | "envelope" | "parse";
 
 export class MultiBaasError extends Error {
   constructor(
