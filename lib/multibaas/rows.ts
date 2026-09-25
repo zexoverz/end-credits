@@ -5,10 +5,9 @@ import { MultiBaasError, type MultiBaasClient } from "./client";
 
 export type Row = Record<string, unknown>;
 
-/** Requested page size. If MultiBaas caps `limit` lower than this, a short page would end the
- *  read early; scripts/multibaas-setup.ts compares row counts with `/count` to catch that. */
-export const PAGE_SIZE = 1000;
-export const MAX_PAGES = 10;
+/** MultiBaas rejects `limit` above 50 with 400 "invalid request" (checked live, 26 Sep). */
+export const PAGE_SIZE = 50;
+export const MAX_PAGES = 40;
 
 const bad = (what: string, v: unknown) =>
   new MultiBaasError(`MultiBaas returned an unexpected ${what}: ${JSON.stringify(v)}`, "parse");

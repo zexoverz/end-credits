@@ -38,7 +38,6 @@ function isEnvelope(v: unknown): v is Envelope {
     v !== null &&
     "status" in v &&
     "message" in v &&
-    "result" in v &&
     typeof (v as Envelope).message === "string"
   );
 }
@@ -95,7 +94,8 @@ export function createMultiBaasClient(opts: ClientOptions): MultiBaasClient {
       const detail = isEnvelope(json) ? json.message : `HTTP ${res.status}`;
       throw new MultiBaasError(`MultiBaas ${where}: ${res.status} ${detail}`, "http", res.status);
     }
-    if (!isEnvelope(json)) {
+    // Reads must carry `result`; writes like PUT /queries answer with status and message only.
+    if (!isEnvelope(json) || (method === "GET" && !("result" in json))) {
       throw new MultiBaasError(`MultiBaas ${where}: response is not the {status,message,result} envelope`, "envelope", res.status);
     }
     return json.result as T;

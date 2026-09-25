@@ -42,6 +42,12 @@ describe("multibaas client", () => {
     expect((err as Error).message).not.toContain(KEY);
   });
 
+  it("accepts a write answered with status and message but no result (PUT /queries)", async () => {
+    const fetch = vi.fn(async () => jsonResponse({ status: 200, message: "success" }));
+    const mb = createMultiBaasClient({ baseUrl: "https://x", apiKey: KEY, fetch });
+    await expect(mb.put("/queries/q", {})).resolves.toBeUndefined();
+  });
+
   it("rejects a 200 whose body is not the envelope", async () => {
     const fetch = vi.fn(async () => jsonResponse({ rows: [] }));
     const mb = createMultiBaasClient({ baseUrl: "https://x", apiKey: KEY, fetch });
