@@ -38,3 +38,6 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
 | T5.2 | `lib/x402/constants.ts`, `lib/x402/receipt.ts`, `lib/x402/receipt.test.ts`, `lib/x402/server.ts`, `lib/x402/server.test.ts`, `lib/x402/repo.ts`, `lib/x402/deps.ts`, `app/api/x402/credit/[creditId]/route.ts`, `lib/messages.ts` (`NOT_PAYABLE`), `lib/messages.test.ts` | pending review |
 | T5.3 | `lib/x402/client.ts`, `lib/x402/client.test.ts`, `scripts/x402-smoke.ts`; the smoke payment on Base Sepolia was run by the agent | pending review |
+| T9.1 | `lib/multibaas/queries.ts`, `lib/multibaas/queries.test.ts`, `scripts/multibaas-setup.ts` (not run yet: no MultiBaas deployment), `docs/plan/decisions.md` (E9) | pending review |
+| T9.2 backend | `lib/multibaas/client.ts`, `rows.ts`, `dashboard.ts`, `repo.ts`, `deps.ts`, their tests, `lib/multibaas/__fixtures__/dashboard.ts`, `app/api/dashboard/route.ts` | pending review |
+| T9.3 | `lib/multibaas/webhook.ts`, `lib/multibaas/webhook.test.ts`, `lib/multibaas/repo.ts` (webhook repo), `app/api/webhooks/multibaas/route.ts` | pending review |
