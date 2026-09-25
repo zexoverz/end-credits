@@ -60,6 +60,8 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
 | T2.6 | `lib/payee/push.ts`, `lib/payee/push.test.ts`, `lib/payee/change.ts`, `lib/payee/change.test.ts`, `docs/plan/decisions.md` (Activity API CONFIRM) | pending review |
 | T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |
+| T10.2 (client wallet) | `app/npm/[...name]/passkey.ts`, `package.json` + `pnpm-lock.yaml` (`@base-org/account`), `docs/plan/decisions.md` (E10 frontend) | pending review |
+| T10.5 (page) | `app/npm/[...name]/page.tsx`, `claim-page.tsx`, `header.tsx`, `steps.tsx`, `lib/client/claim.ts`, `lib/client/claim.test.ts`, `lib/copy/claim.ts` | pending review |
 | T8.3 owner page | `app/owner/*`, `lib/client/owner.ts`, `lib/client/owner.test.ts`, `lib/copy/owner.ts`, `docs/plan/decisions.md` (E8 frontend); checked live against local Postgres with a headless browser | pending review |
 | T8.3 / T11.3 / T11.4 approve page | `app/approve/[tipId]/*`, `lib/client/approve.ts`, `lib/client/approve.test.ts`, `lib/copy/approve.ts` | pending review |
 | T9.2 (frontend) | `app/dashboard/page.tsx`, `app/dashboard/dashboard-view.tsx`, `app/dashboard/sections.tsx`, `lib/client/dashboard.ts`, `lib/client/dashboard.test.ts`, `lib/copy/dashboard.ts`, `docs/plan/decisions.md` (E8/E9 frontend) | pending review |

@@ -577,6 +577,38 @@ payment. Found while wiring E7.
   `errors` and leaves the value null. `sessions` counts distinct sessions with a `reserved`
   credit for the package. A package not in our table is read from npm and not stored.
 
+## E10 frontend
+
+### CONFIRM: passkey wallet SDK (26 Sep, installed `@base-org/account` 2.5.13 README and `.d.ts`, Context7 `/websites/base`)
+
+- `@base-org/account` is the current SDK; its README: "Base Account is now Coinbase Wallet. The
+  npm package remains `@base-org/account`". Pinned `~2.5.13`. No wagmi.
+- `createBaseAccountSDK(params: Partial<AppMetadata> & {preference?, subAccounts?, paymasterUrls?})`
+  returns `{getProvider(), subAccount}`; `AppMetadata = {appName, appLogoUrl, appChainIds}`
+  (`dist/interface/builder/core/createBaseAccountSDK.d.ts`, `dist/core/provider/interface.d.ts`).
+  `getProvider()` is EIP-1193; `request({method: "eth_requestAccounts"})` opens the
+  keys.coinbase.com popup and resolves to `string[]`; 4001 is a user rejection.
+- It is a passkey smart account only, so there is no `smartWalletOnly` option to set.
+- We call `createBaseAccountSDK({appName: "End Credits", appChainIds: [84532]})` once, on the first
+  button press. `NEXT_PUBLIC_CB_APP_NAME` is not needed.
+- **Import `@base-org/account/browser`, not the bare name.** The bare name resolves to
+  `dist/index.node.js` in the SSR build, which pulls `@coinbase/cdp-sdk` and fails on
+  `@x402/svm/exact/client`. The `./browser` export has no CDP dependency.
+
+### Choices
+
+- `/npm/[...name]` is a server wrapper (params, `?github=cancelled`) around one client component.
+  The step state is derived in `lib/client/claim.ts` from the summary and the latest `ClaimView`,
+  never stored.
+- Steps are locked for everyone when the package has no repo, already has a non-claim payee
+  (ALREADY_PAYABLE) or is claimed by someone else; the visitor's own claim always shows.
+- A failed chain read shows an error line; "nothing reserved" only appears after a good read.
+- The page polls `GET …/status` every 5 s while the claim is `pr_open`, `merged` or `verified`;
+  "Check now" sends a POST. On load, an open claim asks the status once so its message shows.
+- "Use an existing address" posts the same `wallet` call; a closed passkey popup may never answer,
+  so waiting on it does not disable the fallback.
+- Funding links from `package.json` are rendered only when `http:` or `https:`.
+
 ## E11
 
 - **Discovery doc, read live 26 Sep** (`curl https://auth.world.org/.well-known/openid-configuration`):

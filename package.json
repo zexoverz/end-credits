@@ -12,6 +12,7 @@
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@base-org/account": "~2.5.13",
     "@x402/core": "~2.27.0",
     "@x402/evm": "~2.27.0",
     "@x402/fetch": "~2.27.0",
