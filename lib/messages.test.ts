@@ -16,7 +16,13 @@ describe("msg", () => {
     );
   });
 
-  it("has every code from DESIGN §11", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(38);
+  it("has every code from DESIGN §11, plus SPOOF_REPO (T2.5)", () => {
+    expect(Object.keys(MESSAGES)).toHaveLength(39);
+  });
+
+  it("names the repo and package in SPOOF_REPO", () => {
+    expect(msg("SPOOF_REPO", { repo: "prettier/prettier", package: "prettier-plus" })).toBe(
+      "Reserved: prettier/prettier does not publish prettier-plus.",
+    );
   });
 });
