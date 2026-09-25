@@ -58,13 +58,17 @@ export interface ChainParams {
   recorder: Account;
   escrow: Address;
   usdc: Address;
+  /** Receipt polling, ms. Base Sepolia makes a block every 2 s. */
+  pollingInterval?: number;
 }
 
 export function createChainContext(p: ChainParams): ChainContext {
   const transport = http(p.rpcUrl);
-  const wallet = (account: Account) => createWalletClient({ account, chain: p.chain, transport });
+  const pollingInterval = p.pollingInterval ?? 1_000;
+  const wallet = (account: Account) =>
+    createWalletClient({ account, chain: p.chain, transport, pollingInterval });
   return {
-    publicClient: createPublicClient({ chain: p.chain, transport }),
+    publicClient: createPublicClient({ chain: p.chain, transport, pollingInterval }),
     payer: wallet(p.payer),
     recorder: wallet(p.recorder),
     escrow: p.escrow,
