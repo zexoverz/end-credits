@@ -46,8 +46,15 @@ export function toMicro(v: unknown): bigint {
   throw bad("amount", v);
 }
 
+/** bytes32 arrives as 0x hex or, from saved-query results, as a byte-array string "[193, 60, ...]". */
 export function toBytes32(v: unknown): string {
   if (typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v)) return v.toLowerCase();
+  if (typeof v === "string" && /^\[[\d,\s]*\]$/.test(v)) {
+    const bytes = v.slice(1, -1).split(",").map((b) => Number(b.trim()));
+    if (bytes.length === 32 && bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) {
+      return "0x" + bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  }
   throw bad("bytes32", v);
 }
 
