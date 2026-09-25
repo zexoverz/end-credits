@@ -26,16 +26,16 @@ export type ActionError =
 export type ApproveResult = { ok: true; releaseTx: Hex; message: string } | ActionError;
 export type DenyResult = { ok: true; refundTx: Hex; message: string } | ActionError;
 
-class Abort extends Error {
+export class Abort extends Error {
   constructor(readonly result: ActionError) {
     super(result.error);
   }
 }
 
-const chainCode = (e: unknown) => (e instanceof TxRevertedError ? e.errorName : "unknown");
+export const chainCode = (e: unknown) => (e instanceof TxRevertedError ? e.errorName : "unknown");
 
 /** Locks the hold and checks it belongs to `ownerId`, is pending and is not expired. */
-function checked(row: HoldRow | null, ownerId: string, now: Date): HoldRow {
+export function checked(row: HoldRow | null, ownerId: string, now: Date): HoldRow {
   if (!row || row.ownerId !== ownerId) throw new Abort({ error: "not_found", status: 404 });
   if (row.status !== "pending") {
     throw new Abort({ error: "not_pending", status: 409, holdStatus: row.status });
@@ -44,7 +44,7 @@ function checked(row: HoldRow | null, ownerId: string, now: Date): HoldRow {
   return row;
 }
 
-async function unwrap<T>(run: () => Promise<T>): Promise<T | ActionError> {
+export async function unwrap<T>(run: () => Promise<T>): Promise<T | ActionError> {
   try {
     return await run();
   } catch (e) {
@@ -73,10 +73,7 @@ export async function approveWithSession(
         throw new Abort({ error: "chain_error", status: 502, code: failure.code });
       }
       const done = new Date();
-      const message = msg("APPROVED_SESSION", {
-        amount: formatUsdc(row.amountMicro),
-        address: row.payee ?? "",
-      });
+      const message = await markReleased(tx, row, releaseTx, "APPROVED_SESSION", done);
       await tx.insert(approvals).values({
         holdId: row.holdId,
         ownerId,
@@ -87,19 +84,6 @@ export async function approveWithSession(
         status: "approved",
         completedAt: done,
       });
-      await tx
-        .update(holds)
-        .set({ status: "released", releaseTx, resolvedAt: done })
-        .where(eq(holds.id, row.holdId));
-      await tx
-        .update(credits)
-        .set({
-          outcome: "paid",
-          txHash: releaseTx,
-          settledAt: done,
-          reasons: appendOwnerReason(row.reasons, "APPROVED_SESSION", message),
-        })
-        .where(eq(credits.id, row.creditId));
       return { ok: true as const, releaseTx, message };
     }),
   );
@@ -107,6 +91,36 @@ export async function approveWithSession(
     await recordFailure(ownerId, now, { holdId: failure.holdId, code: failure.code });
   }
   return result;
+}
+
+type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+
+/**
+ * The one release outcome for both approval methods: hold released, credit held → paid with the
+ * release tx, and the owner's reason (`APPROVED` or `APPROVED_SESSION`) appended. Returns its text.
+ */
+export async function markReleased(
+  tx: Tx,
+  row: HoldRow,
+  releaseTx: Hex,
+  code: "APPROVED" | "APPROVED_SESSION",
+  done: Date,
+): Promise<string> {
+  const message = msg(code, { amount: formatUsdc(row.amountMicro), address: row.payee ?? "" });
+  await tx
+    .update(holds)
+    .set({ status: "released", releaseTx, resolvedAt: done })
+    .where(eq(holds.id, row.holdId));
+  await tx
+    .update(credits)
+    .set({
+      outcome: "paid",
+      txHash: releaseTx,
+      settledAt: done,
+      reasons: appendOwnerReason(row.reasons, code, message),
+    })
+    .where(eq(credits.id, row.creditId));
+  return message;
 }
 
 async function recordFailure(
