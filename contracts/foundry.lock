@@ -1,6 +1,6 @@
 {
   "lib/forge-multibaas": {
-    "rev": "8e84d1c"
+    "rev": "8e84d1ca7db1240dcf7c1646d26c4fbcbb95a54d"
   },
   "lib/forge-std": {
     "tag": {
