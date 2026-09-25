@@ -195,6 +195,20 @@ contract EndCreditsEscrow {
         usdc.safeTransfer(c.payee, amount);
     }
 
+    /// @notice One event per settled session, for the dashboard. Moves no funds.
+    function recordSession(
+        bytes32 sessionId,
+        bytes32 ownerHash,
+        uint256 budget,
+        uint256 paid,
+        uint256 held,
+        uint256 reservedAmount,
+        uint256 refused,
+        bytes32 manifestHash
+    ) external onlyRecorder {
+        emit SessionSettled(sessionId, ownerHash, budget, paid, held, reservedAmount, refused, manifestHash);
+    }
+
     function claimOf(bytes32 packageKey) external view returns (address) {
         return claims[packageKey].payee;
     }
