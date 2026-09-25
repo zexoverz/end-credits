@@ -427,6 +427,27 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
 - **Agent keys:** `ec_` + 32 random bytes base64url, shown once; `agent_keys.token_hash` is its
   sha256 hex (the hash `POST /api/sessions` checks). `bound_via 'dev'`. Revoking someone else's key
   is 404; revoking twice keeps the first time.
+
+## E8 frontend: owner and approve
+
+- Both pages are thin client components behind a server `page.tsx` that only reads `params` and
+  `searchParams` (`?world=`, `?result=`). All data comes from the existing APIs; no API was added.
+- **The page never decides an outcome.** `?result=<CODE>` after the World step-up is a hint: the
+  server's view wins. A final status shows the server's recorded message; while pending, the
+  server's `failureCode` wins over the query, and `result=APPROVED` with a pending view is ignored.
+  Codes are mapped per decisions E11 (`AMR` as `ACR`, token codes as `VERIFY_FAILED`); an unknown
+  code shows the generic release failure and is echoed only if it matches `[A-Za-z0-9_]{1,64}`.
+- `POST /start` answering `{status: "verify", url}` is followed only when `url` is https.
+- Hold TTL is edited in whole minutes (1 to 10080) and sent as seconds. USDC fields are checked for
+  shape only on the client; ranges and `cap_over_budget` come back from the API and are shown per
+  field.
+- The agent token lives only in component state until **Done**; it is never refetched or stored.
+- At sign-in, `WRONG_HUMAN` reads "This World ID is not the owner of this account." (the §11 text
+  speaks of an approval). Expired before the expirer's refund reads "refund on its way", not
+  "returned".
+- **API gap:** the approve view's `worldRequired` is `WORLD_REQUIRED` only; with
+  `APPROVE_METHOD=world` alone the button reads **Approve** but still goes through World.
+  Notifications have no mark-read endpoint, so the unread list only grows.
 ## E9
 
 Sources: `@curvegrid/multibaas-sdk` 1.1.1 types and docs (`npm pack`), the live pages
