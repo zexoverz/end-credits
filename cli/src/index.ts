@@ -52,7 +52,9 @@ async function settle(session: string | undefined): Promise<number> {
     say(cliMsg("SESSION_REQUIRED"));
     return 1;
   }
-  const deps = { fetch, open: openInBrowser, say, now: () => new Date() };
+  // ENDCREDITS_NO_OPEN=1 skips the browser tab (headless machines, scripted checks).
+  const open = process.env.ENDCREDITS_NO_OPEN === "1" ? () => {} : openInBrowser;
+  const deps = { fetch, open, say, now: () => new Date() };
   return (await settleSession(home, session, deps)).ok ? 0 : 1;
 }
 
