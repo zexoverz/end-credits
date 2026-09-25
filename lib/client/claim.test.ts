@@ -10,6 +10,7 @@ import {
   packageNameFrom,
   parseAddress,
   reserveLine,
+  safeLinks,
   shouldPoll,
   steps,
   summaryPath,
@@ -248,5 +249,12 @@ describe("addresses", () => {
   it("names a cancelled passkey prompt", () => {
     expect(walletErrorText({ code: 4001, message: "User rejected" })).toBe(CLAIM_COPY.WALLET_REJECTED);
     expect(walletErrorText(new Error("popup blocked"))).toBe("The wallet did not return an address (popup blocked).");
+  });
+});
+
+describe("safeLinks", () => {
+  it("keeps only http(s) funding links", () => {
+    const links = ["https://opencollective.com/x", "javascript:alert(1)", "data:text/html,x", "nope", "http://a.b"];
+    expect(safeLinks(links)).toEqual(["https://opencollective.com/x", "http://a.b"]);
   });
 });

@@ -127,3 +127,14 @@ export function walletErrorText(e: unknown): string {
 }
 
 export const githubRepoUrl = (repo: string) => `https://github.com/${repo}`;
+
+// Funding links come from package.json; only http(s) may become an href.
+export function safeLinks(urls: string[]): string[] {
+  return urls.filter((u) => {
+    try {
+      return ["http:", "https:"].includes(new URL(u).protocol);
+    } catch {
+      return false;
+    }
+  });
+}
