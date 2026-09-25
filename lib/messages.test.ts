@@ -33,19 +33,5 @@ describe("cliMsg", () => {
       "End Credits: rolling credits at https://x/credits/1",
     );
     expect(() => cliMsg("ROLLING", {})).toThrow("Missing message var: url in ROLLING");
-  it("has every code from DESIGN §11 plus the ones added during the build (decisions.md)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(43);
-  });
-});
-
-describe("cliMsg", () => {
-  it("formats CLI strings with the same placeholder rule", () => {
-    expect(cliMsg("ROLLING", { url: "https://x/credits/1" })).toBe(
-      "End Credits: rolling credits at https://x/credits/1",
-    );
-    expect(() => cliMsg("ROLLING", {})).toThrow("Missing message var: url in ROLLING");
-=======
-  it("has every code from DESIGN §11 plus the ones added during the build (decisions.md)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(43);
   });
 });
