@@ -125,6 +125,71 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
   `drips.*.ownedBy`.
 
 ## E1
+## E4 (26 Sep)
+## E6 chain
+
+- **MultiBaas link:** `curvegrid/forge-multibaas` pinned at `8e84d1ca7db1240dcf7c1646d26c4fbcbb95a54d`
+  (24 Mar 2025, the latest commit), remapped `forge-multibaas/=lib/forge-multibaas/src/`. `ffi` is
+  not in `foundry.toml`; the deploy passes `--ffi` on the command line.
+- `Deploy.s.sol` links only when `MULTIBAAS_URL` is set **and** the run is a broadcast
+  (`vm.isContext(ScriptBroadcast)`), so a dry run never links an address that was not sent. Label
+  `endcredits_escrow`, alias `escrow`, version `1.0`, starting block `-100`.
+- **The plugin swallows link errors:** with a bad URL the script logs
+  `Link Contract: Error during validation: ...` and still exits 0 (tested on anvil). The deploy log
+  has to be read for that line. The link also runs during simulation, before the tx is sent, so a
+  failed broadcast after a good link leaves a MultiBaas address with no contract; re-run with
+  `MULTIBAAS_ALLOW_UPDATE_ADDRESS=true`.
+- **Tx queue:** every write is simulated first (inside the queue, after the previous tx from that
+  key is mined), so a revert is named from the custom error before anything is signed. Nonce comes
+  from `getTransactionCount(blockTag: "pending")`; one retry on `nonce too low` with a fresh nonce.
+  If a mined tx reverts anyway, the call is replayed at `blockNumber - 1` to name the error, else
+  `unknown`. Errors are `TxRevertedError` with `errorName`.
+- `refund` and `claim` are sent from the recorder key (DESIGN §2), though the contract lets anyone
+  call them after expiry / always.
+- Receipt polling is 1 s by default (Base Sepolia blocks are 2 s; viem's default is 4 s).
+- The integration test (`lib/chain/escrow.anvil.test.ts`) uses anvil on `:8546`, starting one if
+  none is running, and skips when anvil or `contracts/out` is missing. It stands in for the live
+  Base Sepolia test until the escrow is deployed.
+- `origin/e0-foundation` had committed a gitlink for `.claude/worktrees/agent-a44bbe6f…`, which
+  broke `git submodule update`; removed on this branch.
+## E5
+
+- **Manual resource route, no `withX402`.** `app/api/x402/credit/[creditId]` calls
+  `handleCreditRequest` (`lib/x402/server.ts`), which builds the v2 challenge itself and calls the
+  facilitator's `verify` then `settle` directly (`HTTPFacilitatorClient`). This lets the 409 run
+  before any quote and gives the handler the settle tx hash to sign and store the receipt.
+  `@x402/next` and `@x402/paywall` are not installed.
+- **Order in the handler:** unknown credit → 404; already settled (`tx_hash` and `receipt` set) →
+  the stored receipt, 200, before the freshness check, so a receipt stays readable after its screen
+  ages out; outcome not `paid`/`capped`, or no `status 200` `address` screen of the payee (matched
+  case-insensitively) within 10 min → 409 `NOT_PAYABLE`; no `PAYMENT-SIGNATURE` → 402.
+- **The server re-checks the payment against the credit** (`accepted` scheme, network, asset,
+  payTo, amount, and the signed authorization's `to` and `value`) before it calls the facilitator,
+  and passes its own requirements, not the client's copy, to `verify` and `settle`. Failures come
+  back as a 402 whose `error` is `CHALLENGE_MISMATCH`, `INVALID_PAYMENT` or the facilitator's reason.
+- **Challenge differs from DESIGN §10 as the x402 v2 CONFIRM says:** `resource` is the top-level
+  `{url, description}`; each accept carries `maxTimeoutSeconds: 120` and
+  `extra: {name:"USDC", version:"2"}`. `resource.url` is built from `APP_URL`, not `req.url`.
+- **Receipt:** `{creditId, package, amount, payee, tx}`, `amount` in micro-USDC as a string, signed
+  with `RECEIPT_SIGNING_KEY` by `signMessage` over the JSON with sorted keys; `sig` and `signer`
+  added. The client checks the signature, `creditId`, `payee` and that `tx` equals the
+  `PAYMENT-RESPONSE` transaction.
+- **Client spend controls are off (`setSpendControls(false)`), not `{maxAmountPerPayment:false}`.**
+  With an object, the library's default-asset allowlist rejects a wrong token before our hook runs,
+  so the refusal would be a library error instead of `TOKEN_PIN`. Our `onBeforePaymentCreation` hook
+  is the gate. Only `eip155:84532` is registered; a challenge on another network fails selection
+  and is mapped to `CHALLENGE_MISMATCH`, and the hook checks the network too.
+- **Extra client checks beyond DESIGN §10:** `extra` must be `{name:"USDC", version:"2"}` with no
+  `assetTransferMethod` other than `eip3009`, and `maxTimeoutSeconds` must be 1 to 120; else
+  `CHALLENGE_MISMATCH`.
+- **New message `NOT_PAYABLE`** ("Not paid: this credit has no fresh paid decision to pay
+  against."): the 409 body and the client refusal when `decisionAllowsPay` is false.
+- **Smoke run (26 Sep):** `scripts/x402-smoke.ts` paid 0.01 USDC from the payer to
+  `0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13` through `https://x402.org/facilitator`, tx
+  `0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`, block 47293505, status 1,
+  `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
+  receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
+  `Transfer` log instead.
 
 - **Ledger.** One line per tool call at most. A Bash install wins over Bash reads. Reads pulled out
   of Bash become `{t:"read", ps:[…]}` (up to 20 paths), only from segments whose command is a reader
@@ -157,6 +222,60 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
 - CLI output lives in `CLI_MESSAGES` in `lib/messages.ts`, apart from the DESIGN §11 codes.
 - `next dev` rewrites the repo `AGENTS.md` (Next 16 `agentRules`). Not changed here; revert it or
   set `agentRules: false` in `next.config.ts`.
+### Intercepta API, confirmed from the OpenAPI docs
+
+Index `https://docs.web3antivirus.io/llms.txt`; each reference page + `.md` holds its OpenAPI JSON.
+Base `https://api.web3antivirus.io`, header `X-API-KEY`.
+
+- Quick scan: `GET /api/public/v2/extension/account/{address}/quick-scan`
+  (`/reference/quick-scan-address.md`). `/toxic-score` (`/reference/scan-address.md`, "Deep Scan")
+  returns the same `ToxicScoreShortResponseV2`: `{toxicScore: number, traits: [{name, risk,
+  txsCount, description}]}`. No `chainId`. Trait names include `sanction_address`, `known_scammer`,
+  `blacklist`, `fake_phishing_transfer`, `mixer_transfers`, `sanction_address_communication`,
+  `rug_pull` and others; we parse `name` as a free string.
+- Token risks: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453`
+  (`/reference/scan-token.md`). `{apiVersion, riskScore, riskLevel: neutral|low|medium|high,
+  category, trust: whitelist|blocklist|neutral, action: block|warn|info, detectors: [{code,
+  description}], token: {chainId, address, symbol}, saleTax, buyTax}`.
+- Simulation: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`
+  (`/reference/scan-transaction.md`), chains `1, 56, 8453, 42161, 10, solana`. Body
+  `{transaction: {from, to, value, data, gas?, gasPrice?}, mode: "short"}`. Response
+  `{to, from, detectors: [{code, description}], assetsMovement: {send, receive}, transactionType}`.
+  We simulate `USDC.transfer(payee, amount)` on Base USDC from the payer.
+- **Impersonation (the SPEC §7.1 CONFIRM): there is a dedicated endpoint.**
+  `GET /api/public/v1/extension/poisoning-attack/check-address/{address}`
+  (`/reference/detect-address-impersonation.md`) → `{isAddressPoisoned: boolean, originalAddress}`.
+  Its sibling `/poisoning-attack/user/{address}` lists attacks *against* a wallet and is not used.
+
+### Choices
+
+- `screenPayee` runs quick scan, impersonation and token risks in parallel (token risks hit the 1 h
+  cache after the first payee). Simulation runs only when quick scan fails. Any of the three still
+  failing sets `Screen.error`, so the matrix holds. A payee therefore costs 2 requests, not 1.
+- A positive impersonation check refuses at rule 4 with a new message code `IMPERSONATION`
+  (`Refused. Intercepta: this address impersonates {original} (address poisoning).`), so
+  `MESSAGES` has 39 codes. Our own lookalike rule still runs after it, labelled as ours.
+- New `screens.kind` value `impersonation` (migration `0001_screens_impersonation`).
+- Simulation fallback: its detectors become `Screen.traits` (name = detector code, description
+  verbatim), toxic score 0. `CRITICAL` also holds `SCAM_ADDRESS`, `MALICIOUS_ADDRESS`,
+  `TRANSFER_TO_POISONING_ADDRESS`, `POISONING_ATTACK` so a scam recipient found this way is refused.
+- Failure mapping: deadline hit → `TIMEOUT` (the deadline races the fetch, so a fetch that ignores
+  its signal still times out); non-2xx or network error → `HTTP`; bad JSON or a body that fails
+  the schema → `PARSE`. Every call, failed or not, is a `screens` row (status 0 when there was no
+  HTTP answer). Only status-200 rows that pass the schema again are reused from the cache.
+- `DecideInput` gains `pkg` (the message texts need `{package}`); `Screen` gains `impersonation` and
+  `screenIds` (for `credits.screen_ids`). Reason sources: `intercepta`, `policy`, `payee` as in
+  DESIGN §3. `SCREENED_AS` is appended to every decision made on a successful screen.
+- Held on token `warn` uses `HELD_MEDIUM` with the address score, which may read `(0)`. Left as is.
+- Spam: an unknown download count is not treated as low.
+- `noCodeOnBase` reads `getCode` on `ETH_MAINNET_RPC` / `BASE_MAINNET_RPC` (defaults
+  `https://ethereum-rpc.publicnode.com`, `https://mainnet.base.org`). An RPC error throws rather
+  than returning false. An EIP-7702 delegation (`0xef0100…`) counts as an EOA. Live fixtures,
+  checked with `eth_getCode` on 26 Sep: DAI `0x6B175474E89094C44Da98b954EedeAC495271d0F` is on
+  Ethereum only; Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` is on both.
+- T4.1 probe: `~/.config/dominion/intercepta-key` did not exist on 26 Sep, so
+  `scripts/probe-intercepta.ts` is written (10 requests) but not run, and
+  `docs/intercepta-probe.md` does not exist yet.
 ## E2 and E3 (26 Sep)
 
 - **Registry:** `repository` is read from the requested version (default `latest`), falling back to
@@ -215,7 +334,6 @@ changed, `days` from the push. Two consequences:
   the cap" and the two cap cases; replacing `amount < DUST_FLOOR` with `false` fails "never sends a
   nonzero amount under the dust floor" and the two dust cases. Removing the 30-day window in
   `recentlyChanged` fails "last seen over 30 days ago is not a change".
-## E4 (26 Sep)
 
 ### Intercepta API, confirmed from the OpenAPI docs
 
@@ -271,7 +389,6 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
 - T4.1 probe: `~/.config/dominion/intercepta-key` did not exist on 26 Sep, so
   `scripts/probe-intercepta.ts` is written (10 requests) but not run, and
   `docs/intercepta-probe.md` does not exist yet.
-## E6 chain
 
 - **MultiBaas link:** `curvegrid/forge-multibaas` pinned at `8e84d1ca7db1240dcf7c1646d26c4fbcbb95a54d`
   (24 Mar 2025, the latest commit), remapped `forge-multibaas/=lib/forge-multibaas/src/`. `ffi` is
@@ -297,7 +414,6 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   Base Sepolia test until the escrow is deployed.
 - `origin/e0-foundation` had committed a gitlink for `.claude/worktrees/agent-a44bbe6f…`, which
   broke `git submodule update`; removed on this branch.
-## E5
 
 - **Manual resource route, no `withX402`.** `app/api/x402/credit/[creditId]` calls
   `handleCreditRequest` (`lib/x402/server.ts`), which builds the v2 challenge itself and calls the
@@ -389,3 +505,97 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   and skipped when `~/.endcredits/config.json` already holds a live key of that owner. The token is
   never printed. Approval runs when `ESCROW_ADDRESS` is set and the allowance is under 1000 USDC.
 - **New messages:** `RESOLVE_FAILED`, `EXECUTION_FAILED` (43 codes).
+
+- **MultiBaas link:** `curvegrid/forge-multibaas` pinned at `8e84d1ca7db1240dcf7c1646d26c4fbcbb95a54d`
+  (24 Mar 2025, the latest commit), remapped `forge-multibaas/=lib/forge-multibaas/src/`. `ffi` is
+  not in `foundry.toml`; the deploy passes `--ffi` on the command line.
+- `Deploy.s.sol` links only when `MULTIBAAS_URL` is set **and** the run is a broadcast
+  (`vm.isContext(ScriptBroadcast)`), so a dry run never links an address that was not sent. Label
+  `endcredits_escrow`, alias `escrow`, version `1.0`, starting block `-100`.
+- **The plugin swallows link errors:** with a bad URL the script logs
+  `Link Contract: Error during validation: ...` and still exits 0 (tested on anvil). The deploy log
+  has to be read for that line. The link also runs during simulation, before the tx is sent, so a
+  failed broadcast after a good link leaves a MultiBaas address with no contract; re-run with
+  `MULTIBAAS_ALLOW_UPDATE_ADDRESS=true`.
+- **Tx queue:** every write is simulated first (inside the queue, after the previous tx from that
+  key is mined), so a revert is named from the custom error before anything is signed. Nonce comes
+  from `getTransactionCount(blockTag: "pending")`; one retry on `nonce too low` with a fresh nonce.
+  If a mined tx reverts anyway, the call is replayed at `blockNumber - 1` to name the error, else
+  `unknown`. Errors are `TxRevertedError` with `errorName`.
+- `refund` and `claim` are sent from the recorder key (DESIGN §2), though the contract lets anyone
+  call them after expiry / always.
+- Receipt polling is 1 s by default (Base Sepolia blocks are 2 s; viem's default is 4 s).
+- The integration test (`lib/chain/escrow.anvil.test.ts`) uses anvil on `:8546`, starting one if
+  none is running, and skips when anvil or `contracts/out` is missing. It stands in for the live
+  Base Sepolia test until the escrow is deployed.
+- `origin/e0-foundation` had committed a gitlink for `.claude/worktrees/agent-a44bbe6f…`, which
+  broke `git submodule update`; removed on this branch.
+
+- **Manual resource route, no `withX402`.** `app/api/x402/credit/[creditId]` calls
+  `handleCreditRequest` (`lib/x402/server.ts`), which builds the v2 challenge itself and calls the
+  facilitator's `verify` then `settle` directly (`HTTPFacilitatorClient`). This lets the 409 run
+  before any quote and gives the handler the settle tx hash to sign and store the receipt.
+  `@x402/next` and `@x402/paywall` are not installed.
+- **Order in the handler:** unknown credit → 404; already settled (`tx_hash` and `receipt` set) →
+  the stored receipt, 200, before the freshness check, so a receipt stays readable after its screen
+  ages out; outcome not `paid`/`capped`, or no `status 200` `address` screen of the payee (matched
+  case-insensitively) within 10 min → 409 `NOT_PAYABLE`; no `PAYMENT-SIGNATURE` → 402.
+- **The server re-checks the payment against the credit** (`accepted` scheme, network, asset,
+  payTo, amount, and the signed authorization's `to` and `value`) before it calls the facilitator,
+  and passes its own requirements, not the client's copy, to `verify` and `settle`. Failures come
+  back as a 402 whose `error` is `CHALLENGE_MISMATCH`, `INVALID_PAYMENT` or the facilitator's reason.
+- **Challenge differs from DESIGN §10 as the x402 v2 CONFIRM says:** `resource` is the top-level
+  `{url, description}`; each accept carries `maxTimeoutSeconds: 120` and
+  `extra: {name:"USDC", version:"2"}`. `resource.url` is built from `APP_URL`, not `req.url`.
+- **Receipt:** `{creditId, package, amount, payee, tx}`, `amount` in micro-USDC as a string, signed
+  with `RECEIPT_SIGNING_KEY` by `signMessage` over the JSON with sorted keys; `sig` and `signer`
+  added. The client checks the signature, `creditId`, `payee` and that `tx` equals the
+  `PAYMENT-RESPONSE` transaction.
+- **Client spend controls are off (`setSpendControls(false)`), not `{maxAmountPerPayment:false}`.**
+  With an object, the library's default-asset allowlist rejects a wrong token before our hook runs,
+  so the refusal would be a library error instead of `TOKEN_PIN`. Our `onBeforePaymentCreation` hook
+  is the gate. Only `eip155:84532` is registered; a challenge on another network fails selection
+  and is mapped to `CHALLENGE_MISMATCH`, and the hook checks the network too.
+- **Extra client checks beyond DESIGN §10:** `extra` must be `{name:"USDC", version:"2"}` with no
+  `assetTransferMethod` other than `eip3009`, and `maxTimeoutSeconds` must be 1 to 120; else
+  `CHALLENGE_MISMATCH`.
+- **New message `NOT_PAYABLE`** ("Not paid: this credit has no fresh paid decision to pay
+  against."): the 409 body and the client refusal when `decisionAllowsPay` is false.
+- **Smoke run (26 Sep):** `scripts/x402-smoke.ts` paid 0.01 USDC from the payer to
+  `0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13` through `https://x402.org/facilitator`, tx
+  `0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`, block 47293505, status 1,
+  `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
+  receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
+  `Transfer` log instead.
+=======
+- **Ledger.** One line per tool call at most. A Bash install wins over Bash reads. Reads pulled out
+  of Bash become `{t:"read", ps:[…]}` (up to 20 paths), only from segments whose command is a reader
+  (`cat head tail less more grep egrep rg ag find fd ls tree sed awk wc bat file stat jq`), so
+  `rm -rf node_modules/x` is not a read. Grep/Glob use `path`, then `pattern`.
+- `start` keeps the first snapshot when a session resumes (SessionStart fires again on
+  resume/clear/compact).
+- **Settle.** The hook writes `<id>.end.json` (`endedAt`, `cwd`) and spawns a detached
+  `endcredits settle --session <id>`, returning in ~90 ms. On success the child writes
+  `<id>.done.json` and deletes the ledger, start and end files; a later retry reopens the same roll
+  without uploading. On failure everything is kept and the error goes to `errors.log`. A session
+  with no installed package used uploads nothing. The opened URL must be on the configured `apiUrl`
+  origin, else `{apiUrl}/credits/<id>` is opened. `ENDCREDITS_NO_OPEN=1` skips the tab.
+- **Timing.** The bundled `record` process, node boot included, takes ~36 ms on a 1 MB Write.
+- **repoLabel** is the `name` in `cwd/package.json`, omitted when absent. Never a path.
+- **Docs mapping.** A `homepage` on a shared host (github.com, gitlab.com, bitbucket.org,
+  npmjs.com, unpkg.com, cdn.jsdelivr.net) is not a host match; a GitHub homepage counts as the repo
+  URL. unpkg and jsdelivr also match `/<name>/…` and `/<name>`. An ambiguous match is sent as
+  evidence `ambiguous <url>`. "Name in the path" checks the full name or the part after the scope.
+- **dep_added** follows DESIGN §5 literally: `(end − start) ∪ add lines`, so an install command for a
+  package already present still counts once. `import` sends no evidence (file hashes stay local).
+- **session_key** = `keccak256` of the UTF-8 bytes of the `sessions.id` uuid string (viem
+  `keccak256(stringToBytes(id))`).
+- **POST /api/sessions** answers 201 when created, 200 with the same `{id, url}` on a re-upload.
+  Idempotency is the `(owner_id, claude_session_id)` unique key with `ON CONFLICT DO NOTHING`, one
+  path for retries and races. Errors are machine codes (`unauthorized`, `invalid_body`,
+  `invalid_json`, `too_large`), not UI text. Body ≤ 2 MB; evidence ≤ cap entries of ≤ 512 chars.
+- **GET /api/sessions/:id**: amounts via `formatUnits(micro, 6)` (`"0.25"`), payee `0x1234…5678`,
+  404 for a non-uuid id. `credits` is empty until the settler writes them.
+- CLI output lives in `CLI_MESSAGES` in `lib/messages.ts`, apart from the DESIGN §11 codes.
+- `next dev` rewrites the repo `AGENTS.md` (Next 16 `agentRules`). Not changed here; revert it or
+  set `agentRules: false` in `next.config.ts`.
