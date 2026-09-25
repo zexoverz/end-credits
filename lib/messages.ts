@@ -39,6 +39,8 @@ export const MESSAGES = {
   PR_OPENED:
     "Pull request #{number} opened. Merge it to claim; merging is the proof that you control this repository.",
   PR_WAITING: "Waiting for #{number} to be merged.",
+  PR_LINK:
+    "Your GitHub sign-in cannot write to {repo}. Open the prefilled FUNDING.json on GitHub, commit it to {branch}, then check again.",
   FUNDING_MISMATCH: "FUNDING.json on {branch} names {found}, not your wallet {expected}.",
   CLAIM_REFUSED: "This address cannot receive funds. Intercepta: {description}",
   CLAIMED: "Claimed {amount} USDC to {address}.",
