@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Page } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api, type ApiResult } from "@/lib/client/api";
 import {
   blocker,
   claimPath,
@@ -32,12 +32,12 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
   const [loadError, setLoadError] = useState<string | null>(null);
   const [claim, setClaim] = useState<ClaimView | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+  const [waiting, setWaiting] = useState(false);
   const [walletNotice, setWalletNotice] = useState<Notice | null>(null);
   const [prNotice, setPrNotice] = useState<Notice | null>(null);
   const [statusNotice, setStatusNotice] = useState<Notice | null>(null);
 
-  const load = useCallback(async () => {
-    const r = await api<PackageSummary>(summaryPath(name));
+  const apply = useCallback((r: ApiResult<PackageSummary>): PackageSummary | null => {
     if (!r.ok) {
       setLoadError(r.status === 404 ? claimCopy("NOT_FOUND") : claimCopy("LOAD_FAILED", { error: r.error }));
       return null;
@@ -45,7 +45,9 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
     setSummary(r.data);
     setClaim(r.data.claim);
     return r.data;
-  }, [name]);
+  }, []);
+
+  const load = useCallback(async () => apply(await api<PackageSummary>(summaryPath(name))), [name, apply]);
 
   const check = useCallback(
     async (method: "GET" | "POST") => {
@@ -64,13 +66,15 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
   // First load; an open claim asks the status once so its message shows.
   useEffect(() => {
     let live = true;
-    load().then((s) => {
-      if (live && s?.claim && MOVING.has(s.claim.status)) void check("GET");
+    api<PackageSummary>(summaryPath(name)).then((r) => {
+      if (!live) return;
+      const s = apply(r);
+      if (s?.claim && MOVING.has(s.claim.status)) void check("GET");
     });
     return () => {
       live = false;
     };
-  }, [load, check]);
+  }, [name, apply, check]);
 
   const polling = shouldPoll(claim);
   useEffect(() => {
@@ -95,16 +99,21 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
     }
   };
 
-  const onPasskey = () =>
-    run("wallet", async () => {
-      try {
-        const address = await connectPasskey();
-        if (!address) return setWalletNotice({ tone: "error", text: walletErrorText(null), code: "wallet" });
-        await postWallet(address);
-      } catch (e) {
-        setWalletNotice({ tone: "error", text: walletErrorText(e), code: "wallet" });
-      }
-    });
+  // Not tied to `busy`: a closed popup may never answer, and the button or the typed address must
+  // still work after that.
+  const onPasskey = async () => {
+    setWaiting(true);
+    setWalletNotice(null);
+    try {
+      const address = await connectPasskey();
+      if (!address) return setWalletNotice({ tone: "error", text: walletErrorText(null), code: "wallet" });
+      await run("wallet", () => postWallet(address));
+    } catch (e) {
+      setWalletNotice({ tone: "error", text: walletErrorText(e), code: "wallet" });
+    } finally {
+      setWaiting(false);
+    }
+  };
 
   const onPr = () =>
     run("pr", async () => {
@@ -141,8 +150,9 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
             claim={claim}
             done={st.wallet === "done"}
             busy={busy === "wallet"}
+            waiting={waiting}
             notice={walletNotice}
-            onPasskey={onPasskey}
+            onPasskey={() => void onPasskey()}
             onAddress={(a) => void run("wallet", () => postWallet(a))}
           />
         </Step>

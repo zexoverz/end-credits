@@ -54,12 +54,13 @@ type WalletProps = {
   claim: ClaimView | null;
   done: boolean;
   busy: boolean;
+  waiting: boolean;
   notice: Notice | null;
   onPasskey: () => void;
   onAddress: (address: string) => void;
 };
 
-export function WalletStep({ claim, done, busy, notice, onPasskey, onAddress }: WalletProps) {
+export function WalletStep({ claim, done, busy, waiting, notice, onPasskey, onAddress }: WalletProps) {
   const [typed, setTyped] = useState("");
   const [invalid, setInvalid] = useState(false);
   if (done && claim?.wallet) {
@@ -79,7 +80,7 @@ export function WalletStep({ claim, done, busy, notice, onPasskey, onAddress }: 
     <>
       <p className="text-muted">{claimCopy("WALLET_WHY")}</p>
       <Button onClick={onPasskey} disabled={busy}>
-        {busy ? claimCopy("WALLET_CONNECTING") : claimCopy("WALLET_BUTTON")}
+        {waiting ? claimCopy("WALLET_CONNECTING") : claimCopy("WALLET_BUTTON")}
       </Button>
       <div className="space-y-1">
         <label htmlFor="wallet-address" className="block text-muted">
