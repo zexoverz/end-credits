@@ -305,4 +305,81 @@ contract EndCreditsEscrowTest is Test {
         escrow.claim(PKG);
         assertEq(usdc.balanceOf(maintainerA), AMOUNT);
     }
+
+    // --------------------------------------------------------------- claim
+
+    function test_claim_paysClaimedPayeeAndZeroes() public {
+        _reserve(AMOUNT);
+        _setClaim(maintainerA);
+
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Claimed(PKG, maintainerA, AMOUNT);
+        vm.prank(stranger);
+        escrow.claim(PKG);
+
+        assertEq(usdc.balanceOf(maintainerA), AMOUNT);
+        assertEq(usdc.balanceOf(stranger), 0);
+        assertEq(escrow.reserved(PKG), 0);
+        assertEq(escrow.totalReserved(), 0);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function test_claim_revertsWithoutClaim() public {
+        _reserve(AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NoClaim.selector, PKG));
+        escrow.claim(PKG);
+    }
+
+    function test_claim_revertsWhenNothingReserved() public {
+        _setClaim(maintainerA);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NothingReserved.selector, PKG));
+        escrow.claim(PKG);
+    }
+
+    function test_claim_revertsAfterReserveDrained() public {
+        _reserve(AMOUNT);
+        _setClaim(maintainerA);
+        escrow.claim(PKG);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NothingReserved.selector, PKG));
+        escrow.claim(PKG);
+    }
+
+    function test_claim_firstSetClaimHasNoDelay() public {
+        _reserve(AMOUNT);
+        _setClaim(maintainerA);
+        (, uint64 changedAt, bool changed) = escrow.claims(PKG);
+        assertFalse(changed);
+        assertEq(changedAt, 0);
+
+        escrow.claim(PKG);
+        assertEq(usdc.balanceOf(maintainerA), AMOUNT);
+    }
+
+    function test_claim_revertsDuringCoolingAfterChange() public {
+        _reserve(AMOUNT);
+        _setClaim(maintainerA);
+        vm.warp(block.timestamp + 1 hours);
+        _setClaim(maintainerB);
+        uint64 until = uint64(block.timestamp) + DELAY;
+
+        (, uint64 changedAt, bool changed) = escrow.claims(PKG);
+        assertTrue(changed);
+        assertEq(changedAt, uint64(block.timestamp));
+
+        vm.warp(until - 1);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.ClaimCoolingDown.selector, PKG, until));
+        escrow.claim(PKG);
+    }
+
+    function test_claim_succeedsAfterCooling() public {
+        _reserve(AMOUNT);
+        _setClaim(maintainerA);
+        _setClaim(maintainerB);
+        vm.warp(block.timestamp + DELAY);
+
+        escrow.claim(PKG);
+        assertEq(usdc.balanceOf(maintainerB), AMOUNT);
+        assertEq(usdc.balanceOf(maintainerA), 0);
+        assertEq(escrow.reserved(PKG), 0);
+    }
 }
