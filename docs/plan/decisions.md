@@ -335,3 +335,57 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
   receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
   `Transfer` log instead.
+## E7
+
+- **Layout.** The orchestration is `lib/settle/` (`settle.ts`, `store.ts`, `run.ts`, `expire.ts`,
+  production wiring in `deps.ts`); `worker/settler.ts` and `worker/expirer.ts` are thin loops.
+  Every outside call is a dependency, so `settle.test.ts` runs on Postgres with fakes and
+  `settle.anvil.test.ts` runs the real escrow calls on anvil `:8547`.
+- **Claim:** one `update … where id = (select … for update skip locked limit 1) returning id`,
+  oldest `settle_requested_at` first.
+- **Daily limit:** "today" is the UTC calendar day of `credits.decided_at`; spent is the sum of
+  `amount_micro` over the owner's credits with outcome `paid`, `capped`, `held` or `reserved`,
+  executed or not (a failed execution still counts, so a retry can never exceed the limit).
+  B ≤ 0 → every credit `dust` with `DAILY_LIMIT`, session `settled`, no `recordSession` (as in the
+  §7 pseudo-code).
+- **Scores** are recomputed from `usage` with the §5 weights and caps (`lib/settle/scores.ts`); the
+  CLI's caps are not trusted. Roles as in §5: top 3 starring, else the lead signal.
+- **Two phases.** Phase 1 (concurrency 3): registry, payee, change detection, `noCodeOnBase` for
+  every non-dust credit. Phase 2 (concurrency 3, amount desc): screen, decide, store, execute. The
+  split is needed because the spam rule counts payees across the whole session.
+- **Rows first.** All credits are inserted with outcome null before any lookup, so the roll lists
+  every package at once. Dust shares get `dust` + `DUST` at insert and are never resolved. `tip_id`
+  is set on every row at insert.
+- **Lookup failure** (registry, GitHub, claim read, push time, or mainnet RPC throwing twice) →
+  `refused` with a new `RESOLVE_FAILED` reason. Held needs a payee and reserved means "no wallet",
+  so neither fits; refusing keeps the money with the owner.
+- **Screen that throws** (e.g. the `screens` insert fails) → a screen with `error: "HTTP"` → held.
+- **Lookalike** compares against every payee observed for any other package (claims included, as
+  claims are observations too), read from `payee_observations`.
+- **Change detection** passes GitHub push times only for `drips` (`FUNDING.json`) and `tea`
+  (`tea.yaml`) payees.
+- **Execution failure keeps the decision.** The outcome stays; `tx_hash` stays null; a reason is
+  appended: the x402 refusal code when the client refused (`PAYTO_MISMATCH`, `NOT_PAYABLE`, …),
+  else a new `EXECUTION_FAILED` with the error's name only (messages can carry RPC URLs). A paid
+  credit that already has a `tx_hash` is never paid again.
+- **recordSession totals** count only executed amounts for paid (paid + capped), held and reserved;
+  refused counts decided amounts. The manifest is the credits (package, amount as a micro-USDC
+  string, outcome, payee, tx) sorted by package, canonical JSON with sorted keys, keccak256.
+  `ownerHash` = `owners.sub_hash`, else `keccak256(utf8(owner.id))`. A `recordSession` failure
+  marks the session `failed` (credits already executed stay executed).
+- **Holds row** `expires_at` = decision time + `hold_ttl_seconds` (the chain's own `expiresAt` is a
+  few seconds later, so the expirer never refunds early).
+- **Expirer:** every 30 s, `pending` holds with `expires_at < now` → `refund(tipId)` from the
+  recorder → `expired`, `refund_tx`, `resolved_at`, and `EXPIRED` appended to the credit. A failed
+  refund leaves the hold pending for the next tick.
+- **`POST /api/sessions/:id/settle`:** 404 unknown id, 401 no owner, 403 another owner's session,
+  409 unless `status = 'uploaded'` and `settle_requested_at` is null (one conditional update, so two
+  presses race safely), else 202. The owner comes from the `ec_owner` iron-session cookie
+  (`{ownerId}`, password `SESSION_SECRET`, `lib/auth/owner.ts`), or from
+  `Authorization: Bearer <OWNER_DEV_TOKEN>` (constant-time compare) while `WORLD_REQUIRED` is not
+  `true`. `getOwnerSession(req)` reads through `webCookies(req)`; without a request it uses Next's
+  `cookies()`.
+- **Seed:** owner matched by `display_name`; the agent key is created only with `--write-config`,
+  and skipped when `~/.endcredits/config.json` already holds a live key of that owner. The token is
+  never printed. Approval runs when `ESCROW_ADDRESS` is set and the allowance is under 1000 USDC.
+- **New messages:** `RESOLVE_FAILED`, `EXECUTION_FAILED` (43 codes).
