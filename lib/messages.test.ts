@@ -16,7 +16,7 @@ describe("msg", () => {
     );
   });
 
-  it("has every code from DESIGN §11", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(38);
+  it("has every code from DESIGN §11, plus IMPERSONATION (decisions.md, E4)", () => {
+    expect(Object.keys(MESSAGES)).toHaveLength(39);
   });
 });
