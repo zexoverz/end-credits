@@ -125,3 +125,36 @@ changed, `days` from the push. Two consequences:
   the cap" and the two cap cases; replacing `amount < DUST_FLOOR` with `false` fails "never sends a
   nonzero amount under the dust floor" and the two dust cases. Removing the 30-day window in
   `recentlyChanged` fails "last seen over 30 days ago is not a change".
+## E1
+
+- **Ledger.** One line per tool call at most. A Bash install wins over Bash reads. Reads pulled out
+  of Bash become `{t:"read", ps:[…]}` (up to 20 paths), only from segments whose command is a reader
+  (`cat head tail less more grep egrep rg ag find fd ls tree sed awk wc bat file stat jq`), so
+  `rm -rf node_modules/x` is not a read. Grep/Glob use `path`, then `pattern`.
+- `start` keeps the first snapshot when a session resumes (SessionStart fires again on
+  resume/clear/compact).
+- **Settle.** The hook writes `<id>.end.json` (`endedAt`, `cwd`) and spawns a detached
+  `endcredits settle --session <id>`, returning in ~90 ms. On success the child writes
+  `<id>.done.json` and deletes the ledger, start and end files; a later retry reopens the same roll
+  without uploading. On failure everything is kept and the error goes to `errors.log`. A session
+  with no installed package used uploads nothing. The opened URL must be on the configured `apiUrl`
+  origin, else `{apiUrl}/credits/<id>` is opened. `ENDCREDITS_NO_OPEN=1` skips the tab.
+- **Timing.** The bundled `record` process, node boot included, takes ~36 ms on a 1 MB Write.
+- **repoLabel** is the `name` in `cwd/package.json`, omitted when absent. Never a path.
+- **Docs mapping.** A `homepage` on a shared host (github.com, gitlab.com, bitbucket.org,
+  npmjs.com, unpkg.com, cdn.jsdelivr.net) is not a host match; a GitHub homepage counts as the repo
+  URL. unpkg and jsdelivr also match `/<name>/…` and `/<name>`. An ambiguous match is sent as
+  evidence `ambiguous <url>`. "Name in the path" checks the full name or the part after the scope.
+- **dep_added** follows DESIGN §5 literally: `(end − start) ∪ add lines`, so an install command for a
+  package already present still counts once. `import` sends no evidence (file hashes stay local).
+- **session_key** = `keccak256` of the UTF-8 bytes of the `sessions.id` uuid string (viem
+  `keccak256(stringToBytes(id))`).
+- **POST /api/sessions** answers 201 when created, 200 with the same `{id, url}` on a re-upload.
+  Idempotency is the `(owner_id, claude_session_id)` unique key with `ON CONFLICT DO NOTHING`, one
+  path for retries and races. Errors are machine codes (`unauthorized`, `invalid_body`,
+  `invalid_json`, `too_large`), not UI text. Body ≤ 2 MB; evidence ≤ cap entries of ≤ 512 chars.
+- **GET /api/sessions/:id**: amounts via `formatUnits(micro, 6)` (`"0.25"`), payee `0x1234…5678`,
+  404 for a non-uuid id. `credits` is empty until the settler writes them.
+- CLI output lives in `CLI_MESSAGES` in `lib/messages.ts`, apart from the DESIGN §11 codes.
+- `next dev` rewrites the repo `AGENTS.md` (Next 16 `agentRules`). Not changed here; revert it or
+  set `agentRules: false` in `next.config.ts`.

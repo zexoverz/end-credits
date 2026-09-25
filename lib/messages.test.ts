@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MESSAGES, msg } from "./messages";
+import { MESSAGES, cliMsg, msg } from "./messages";
 
 describe("msg", () => {
   it("fills every placeholder", () => {
@@ -24,5 +24,14 @@ describe("msg", () => {
     expect(msg("SPOOF_REPO", { repo: "prettier/prettier", package: "prettier-plus" })).toBe(
       "Reserved: prettier/prettier does not publish prettier-plus.",
     );
+  });
+});
+
+describe("cliMsg", () => {
+  it("formats CLI strings with the same placeholder rule", () => {
+    expect(cliMsg("ROLLING", { url: "https://x/credits/1" })).toBe(
+      "End Credits: rolling credits at https://x/credits/1",
+    );
+    expect(() => cliMsg("ROLLING", {})).toThrow("Missing message var: url in ROLLING");
   });
 });

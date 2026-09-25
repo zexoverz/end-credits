@@ -19,3 +19,9 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
 | T2.6 | `lib/payee/push.ts`, `lib/payee/push.test.ts`, `lib/payee/change.ts`, `lib/payee/change.test.ts`, `docs/plan/decisions.md` (Activity API CONFIRM) | pending review |
 | T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |
+| T1.2 | `cli/src/init.ts`, `cli/src/config.ts`, `cli/src/paths.ts`, `cli/src/args.ts`, `cli/src/index.ts`, their tests, `lib/messages.ts` (CLI strings) | pending review |
+| T1.4 | `lib/attribution/specifier.ts`, `lib/attribution/specifier.test.ts` | pending review |
+| T1.3 | `cli/src/start.ts`, `cli/src/record.ts`, `cli/src/bash.ts`, `cli/src/hook.ts`, `lib/attribution/types.ts`, their tests, `cli/src/hooks.process.test.ts` | pending review |
+| T1.5 | `lib/attribution/score.ts`, `lib/attribution/docs.ts`, `lib/attribution/score.test.ts` | pending review |
+| T1.6 | `cli/src/attribute.ts`, `cli/src/settle.ts`, `cli/src/fixture.ts`, `cli/src/index.ts`, their tests | pending review |
+| T1.7 | `lib/sessions/schema.ts`, `lib/sessions/auth.ts`, `lib/sessions/ingest.ts`, `lib/sessions/view.ts`, `app/api/sessions/route.ts`, `app/api/sessions/[id]/route.ts`, `lib/sessions/schema.test.ts`, `app/api/sessions/sessions.test.ts` | pending review |
