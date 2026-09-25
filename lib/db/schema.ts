@@ -247,6 +247,7 @@ export const claims = pgTable(
     screenId: uuid("screen_id").references(() => screens.id),
     setClaimTx: text("set_claim_tx"),
     claimTxs: text("claim_txs").array().notNull().default(sql`'{}'::text[]`),
+    claimedMicro: micro("claimed_micro"),
     status: text().notNull().default("started"),
     failureCode: text("failure_code"),
     createdAt: createdAt(),

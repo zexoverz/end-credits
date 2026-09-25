@@ -15,6 +15,13 @@
       "when": 1790354364763,
       "tag": "0001_screens_impersonation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790355938802,
+      "tag": "0002_claim_amount",
+      "breakpoints": true
     }
   ]
 }
