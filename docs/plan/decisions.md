@@ -123,3 +123,30 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
 - FUNDING.json (prettier, TanStack/query, vitest): `{"drips":{"ethereum":{"ownedBy":"0x…"}}}`. Drips
   also reads other network keys (`filecoin`, `optimism`, …); we read `ethereum` first, then any other
   `drips.*.ownedBy`.
+
+## E6 chain
+
+- **MultiBaas link:** `curvegrid/forge-multibaas` pinned at `8e84d1ca7db1240dcf7c1646d26c4fbcbb95a54d`
+  (24 Mar 2025, the latest commit), remapped `forge-multibaas/=lib/forge-multibaas/src/`. `ffi` is
+  not in `foundry.toml`; the deploy passes `--ffi` on the command line.
+- `Deploy.s.sol` links only when `MULTIBAAS_URL` is set **and** the run is a broadcast
+  (`vm.isContext(ScriptBroadcast)`), so a dry run never links an address that was not sent. Label
+  `endcredits_escrow`, alias `escrow`, version `1.0`, starting block `-100`.
+- **The plugin swallows link errors:** with a bad URL the script logs
+  `Link Contract: Error during validation: ...` and still exits 0 (tested on anvil). The deploy log
+  has to be read for that line. The link also runs during simulation, before the tx is sent, so a
+  failed broadcast after a good link leaves a MultiBaas address with no contract; re-run with
+  `MULTIBAAS_ALLOW_UPDATE_ADDRESS=true`.
+- **Tx queue:** every write is simulated first (inside the queue, after the previous tx from that
+  key is mined), so a revert is named from the custom error before anything is signed. Nonce comes
+  from `getTransactionCount(blockTag: "pending")`; one retry on `nonce too low` with a fresh nonce.
+  If a mined tx reverts anyway, the call is replayed at `blockNumber - 1` to name the error, else
+  `unknown`. Errors are `TxRevertedError` with `errorName`.
+- `refund` and `claim` are sent from the recorder key (DESIGN §2), though the contract lets anyone
+  call them after expiry / always.
+- Receipt polling is 1 s by default (Base Sepolia blocks are 2 s; viem's default is 4 s).
+- The integration test (`lib/chain/escrow.anvil.test.ts`) uses anvil on `:8546`, starting one if
+  none is running, and skips when anvil or `contracts/out` is missing. It stands in for the live
+  Base Sepolia test until the escrow is deployed.
+- `origin/e0-foundation` had committed a gitlink for `.claude/worktrees/agent-a44bbe6f…`, which
+  broke `git submodule update`; removed on this branch.
