@@ -2,7 +2,7 @@
 // The film screen (SPEC §12.1): title, rows by role, totals once settled, NOT_A_PAYWALL footer.
 import type { ReactNode } from "react";
 import { txUrl } from "@/lib/client/format";
-import { canRoll, fill, groupByRole, totals, totalsLine } from "@/lib/client/roll";
+import { canRoll, fill, groupByRole, statusLine, totals, totalsLine } from "@/lib/client/roll";
 import { ROLL_COPY } from "@/lib/copy/roll";
 import { msg } from "@/lib/messages";
 import type { SessionView } from "@/lib/sessions/view";
@@ -24,7 +24,7 @@ function Film({ children }: { children: ReactNode }) {
 
 function Credits({ view, refresh }: { view: SessionView; refresh: () => void }) {
   const groups = groupByRole(view.credits);
-  const status = ROLL_COPY.STATUS[view.status as keyof typeof ROLL_COPY.STATUS];
+  const status = statusLine(view);
   return (
     <>
       {status && <p className="mb-6 text-center text-sm text-white/50">{status}</p>}

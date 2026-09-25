@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ROLL_COPY } from "../copy/roll";
 import type { CreditView } from "../sessions/view";
 import {
   canRoll,
@@ -8,6 +9,7 @@ import {
   isLive,
   settleResult,
   signalLine,
+  statusLine,
   toMicro,
   totals,
   totalsLine,
@@ -97,6 +99,14 @@ describe("canRoll", () => {
     expect(canRoll({ status: "uploaded", settleRequested: false })).toBe(true);
     expect(canRoll({ status: "uploaded", settleRequested: true })).toBe(false);
     expect(canRoll({ status: "settling", settleRequested: true })).toBe(false);
+  });
+});
+
+describe("statusLine", () => {
+  it("says the roll was requested between the press and the settler starting", () => {
+    expect(statusLine({ status: "uploaded", settleRequested: true })).toBe(ROLL_COPY.ROLL_REQUESTED);
+    expect(statusLine({ status: "uploaded", settleRequested: false })).toBe(ROLL_COPY.STATUS.uploaded);
+    expect(statusLine({ status: "weird", settleRequested: false })).toBeNull();
   });
 });
 

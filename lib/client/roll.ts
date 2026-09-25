@@ -109,6 +109,12 @@ export function settleResult(status: number, error = ""): SettleResult {
   return { kind: "error", text: fill(ROLL_COPY.ROLL_FAILED, { error: error || `HTTP ${status}` }) };
 }
 
+/** The line under the title: the status, or "requested" between the press and the settler starting. */
+export function statusLine(view: Pick<SessionView, "status" | "settleRequested">): string | null {
+  if (view.status === "uploaded" && view.settleRequested) return ROLL_COPY.ROLL_REQUESTED;
+  return ROLL_COPY.STATUS[view.status as keyof typeof ROLL_COPY.STATUS] ?? null;
+}
+
 /** The Roll credits button shows only before anyone asked the settler to start. */
 export function canRoll(view: Pick<SessionView, "status" | "settleRequested">): boolean {
   return view.status === "uploaded" && !view.settleRequested;
