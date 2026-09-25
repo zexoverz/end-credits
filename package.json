@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "worker": "tsx worker/index.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "next": "16.3.6",
