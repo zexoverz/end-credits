@@ -134,9 +134,14 @@ export function attribute(input: AttributeInput): PackageAttribution[] {
     const version = input.installed[name].version;
     scored.push({ name, ...(version ? { version } : {}), signals, score });
   }
-  scored.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : 1));
-  return scored.map((p, i) => ({
-    ...p,
-    role: i < STARRING ? "starring" : ROLE_OF[leadSignal(p.signals)],
-  }));
+  return rank(scored);
+}
+
+/** Highest score first; the top three star, the rest take the role of their lead signal. */
+export function rank<T extends { name: string; score: number; signals: Partial<Record<Signal, SignalUse>> }>(
+  scored: T[],
+): (T & { role: Role })[] {
+  return [...scored]
+    .sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : 1))
+    .map((p, i) => ({ ...p, role: i < STARRING ? "starring" : ROLE_OF[leadSignal(p.signals)] }));
 }
