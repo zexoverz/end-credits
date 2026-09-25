@@ -37,6 +37,8 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | E7 seed | `scripts/seed.ts` (run twice against a local Postgres; `--write-config` not run) | pending review |
 | T8.2 backend | `lib/history/history.ts`, `lib/history/history.test.ts`, `app/api/history/route.ts`, `lib/money.ts` | pending review |
 | T8.3 backend | `lib/auth/owner.ts`, `lib/auth/dev.ts`, their tests, `app/api/auth/{dev,logout}/route.ts`, `lib/owner/*`, `app/api/owner/**`, `lib/approve/*`, `app/api/approve/[tipId]/**`, `lib/__fixtures__/owner-db.ts`, `docs/plan/decisions.md` (E8 backend) | pending review |
+| T8.1 frontend | `app/credits/[id]/{page,roll,credit-row,roll-button}.tsx`, `app/credits/[id]/use-session.ts`, `lib/client/roll.ts`, `lib/client/roll.test.ts`, `lib/copy/roll.ts`, `lib/sessions/view.ts` (main signal, `settleRequested`), `lib/sessions/view.test.ts`, `docs/plan/decisions.md` (E8 frontend) | pending review |
+| T8.2 frontend | `app/history/{page,history,history-row}.tsx`, `lib/copy/history.ts` | pending review |
 | T9.1 | `lib/multibaas/queries.ts`, `lib/multibaas/queries.test.ts`, `scripts/multibaas-setup.ts` (not run yet: no MultiBaas deployment), `docs/plan/decisions.md` (E9) | pending review |
 | T9.2 backend | `lib/multibaas/client.ts`, `rows.ts`, `dashboard.ts`, `repo.ts`, `deps.ts`, their tests, `lib/multibaas/__fixtures__/dashboard.ts`, `app/api/dashboard/route.ts` | pending review |
 | T9.3 | `lib/multibaas/webhook.ts`, `lib/multibaas/webhook.test.ts`, `lib/multibaas/repo.ts` (webhook repo), `app/api/webhooks/multibaas/route.ts` | pending review |

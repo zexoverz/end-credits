@@ -620,6 +620,20 @@ payment. Found while wiring E7.
   require both); `verification_uri_complete` and `interval` in the device response; `aud` shape;
   the production portal URL.
 
+## E8 frontend: roll and history
+
+- **Main signal.** `GET /api/sessions/:id` now carries `signal: {signal, count}` per credit: the
+  usage row with the largest `WEIGHT × count`, the heavier signal on a tie. The roll shows it as
+  "import · 6".
+- **`settleRequested`** is added to the session view, so the **Roll credits** button hides once
+  anyone pressed it and the status line reads "Rolling requested" until the settler moves the
+  session to `settling`. The button shows for any `uploaded` session; the settle route decides
+  (401 links to `/owner`, 403 and 409 show their line).
+- **Totals line** appears only once `settled`. Paid counts `paid` and `capped`; held, reserved
+  and refused count their own outcome; dust and undecided rows are left out. "Refused W" is a
+  count of refused credits, not an amount, since refused money never leaves the owner.
+- **Polling** every 1 s while `uploaded` or `settling`; stops on `settled`, `failed` or 404. A
+  5xx or network error keeps the last view on screen, shows the error and keeps retrying.
 ## E8/E9 frontend: dashboard and landing
 
 - `/dashboard` is a server page around one client view. It fetches `/api/dashboard` on load, every
