@@ -133,6 +133,23 @@ contract EndCreditsEscrow {
         usdc.safeTransfer(payee, amount);
     }
 
+    /// @notice Return a pending tip to its payer. The recorder may do so any time (a deny);
+    /// anyone may once the tip has expired.
+    function refund(bytes32 tipId) external {
+        Tip storage tip = tips[tipId];
+        if (tip.status != TipStatus.Pending) revert NotPending(tipId);
+        bool expired = block.timestamp >= tip.expiresAt;
+        if (msg.sender != recorder && !expired) revert NotExpired(tipId);
+
+        uint256 amount = tip.amount;
+        address payer = tip.payer;
+        tip.status = TipStatus.Refunded;
+        totalPending -= amount;
+
+        emit Refunded(tipId, payer, amount, expired);
+        usdc.safeTransfer(payer, amount);
+    }
+
     function tipOf(bytes32 tipId) external view returns (Tip memory) {
         return tips[tipId];
     }
