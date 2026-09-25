@@ -108,4 +108,72 @@ contract EndCreditsEscrowTest is Test {
         vm.stopPrank();
         assertEq(escrow.totalPending(), 2 * AMOUNT);
     }
+
+    // ------------------------------------------------------------- release
+
+    function test_release_paysFixedPayee() public {
+        _hold();
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Released(TIP, payee, AMOUNT, APPROVAL);
+
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL);
+
+        assertEq(usdc.balanceOf(payee), AMOUNT);
+        assertEq(usdc.balanceOf(recorder), 0);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+        assertEq(escrow.totalPending(), 0);
+        assertEq(uint8(_status(TIP)), uint8(EndCreditsEscrow.TipStatus.Released));
+    }
+
+    function test_release_revertsForNonRecorder() public {
+        _hold();
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
+        vm.prank(payee);
+        escrow.release(TIP, APPROVAL);
+
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
+        vm.prank(payer);
+        escrow.release(TIP, APPROVAL);
+    }
+
+    function test_release_revertsAfterExpiry() public {
+        uint64 expiresAt = _hold();
+        vm.warp(expiresAt);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.TipExpired.selector, TIP));
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL);
+    }
+
+    function test_release_succeedsJustBeforeExpiry() public {
+        uint64 expiresAt = _hold();
+        vm.warp(expiresAt - 1);
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL);
+        assertEq(usdc.balanceOf(payee), AMOUNT);
+    }
+
+    function test_release_revertsTwice() public {
+        _hold();
+        vm.startPrank(recorder);
+        escrow.release(TIP, APPROVAL);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
+        escrow.release(TIP, APPROVAL);
+        vm.stopPrank();
+    }
+
+    function test_release_revertsAfterRefund() public {
+        _hold();
+        vm.startPrank(recorder);
+        escrow.refund(TIP);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
+        escrow.release(TIP, APPROVAL);
+        vm.stopPrank();
+    }
+
+    function test_release_revertsForUnknownTip() public {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL);
+    }
 }
