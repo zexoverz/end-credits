@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent worktrees, contract deps and bundled CLI output are not our source.
+    ".claude/**",
+    "contracts/lib/**",
+    "contracts/out/**",
+    "cli/dist/**",
   ]),
 ]);
 
