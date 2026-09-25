@@ -584,8 +584,10 @@ payment. Found while wiring E7.
   `approvals.nonce` is unique, and without it a retry of the same tip (after CANCELLED or
   STALE_AUTH) would hash to the same nonce. `amount` is micro-USDC as a decimal string.
   `approvalRef = keccak256(utf8(nonce))`.
-- **Sealed secrets:** the approval's PKCE verifier (10 min) and the device code are sealed with
-  iron-session's `sealData` under `SESSION_SECRET`; no separate AES helper. The sign-in's state,
+- **Sealed secrets:** the approval's PKCE verifier and the device code are sealed with E10's
+  `lib/crypto/seal.ts` (AES-256-GCM, key from `SESSION_SECRET`). A started approval is good for
+  10 minutes from `started_at` (then `STALE_AUTH` before any token call); a device session until
+  its `expires_at`. The sign-in's state,
   nonce and verifier live in the `ec_world` iron-session cookie (10 min, httpOnly, sameSite lax,
   path `/api/auth/world`), cleared on the callback whatever happens.
 - **Owner binding:** first World sign-in binds the first owner row (`created_at`, the same one dev
