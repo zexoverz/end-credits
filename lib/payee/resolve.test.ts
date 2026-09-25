@@ -32,7 +32,10 @@ const pkg: PackageRef = {
   funding: [{ url: `ethereum:${NPM}` }],
 };
 
+const ownPackageJson = { [`${RAW}/package.json`]: JSON.stringify({ name: "demo" }) };
+
 const allFiles = {
+  ...ownPackageJson,
   [`${RAW}/FUNDING.json`]: fixture("tanstack-query.FUNDING.json"),
   [`${RAW}/tea.yaml`]: fixture("zod.tea.yaml"),
 };
@@ -45,7 +48,7 @@ function deps(files: Record<string, string | number>, claim: string | null = nul
     claimed,
     d: {
       store,
-      fetch: fakeFetch(files),
+      fetch: fakeFetch({ ...ownPackageJson, ...files }),
       claimOf: async (key: `0x${string}`) => {
         claimed.push(key);
         return claim as `0x${string}` | null;
@@ -150,5 +153,69 @@ describe("resolvePayee GitHub fetch", () => {
   it("a GitHub error other than 404 throws instead of reading as none", async () => {
     const { d } = deps({ [`${RAW}/FUNDING.json`]: 502 });
     await expect(resolvePayee(pkg, d)).rejects.toThrow("502");
+  });
+});
+
+describe("resolvePayee anti-spoof (T2.5)", () => {
+  const prettierRaw = "https://raw.githubusercontent.com/prettier/prettier/HEAD";
+  const spoof: PackageRef = {
+    id: "pkg-spoof",
+    name: "prettier-plus",
+    repoFullName: "prettier/prettier",
+    repoDirectory: null,
+    funding: [{ url: `ethereum:${NPM}` }],
+  };
+  const prettierFiles = {
+    [`${prettierRaw}/package.json`]: fixture("prettier.package.json"),
+    [`${prettierRaw}/FUNDING.json`]: fixture("prettier.FUNDING.json"),
+  };
+
+  it("a repo whose package.json names another package is reserved with SPOOF_REPO", async () => {
+    const { d, store } = deps(prettierFiles);
+    expect(await resolvePayee(spoof, d)).toEqual({
+      address: null,
+      reason: "SPOOF_REPO",
+      vars: { repo: "prettier/prettier", package: "prettier-plus" },
+    });
+    expect(store.rows).toEqual([]);
+  });
+
+  it("the real package passes", async () => {
+    const { d } = deps(prettierFiles);
+    expect(await resolvePayee({ ...spoof, name: "prettier" }, d)).toMatchObject({
+      address: "0x3A39F5E9BFe0a90e394982492e166C5635893141",
+      source: "drips",
+    });
+  });
+
+  it("reads package.json under repository.directory", async () => {
+    const { d } = deps({
+      [`${RAW}/packages/demo/package.json`]: JSON.stringify({ name: "demo" }),
+      [`${RAW}/package.json`]: JSON.stringify({ name: "other" }),
+      [`${RAW}/FUNDING.json`]: fixture("tanstack-query.FUNDING.json"),
+    });
+    expect(await resolvePayee({ ...pkg, repoDirectory: "packages/demo" }, d)).toMatchObject({
+      source: "drips",
+    });
+  });
+
+  it("no package.json at the declared place is SPOOF_REPO", async () => {
+    const { d } = deps({ [`${RAW}/FUNDING.json`]: fixture("tanstack-query.FUNDING.json") });
+    expect(await resolvePayee({ ...pkg, repoDirectory: "packages/gone" }, d)).toMatchObject({
+      reason: "SPOOF_REPO",
+    });
+  });
+
+  it("a private workspace root cannot be checked and passes (colinhacks/zod)", async () => {
+    const { d } = deps({
+      [`${RAW}/package.json`]: fixture("zod-root.package.json"),
+      [`${RAW}/tea.yaml`]: fixture("zod.tea.yaml"),
+    });
+    expect(await resolvePayee({ ...pkg, name: "zod" }, d)).toMatchObject({ source: "tea" });
+  });
+
+  it("a claim is not subject to the repo check", async () => {
+    const { d } = deps(prettierFiles, CLAIM);
+    expect(await resolvePayee(spoof, d)).toMatchObject({ source: "claim" });
   });
 });
