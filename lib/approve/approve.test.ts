@@ -84,6 +84,7 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
   it("concurrent approves release once", async () => {
     const seeded = await seedHold(db, s, ownerId);
     const chain = fakeChain();
+    chain.delayMs = 100;
     const results = await Promise.all([1, 2, 3].map(() => start(seeded.tipId, chain)));
     expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409]);
     expect(chain.calls.release).toHaveLength(1);

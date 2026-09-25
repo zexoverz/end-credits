@@ -130,8 +130,11 @@ export function fakeChain() {
   const chain = {
     calls,
     fail: null as Error | null,
+    /** Simulated mining time, so concurrent callers overlap. */
+    delayMs: 0,
     async release(tipId: Hex, approvalRef: Hex): Promise<Hex> {
       if (chain.fail) throw chain.fail;
+      await new Promise((r) => setTimeout(r, chain.delayMs));
       calls.release.push([tipId, approvalRef]);
       return tx();
     },
