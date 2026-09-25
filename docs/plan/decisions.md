@@ -373,8 +373,8 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   string, outcome, payee, tx) sorted by package, canonical JSON with sorted keys, keccak256.
   `ownerHash` = `owners.sub_hash`, else `keccak256(utf8(owner.id))`. A `recordSession` failure
   marks the session `failed` (credits already executed stay executed).
-- **Holds row** `expires_at` = decision time + `hold_ttl_seconds` (the chain's own `expiresAt` is a
-  few seconds later, so the expirer never refunds early).
+- **Holds row** `expires_at` = the time the `hold` tx returned + `hold_ttl_seconds`, so it is at or
+  after the chain's `expiresAt` (block time + TTL) and the expirer does not refund early.
 - **Expirer:** every 30 s, `pending` holds with `expires_at < now` → `refund(tipId)` from the
   recorder → `expired`, `refund_tx`, `resolved_at`, and `EXPIRED` appended to the credit. A failed
   refund leaves the hold pending for the next tick.
