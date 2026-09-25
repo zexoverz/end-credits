@@ -16,8 +16,8 @@ describe("msg", () => {
     );
   });
 
-  it("has every code from DESIGN §11, plus SPOOF_REPO (T2.5) IMPERSONATION (E4) and NOT_PAYABLE (E5)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(41);
+  it("has every code from DESIGN §11, plus SPOOF_REPO (T2.5) IMPERSONATION (E4), NOT_PAYABLE (E5), RESOLVE_FAILED and EXECUTION_FAILED (E7)", () => {
+    expect(Object.keys(MESSAGES)).toHaveLength(43);
   });
 
   it("names the repo and package in SPOOF_REPO", () => {
