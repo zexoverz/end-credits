@@ -161,6 +161,44 @@ contract EndCreditsEscrow {
         usdc.safeTransferFrom(msg.sender, address(this), amount);
     }
 
+    /// @notice Set or change the package's payee. The first set is not a change; a later set to a
+    /// different payee starts `changeDelay`, during which `claim` is blocked.
+    function setClaim(bytes32 packageKey, address payee, bytes32 evidence) external onlyRecorder {
+        if (payee == address(0)) revert ZeroPayee();
+
+        Claim storage c = claims[packageKey];
+        address previous = c.payee;
+        if (previous != address(0) && previous != payee) {
+            c.changed = true;
+            c.changedAt = uint64(block.timestamp);
+        }
+        c.payee = payee;
+
+        emit ClaimSet(packageKey, payee, previous, evidence);
+    }
+
+    /// @notice Send the package's whole reserve to its claimed payee. Anyone may call.
+    function claim(bytes32 packageKey) external {
+        Claim memory c = claims[packageKey];
+        if (c.payee == address(0)) revert NoClaim(packageKey);
+        if (c.changed) {
+            uint64 until = c.changedAt + changeDelay;
+            if (block.timestamp < until) revert ClaimCoolingDown(packageKey, until);
+        }
+        uint256 amount = reserved[packageKey];
+        if (amount == 0) revert NothingReserved(packageKey);
+
+        reserved[packageKey] = 0;
+        totalReserved -= amount;
+
+        emit Claimed(packageKey, c.payee, amount);
+        usdc.safeTransfer(c.payee, amount);
+    }
+
+    function claimOf(bytes32 packageKey) external view returns (address) {
+        return claims[packageKey].payee;
+    }
+
     function tipOf(bytes32 tipId) external view returns (Tip memory) {
         return tips[tipId];
     }
