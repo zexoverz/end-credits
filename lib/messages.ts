@@ -45,9 +45,40 @@ export const MESSAGES = {
 
 export type MessageCode = keyof typeof MESSAGES;
 
-export function msg(code: MessageCode, vars: Record<string, string | number> = {}): string {
-  return MESSAGES[code].replace(/\{(\w+)\}/g, (_, name: string) => {
+// The `endcredits` CLI's own output (E1). Kept apart from the §11 codes above.
+export const CLI_MESSAGES = {
+  USAGE:
+    "Usage: endcredits init [--global] | key <token> [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run]",
+  INIT_ADDED: "End Credits hooks added to {path}.",
+  INIT_UNCHANGED: "End Credits hooks are already in {path}.",
+  INIT_INVALID: "Could not read {path} as JSON. Left it unchanged.",
+  KEY_SAVED: "Agent key saved to {path}.",
+  KEY_INVALID: "Could not save the agent key: {error}",
+  KEY_MISSING: "No agent key yet. Run: endcredits key <token>",
+  SESSION_REQUIRED: "Pass --session <id>.",
+  NO_LEDGER: "No ledger for session {id}.",
+  ROLLING: "End Credits: rolling credits at {url}",
+  UPLOAD_FAILED:
+    "End Credits: upload failed ({error}). The ledger is kept; retry with: endcredits settle --session {id}",
+  NOTHING_USED: "No installed packages were used in session {id}.",
+  TABLE_HEADER: "package|version|role|score|signals",
+} as const;
+
+export type CliMessageCode = keyof typeof CLI_MESSAGES;
+
+type Vars = Record<string, string | number>;
+
+function format(template: string, code: string, vars: Vars): string {
+  return template.replace(/\{(\w+)\}/g, (_, name: string) => {
     if (!(name in vars)) throw new Error(`Missing message var: ${name} in ${code}`);
     return String(vars[name]);
   });
+}
+
+export function msg(code: MessageCode, vars: Vars = {}): string {
+  return format(MESSAGES[code], code, vars);
+}
+
+export function cliMsg(code: CliMessageCode, vars: Vars = {}): string {
+  return format(CLI_MESSAGES[code], code, vars);
 }
