@@ -486,6 +486,75 @@ Nothing below has been run against a deployment yet; the UNVERIFIED items are wh
 Address screens are reused for 5 minutes, token screens for 1 hour. The x402 route refuses to pay on
 an address screen older than 10 minutes, so a 1 hour reuse would decide `paid` and then fail at
 payment. Found while wiring E7.
+## E10
+
+### CONFIRM: GitHub endpoints (26 Sep, docs.github.com read through r.jina.ai)
+
+- OAuth web flow: `GET https://github.com/login/oauth/authorize` with `client_id`, `redirect_uri`,
+  `scope`, `state`, and PKCE `code_challenge` + `code_challenge_method=S256` (only S256 is
+  supported). `POST https://github.com/login/oauth/access_token` with `client_id`,
+  `client_secret`, `code`, `redirect_uri`, `code_verifier`; `Accept: application/json` returns
+  `{access_token, scope, token_type}`. A bad code answers 200 with `{error}`, so we check for
+  `access_token`, not the status. The code lives 10 minutes. We use state and PKCE.
+- REST, header `X-GitHub-Api-Version: 2026-03-10` (the version in today's docs):
+  `GET /user` (`id`, `login`); `GET /repos/{o}/{r}` (`default_branch`, `permissions`);
+  `GET /repos/{o}/{r}/git/ref/heads/{branch}` (`object.sha`); `POST /repos/{o}/{r}/git/refs`
+  `{ref: "refs/heads/…", sha}` (201, 422 when it exists); `GET|PUT /repos/{o}/{r}/contents/{path}`
+  (`?ref=`; PUT takes base64 `content`, `message`, `branch`, and `sha` when replacing a file);
+  `POST /repos/{o}/{r}/pulls` `{title, body, head, base}` (201, 422 when one is open for the
+  head); `GET /repos/{o}/{r}/pulls?head=owner:branch&state=open`; `GET /repos/{o}/{r}/pulls/{n}`
+  (`merged`, `merge_commit_sha`: after a merge, the merge or squash commit on the base branch).
+- **Scope:** the scopes page says `public_repo` gives read/write to code in public repos, but the
+  contents PUT page says "OAuth app tokens … need the `repo` scope". We ask for `public_repo`
+  (the research in confirm-b §6) and rely on the fallback: any 403 or 404 in the PR steps gives
+  the new-file link. Not verified with a live OAuth App token yet.
+- **New-file link** `https://github.com/{repo}/new/{base}?filename=FUNDING.json&value=<urlencoded>`:
+  `filename` and `value` are not in GitHub's docs (the "creating new files" page and the PR
+  query-parameter page do not list them). Behaviour known from use, not confirmed here.
+
+### Choices
+
+- **Routes.** Next.js throws "Catch-all must be the last part of the URL", so
+  `/api/claim/[...name]/wallet` cannot exist. One route `app/api/claim/[...slug]` takes the action
+  as the last segment: `POST …/<name>/wallet`, `POST …/<name>/pr`, `GET|POST …/<name>/status`.
+  Scoped names work unencoded (`/api/claim/@scope/pkg/status`).
+- **Session:** iron-session cookie `ec_maint` (SESSION_SECRET, 24 h, httpOnly, SameSite=Lax,
+  Secure on https). It holds the OAuth `state`, PKCE verifier and `pkg` during sign-in, then
+  `maintainerId`. POSTs with a foreign `Origin` get 403.
+- **Token at rest:** AES-256-GCM, key = HKDF-SHA256(SESSION_SECRET, info `endcredits:seal:v1`),
+  stored `v1.<iv>.<ct>.<tag>`. Set to null once the claim is `claimed`; after that the status
+  reads use `GITHUB_TOKEN_READ` (optional) or go unauthenticated.
+- **ALREADY_PAYABLE** runs `resolvePayee` (claim, FUNDING.json, tea.yaml, npm funding); a payee
+  whose source is `claim` does not block, anything else does. The page summary runs it with a
+  no-op observation store so a page view writes nothing.
+- **PR step is re-runnable:** an existing branch (422) is reused, the file is only written when it
+  differs, and a 422 on the PR looks up the open PR for `owner:endcredits/funding-json`.
+  Non-403/404 GitHub errors are 502 `github_error`, not the fallback.
+- **New message `PR_LINK`** for the fallback. PR title and body are repository content, kept in
+  `lib/github/claim.ts`, not `lib/messages.ts`.
+- **Status machine:** `wallet` → `pr_open` → `merged` (api mode, PR merged) → `verified` (FUNDING.json
+  on the default branch names the wallet) → `claimed` or `refused`. In new-file-link mode the
+  file alone is the proof; `merged_sha` then holds the default branch head at verification.
+  A mismatch keeps the status and sets `failure_code = FUNDING_MISMATCH`. A refusal stores the
+  Intercepta description in `failure_code` so repeat reads show the same message.
+- **Screen:** Intercepta quick scan only (not `screenPayee`: no amount or token here). Refused on a
+  `CRITICAL` trait or `toxicScore > 50`, the matrix's thresholds. Any failure, including a missing
+  `INTERCEPTA_API_KEY`, answers `SCREEN_UNAVAILABLE` and stops before `setClaim`; the next check
+  retries.
+- **Evidence** = `keccak256(utf8(repo + sha))`, `sha` the merge commit (or branch head, link mode).
+- **Payout:** every `packages` row with the same `repo_full_name` and `reserved > 0` on chain;
+  `setClaim` is skipped when the chain already names the wallet; `ClaimCoolingDown` answers
+  `COOLING` with `changedAt + changeDelay` and keeps status `verified`; `NothingReserved` (a
+  concurrent check won) is skipped. A package whose npm `repository` wrongly points at this repo
+  would also be claimed by the repo's maintainer; the money goes to the real repo owner, so this
+  is left as is.
+- **`claims.claimed_micro`** (migration `0002_claim_amount`) stores the claimed total, so repeat
+  status calls answer `CLAIMED` with the same amount without re-reading receipts.
+  `set_claim_tx` keeps the first setClaim tx; `claim_txs` every claim tx.
+- **`GET /api/npm/<name>`** reads `reserved(packageKey)`, `claims(packageKey)` and `changeDelay()`
+  from the escrow directly (MultiBaas is on E9). A failed read puts `chain` or `payee` in
+  `errors` and leaves the value null. `sessions` counts distinct sessions with a `reserved`
+  credit for the package. A package not in our table is read from npm and not stored.
 
 ## E11
 
