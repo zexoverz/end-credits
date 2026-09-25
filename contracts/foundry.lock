@@ -1,4 +1,7 @@
 {
+  "lib/forge-multibaas": {
+    "rev": "8e84d1c"
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.16.2",
