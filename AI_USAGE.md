@@ -67,3 +67,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T9.2 (frontend) | `app/dashboard/page.tsx`, `app/dashboard/dashboard-view.tsx`, `app/dashboard/sections.tsx`, `lib/client/dashboard.ts`, `lib/client/dashboard.test.ts`, `lib/copy/dashboard.ts`, `docs/plan/decisions.md` (E8/E9 frontend) | pending review |
 | T8.4 | `app/page.tsx`, `lib/copy/landing.ts` | pending review |
 | fix-stale-rpc | `lib/chain/txqueue.ts`, `lib/chain/txqueue.test.ts`, `docs/plan/decisions.md` (Stale RPC reads) | pending review |
+| live fixes (26 Sep) | `scripts/multibaas-setup.ts`, `lib/multibaas/client.ts`, `lib/multibaas/rows.ts` (+tests), `lib/intercepta/cache.ts` (+test), `lib/sessions/view.ts`, `lib/attribution/score.ts`, `lib/client/roll.ts`, `vitest.config.ts`, `eslint.config.mjs`, `app/dashboard/dashboard-view.tsx`; each found by running against the live deployment | pending review |
+| frontend base | `app/layout.tsx`, `app/globals.css`, `components/ui.tsx`, `lib/client/api.ts`, `lib/client/format.ts`, `next.config.ts` | pending review |
