@@ -7,6 +7,8 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | Ticket | Files written or changed with AI | Reviewed by the builder |
 |---|---|---|
 | plan | `docs/plan/*` drafted with Claude from the builder's research and decisions | every section |
+| T6.1 | `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules`, `contracts/src/EndCreditsEscrow.sol`, `contracts/test/mocks/MockUSDC.sol`, `contracts/script/Deploy.s.sol`, `docs/plan/decisions.md` | pending review |
+| T6.2 | `contracts/test/EndCreditsEscrow.t.sol`, `contracts/test/EndCreditsEscrow.invariant.t.sol`, `docs/plan/decisions.md` (mutation table) | pending review |
 | T0.1 | `package.json`, `pnpm-workspace.yaml`, `app/*` (create-next-app output), `cli/package.json`, `cli/src/index.ts`, `worker/index.ts`, `vitest.config.ts`, `.gitignore` | pending review |
 | T0.2 | `app/api/health/route.ts`; Railway project, services and domain set up by the agent through the Railway MCP | pending review |
 | T0.3 | `lib/db/schema.ts`, `lib/db/client.ts`, `drizzle.config.ts`, `drizzle/0000_init.sql` | pending review |
@@ -32,3 +34,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T4.5 | `lib/decision/types.ts`, `matrix.ts`, `lookalike.ts`, their tests, `lib/messages.ts` (`IMPERSONATION`) | pending review |
 | T4.6 | `lib/decision/spam.ts`, `spam.test.ts` | pending review |
 | T4.7 | `lib/decision/no-code.ts`, `no-code.test.ts` | pending review |
+| T6.3 prep | `contracts/script/Deploy.s.sol` (MultiBaas link), `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules` (`forge-multibaas`), `docs/plan/decisions.md`; no Base Sepolia deploy yet | pending review |
+| T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
