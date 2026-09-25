@@ -190,6 +190,59 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
   `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
   receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
   `Transfer` log instead.
+## E9
+
+Sources: `@curvegrid/multibaas-sdk` 1.1.1 types and docs (`npm pack`), the live pages
+`docs.curvegrid.com/multibaas/webhooks/` and `/event-indexing/` (26 Sep), and the CONFIRM-B notes.
+Nothing below has been run against a deployment yet; the UNVERIFIED items are what
+`scripts/multibaas-setup.ts` step (d) checks first.
+
+- **Plain fetch, no SDK.** `lib/multibaas/client.ts`: `Authorization: Bearer`, `/api/v0`, unwraps
+  `{status, message, result}`, 8 s deadline, typed `MultiBaasError` (`timeout`, `network`, `http`,
+  `envelope`, `parse`). The key is never in a message.
+- **`PUT /queries/{label}` takes the `EventQuery` itself** as the body (SDK `setEventQuery(label,
+  eventQuery2: EventQuery)`), not `{query}`.
+- **Six saved queries, not five.** `paid_totals`, `held_status`, `reserved_by_package`,
+  `reserved_sessions`, `sessions`, `recent` (`lib/multibaas/queries.ts`). `reserved_sessions`
+  exists because there is no distinct aggregator and the package table needs sessions per package.
+- **No nested filters anywhere.** Each event has one flat filter. `paid_totals` filters
+  `Transfer.from == payer` (checksummed) and selects `contract_address_alias`; rows from any token
+  other than `usdc` and transfers to the escrow (hold / reserve funding) are dropped in code.
+- **No count aggregator:** every count is taken from rows. Non-aggregated queries are read in pages
+  of 1000 until a short page (at most 10 pages, then an error rather than a truncated sum).
+- **One alias set per query, lowercase snake case,** so multi-event queries line up column by
+  column, and in case aliases come back lowercased. `event_signature` is selected to tell events
+  apart; `held_status` puts `expiresAt` / `approvalRef` / `expired` in one `detail` column and only
+  reads Refunded's (denied vs expired). `recent` leaves out `ClaimSet` (no amount).
+- **Values are parsed strictly:** amounts must be whole base units (`"123"`, `123`, `"123.000"`);
+  bytes32 and addresses must be hex. Anything else is a `parse` error → 503. No type conversions
+  may be set on the `usdc` or `escrow` labels, or amounts stop being base units.
+- **Dashboard (`/api/dashboard`)**: paid = sum and count of payer → anyone-but-escrow USDC
+  transfers; projects = distinct package keys paid (tx hash → `credits.tx_hash` → package) or ever
+  reserved; held = per tip, Released → approved, Refunded → denied / expired, else pending; refused
+  = `credits.outcome = 'refused'` count, `source: "decision_log"`; reserved = `reserved_by_package`
+  balances > 0. A payer transfer with no matching credit (the x402 smoke test) counts in paid but
+  maps to no package.
+- **Cache 60 s** (TICKETS says 15 s; 60 s because of the free plan's 30k calls a month: one refresh
+  is 6 calls). Invalidated when the webhook stores an escrow event; failures are not cached. The
+  route answers 503 `{error: "multibaas_unavailable", kind, detail}`; a DB failure is
+  `dashboard_unavailable`.
+- **Webhook (`/api/webhooks/multibaas`)**: HMAC-SHA256 over the exact body bytes then the timestamp
+  string, `timingSafeEqual`, timestamps more than 300 s off either way → 401. The body is read with
+  `arrayBuffer()`, not `text()`, so the bytes are exactly what was signed. Kept: items whose
+  `contract.addressLabel` (or `addressAlias`, the SDK's name for it) is `escrow` and whose name is
+  Held, Released, Refunded, Reserved, Claimed or SessionSettled; everything else is dropped before
+  any DB call. De-dup key `webhook_events.event_id = <txHash lowercase>:<indexInLog>`; the MultiBaas
+  delivery id is kept in the payload as `multibaasId`. Insert and notification run in one
+  transaction. Held → a `held` notification for every owner whose `payer_address` equals
+  `Held.payer`, with `hold_id` when the settler has already written the hold row.
+- **UNVERIFIED until run live:** event names as `eventName` (`"Transfer"`, not the signature);
+  filter value case for addresses; mixed input types in one alias column (`detail`); `orderBy` on an
+  alias in a non-aggregated union; value formats in rows (uint256 as string, bytes32 as hex);
+  whether `limit=1000` is honoured; the webhook's `addressLabel` field on this version; whether
+  redeliveries keep the same `id` (the de-dup key does not depend on it).
+- `scripts/multibaas-setup.ts` was not run: `~/.config/dominion/multibaas-url` and
+  `multibaas-key` do not exist yet and the escrow is not deployed.
 ## E8 backend
 
 - **Owner auth (`lib/auth/owner.ts`).** iron-session cookie `ec_owner` = `{ownerId}`, password
