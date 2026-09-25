@@ -25,6 +25,7 @@ const columns = {
   ownerId: sessions.ownerId,
   sessionId: sessions.id,
   packageName: packages.name,
+  packageKey: packages.packageKey,
 };
 
 function query(d: Db, tipId: Hex) {

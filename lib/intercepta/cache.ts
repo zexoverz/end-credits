@@ -1,7 +1,9 @@
-// 1 h reuse of `screens` rows by (kind, subject, chain_id) (DESIGN §9). Only successful calls are
-// reused; a failed call is retried next time.
+// Reuse of `screens` rows by (kind, subject, chain_id) (DESIGN §9). Only successful calls are
+// reused; a failed call is retried next time. Token screens live 1 h; address screens only 5 min,
+// because the x402 route refuses to pay on an address screen older than 10 min.
 
 export const CACHE_TTL_MS = 60 * 60 * 1000;
+export const ADDRESS_TTL_MS = 5 * 60 * 1000;
 
 export type ScreenKind = "address" | "token" | "simulation" | "impersonation";
 
@@ -31,5 +33,6 @@ export async function freshScreen(
 ): Promise<StoredScreen | null> {
   const row = await repo.latestOk(key);
   if (!row || row.status !== 200) return null;
-  return now.getTime() - row.fetchedAt.getTime() < CACHE_TTL_MS ? row : null;
+  const ttl = key.kind === "address" ? ADDRESS_TTL_MS : CACHE_TTL_MS;
+  return now.getTime() - row.fetchedAt.getTime() < ttl ? row : null;
 }

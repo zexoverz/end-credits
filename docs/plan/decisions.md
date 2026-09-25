@@ -190,6 +190,299 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
   `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
   receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
   `Transfer` log instead.
+## E7
+
+- **Layout.** The orchestration is `lib/settle/` (`settle.ts`, `store.ts`, `run.ts`, `expire.ts`,
+  production wiring in `deps.ts`); `worker/settler.ts` and `worker/expirer.ts` are thin loops.
+  Every outside call is a dependency, so `settle.test.ts` runs on Postgres with fakes and
+  `settle.anvil.test.ts` runs the real escrow calls on anvil `:8547`.
+- **Claim:** one `update … where id = (select … for update skip locked limit 1) returning id`,
+  oldest `settle_requested_at` first.
+- **Daily limit:** "today" is the UTC calendar day of `credits.decided_at`; spent is the sum of
+  `amount_micro` over the owner's credits with outcome `paid`, `capped`, `held` or `reserved`,
+  executed or not (a failed execution still counts, so a retry can never exceed the limit).
+  B ≤ 0 → every credit `dust` with `DAILY_LIMIT`, session `settled`, no `recordSession` (as in the
+  §7 pseudo-code).
+- **Scores** are recomputed from `usage` with the §5 weights and caps (`lib/settle/scores.ts`); the
+  CLI's caps are not trusted. Roles as in §5: top 3 starring, else the lead signal.
+- **Two phases.** Phase 1 (concurrency 3): registry, payee, change detection, `noCodeOnBase` for
+  every non-dust credit. Phase 2 (concurrency 3, amount desc): screen, decide, store, execute. The
+  split is needed because the spam rule counts payees across the whole session.
+- **Rows first.** All credits are inserted with outcome null before any lookup, so the roll lists
+  every package at once. Dust shares get `dust` + `DUST` at insert and are never resolved. `tip_id`
+  is set on every row at insert.
+- **Lookup failure** (registry, GitHub, claim read, push time, or mainnet RPC throwing twice) →
+  `refused` with a new `RESOLVE_FAILED` reason. Held needs a payee and reserved means "no wallet",
+  so neither fits; refusing keeps the money with the owner.
+- **Screen that throws** (e.g. the `screens` insert fails) → a screen with `error: "HTTP"` → held.
+- **Lookalike** compares against every payee observed for any other package (claims included, as
+  claims are observations too), read from `payee_observations`.
+- **Change detection** passes GitHub push times only for `drips` (`FUNDING.json`) and `tea`
+  (`tea.yaml`) payees.
+- **Execution failure keeps the decision.** The outcome stays; `tx_hash` stays null; a reason is
+  appended: the x402 refusal code when the client refused (`PAYTO_MISMATCH`, `NOT_PAYABLE`, …),
+  else a new `EXECUTION_FAILED` with the error's name only (messages can carry RPC URLs). A paid
+  credit that already has a `tx_hash` is never paid again.
+- **recordSession totals** count only executed amounts for paid (paid + capped), held and reserved;
+  refused counts decided amounts. The manifest is the credits (package, amount as a micro-USDC
+  string, outcome, payee, tx) sorted by package, canonical JSON with sorted keys, keccak256.
+  `ownerHash` = `owners.sub_hash`, else `keccak256(utf8(owner.id))`. A `recordSession` failure
+  marks the session `failed` (credits already executed stay executed).
+- **Holds row** `expires_at` = the time the `hold` tx returned + `hold_ttl_seconds`, so it is at or
+  after the chain's `expiresAt` (block time + TTL) and the expirer does not refund early.
+- **Expirer:** every 30 s, `pending` holds with `expires_at < now` → `refund(tipId)` from the
+  recorder → `expired`, `refund_tx`, `resolved_at`, and `EXPIRED` appended to the credit. A failed
+  refund leaves the hold pending for the next tick.
+- **`POST /api/sessions/:id/settle`:** 404 unknown id, 401 no owner, 403 another owner's session,
+  409 unless `status = 'uploaded'` and `settle_requested_at` is null (one conditional update, so two
+  presses race safely), else 202. The owner comes from the `ec_owner` iron-session cookie
+  (`{ownerId}`, password `SESSION_SECRET`, `lib/auth/owner.ts`), or from
+  `Authorization: Bearer <OWNER_DEV_TOKEN>` (constant-time compare) while `WORLD_REQUIRED` is not
+  `true`. `getOwnerSession(req)` reads through `webCookies(req)`; without a request it uses Next's
+  `cookies()`.
+- **Seed:** owner matched by `display_name`; the agent key is created only with `--write-config`,
+  and skipped when `~/.endcredits/config.json` already holds a live key of that owner. The token is
+  never printed. Approval runs when `ESCROW_ADDRESS` is set and the allowance is under 1000 USDC.
+- **New messages:** `RESOLVE_FAILED`, `EXECUTION_FAILED` (43 codes).
+## E8 backend
+
+- **Owner auth (`lib/auth/owner.ts`).** iron-session cookie `ec_owner` = `{ownerId}`, password
+  `SESSION_SECRET`, 7-day ttl, `httpOnly`, `sameSite=lax`, `secure` in production. Handlers read
+  and write it through iron-session's `webCookies(req, headers)`, so they run in tests without a
+  Next request scope; `getOwnerSession()` / `requireOwner()` with no argument read Next's
+  `cookies()`. `requireOwner` also checks the owner row still exists.
+- **Dev login.** `OWNER_DEV_TOKEN` is compared as `timingSafeEqual(sha256(a), sha256(b))`, so length
+  does not leak. Both the cookie login and the dev bearer bind to the first owner row
+  (`created_at`, then `id`) and are off when `WORLD_REQUIRED=true` (login answers 403). No rate
+  limit on `/api/auth/dev`; the token is 32+ random bytes.
+- **One release per tip.** Approve and deny lock the hold row (`FOR UPDATE OF holds`) for the whole
+  call, chain tx included. A second click waits, then sees the hold resolved and gets 409. A chain
+  error rolls the transaction back (hold stays `pending`, credit stays `held`) and answers 502 with
+  the custom error name; approve then writes a `failed` approval row with that code.
+- Checks in order: owner (401), `WORLD_REQUIRED` for session approve (403), tip id shape and the
+  hold belonging to this owner (404, so a tip id of someone else's hold is not confirmed), status
+  `pending` (409), not expired (410). **Deny after expiry is also 410**: the expirer refunds it and
+  appends `EXPIRED`.
+- The session approval row is written once, `status 'approved'`, after the release is mined, with
+  `nonce` = 32 random bytes and `approvalRef = keccak256(nonce)` sent to `release`.
+- Owner decisions are appended to `credits.reasons` with `source: "owner"` (a fourth source next to
+  `intercepta`, `policy`, `payee`). Approve sets `outcome 'paid'`, `tx_hash` = release tx,
+  `settled_at`; deny keeps `outcome 'held'` and the hold tx in `tx_hash`, and the refund tx goes to
+  `holds.refund_tx`.
+- **`GET /api/approve/:tipId` is public**, like the roll: the package, amount and reason are on the
+  roll already; it adds the full payee (what is being approved) and whether the viewer is signed in
+  and is the owner. `status` is `expired` once `expires_at` passes, before the expirer runs.
+- **`GET /api/history` is public**, payees shortened as on the roll, every decided credit
+  (`decided_at` set) newest first, 200 max. `txUrl` is a Basescan link only for a 32-byte hash.
+- **Settings bounds:** budget and cap 0.01 to 100 USDC, daily limit 0.01 to 1000, at most 6
+  decimals, strings only; hold TTL 60 s to 7 days (the escrow's `MIN_TTL`/`MAX_TTL`); the cap may
+  not exceed the session budget (checked against the stored row under a lock).
+- **Payer balance:** read with a 5 s timeout; any failure is `error: "rpc_unavailable"`, never the
+  RPC message, which can carry the provider URL.
+- **Agent keys:** `ec_` + 32 random bytes base64url, shown once; `agent_keys.token_hash` is its
+  sha256 hex (the hash `POST /api/sessions` checks). `bound_via 'dev'`. Revoking someone else's key
+  is 404; revoking twice keeps the first time.
+## E9
+
+Sources: `@curvegrid/multibaas-sdk` 1.1.1 types and docs (`npm pack`), the live pages
+`docs.curvegrid.com/multibaas/webhooks/` and `/event-indexing/` (26 Sep), and the CONFIRM-B notes.
+Nothing below has been run against a deployment yet; the UNVERIFIED items are what
+`scripts/multibaas-setup.ts` step (d) checks first.
+
+- **Plain fetch, no SDK.** `lib/multibaas/client.ts`: `Authorization: Bearer`, `/api/v0`, unwraps
+  `{status, message, result}`, 8 s deadline, typed `MultiBaasError` (`timeout`, `network`, `http`,
+  `envelope`, `parse`). The key is never in a message.
+- **`PUT /queries/{label}` takes the `EventQuery` itself** as the body (SDK `setEventQuery(label,
+  eventQuery2: EventQuery)`), not `{query}`.
+- **Six saved queries, not five.** `paid_totals`, `held_status`, `reserved_by_package`,
+  `reserved_sessions`, `sessions`, `recent` (`lib/multibaas/queries.ts`). `reserved_sessions`
+  exists because there is no distinct aggregator and the package table needs sessions per package.
+- **No nested filters anywhere.** Each event has one flat filter. `paid_totals` filters
+  `Transfer.from == payer` (checksummed) and selects `contract_address_alias`; rows from any token
+  other than `usdc` and transfers to the escrow (hold / reserve funding) are dropped in code.
+- **No count aggregator:** every count is taken from rows. Non-aggregated queries are read in pages
+  of 1000 until a short page (at most 10 pages, then an error rather than a truncated sum).
+- **One alias set per query, lowercase snake case,** so multi-event queries line up column by
+  column, and in case aliases come back lowercased. `event_signature` is selected to tell events
+  apart; `held_status` puts `expiresAt` / `approvalRef` / `expired` in one `detail` column and only
+  reads Refunded's (denied vs expired). `recent` leaves out `ClaimSet` (no amount).
+- **Values are parsed strictly:** amounts must be whole base units (`"123"`, `123`, `"123.000"`);
+  bytes32 and addresses must be hex. Anything else is a `parse` error → 503. No type conversions
+  may be set on the `usdc` or `escrow` labels, or amounts stop being base units.
+- **Dashboard (`/api/dashboard`)**: paid = sum and count of payer → anyone-but-escrow USDC
+  transfers; projects = distinct package keys paid (tx hash → `credits.tx_hash` → package) or ever
+  reserved; held = per tip, Released → approved, Refunded → denied / expired, else pending; refused
+  = `credits.outcome = 'refused'` count, `source: "decision_log"`; reserved = `reserved_by_package`
+  balances > 0. A payer transfer with no matching credit (the x402 smoke test) counts in paid but
+  maps to no package.
+- **Cache 60 s** (TICKETS says 15 s; 60 s because of the free plan's 30k calls a month: one refresh
+  is 6 calls). Invalidated when the webhook stores an escrow event; failures are not cached. The
+  route answers 503 `{error: "multibaas_unavailable", kind, detail}`; a DB failure is
+  `dashboard_unavailable`.
+- **Webhook (`/api/webhooks/multibaas`)**: HMAC-SHA256 over the exact body bytes then the timestamp
+  string, `timingSafeEqual`, timestamps more than 300 s off either way → 401. The body is read with
+  `arrayBuffer()`, not `text()`, so the bytes are exactly what was signed. Kept: items whose
+  `contract.addressLabel` (or `addressAlias`, the SDK's name for it) is `escrow` and whose name is
+  Held, Released, Refunded, Reserved, Claimed or SessionSettled; everything else is dropped before
+  any DB call. De-dup key `webhook_events.event_id = <txHash lowercase>:<indexInLog>`; the MultiBaas
+  delivery id is kept in the payload as `multibaasId`. Insert and notification run in one
+  transaction. Held → a `held` notification for every owner whose `payer_address` equals
+  `Held.payer`, with `hold_id` when the settler has already written the hold row.
+- **UNVERIFIED until run live:** event names as `eventName` (`"Transfer"`, not the signature);
+  filter value case for addresses; mixed input types in one alias column (`detail`); `orderBy` on an
+  alias in a non-aggregated union; value formats in rows (uint256 as string, bytes32 as hex);
+  whether `limit=1000` is honoured; the webhook's `addressLabel` field on this version; whether
+  redeliveries keep the same `id` (the de-dup key does not depend on it).
+- `scripts/multibaas-setup.ts` was not run: `~/.config/dominion/multibaas-url` and
+  `multibaas-key` do not exist yet and the escrow is not deployed.
+
+## Screen age (26 Sep)
+
+Address screens are reused for 5 minutes, token screens for 1 hour. The x402 route refuses to pay on
+an address screen older than 10 minutes, so a 1 hour reuse would decide `paid` and then fail at
+payment. Found while wiring E7.
+
+- **Owner auth (`lib/auth/owner.ts`).** iron-session cookie `ec_owner` = `{ownerId}`, password
+  `SESSION_SECRET`, 7-day ttl, `httpOnly`, `sameSite=lax`, `secure` in production. Handlers read
+  and write it through iron-session's `webCookies(req, headers)`, so they run in tests without a
+  Next request scope; `getOwnerSession()` / `requireOwner()` with no argument read Next's
+  `cookies()`. `requireOwner` also checks the owner row still exists.
+- **Dev login.** `OWNER_DEV_TOKEN` is compared as `timingSafeEqual(sha256(a), sha256(b))`, so length
+  does not leak. Both the cookie login and the dev bearer bind to the first owner row
+  (`created_at`, then `id`) and are off when `WORLD_REQUIRED=true` (login answers 403). No rate
+  limit on `/api/auth/dev`; the token is 32+ random bytes.
+- **One release per tip.** Approve and deny lock the hold row (`FOR UPDATE OF holds`) for the whole
+  call, chain tx included. A second click waits, then sees the hold resolved and gets 409. A chain
+  error rolls the transaction back (hold stays `pending`, credit stays `held`) and answers 502 with
+  the custom error name; approve then writes a `failed` approval row with that code.
+- Checks in order: owner (401), `WORLD_REQUIRED` for session approve (403), tip id shape and the
+  hold belonging to this owner (404, so a tip id of someone else's hold is not confirmed), status
+  `pending` (409), not expired (410). **Deny after expiry is also 410**: the expirer refunds it and
+  appends `EXPIRED`.
+- The session approval row is written once, `status 'approved'`, after the release is mined, with
+  `nonce` = 32 random bytes and `approvalRef = keccak256(nonce)` sent to `release`.
+- Owner decisions are appended to `credits.reasons` with `source: "owner"` (a fourth source next to
+  `intercepta`, `policy`, `payee`). Approve sets `outcome 'paid'`, `tx_hash` = release tx,
+  `settled_at`; deny keeps `outcome 'held'` and the hold tx in `tx_hash`, and the refund tx goes to
+  `holds.refund_tx`.
+- **`GET /api/approve/:tipId` is public**, like the roll: the package, amount and reason are on the
+  roll already; it adds the full payee (what is being approved) and whether the viewer is signed in
+  and is the owner. `status` is `expired` once `expires_at` passes, before the expirer runs.
+- **`GET /api/history` is public**, payees shortened as on the roll, every decided credit
+  (`decided_at` set) newest first, 200 max. `txUrl` is a Basescan link only for a 32-byte hash.
+- **Settings bounds:** budget and cap 0.01 to 100 USDC, daily limit 0.01 to 1000, at most 6
+  decimals, strings only; hold TTL 60 s to 7 days (the escrow's `MIN_TTL`/`MAX_TTL`); the cap may
+  not exceed the session budget (checked against the stored row under a lock).
+- **Payer balance:** read with a 5 s timeout; any failure is `error: "rpc_unavailable"`, never the
+  RPC message, which can carry the provider URL.
+- **Agent keys:** `ec_` + 32 random bytes base64url, shown once; `agent_keys.token_hash` is its
+  sha256 hex (the hash `POST /api/sessions` checks). `bound_via 'dev'`. Revoking someone else's key
+  is 404; revoking twice keeps the first time.
+
+Sources: `@curvegrid/multibaas-sdk` 1.1.1 types and docs (`npm pack`), the live pages
+`docs.curvegrid.com/multibaas/webhooks/` and `/event-indexing/` (26 Sep), and the CONFIRM-B notes.
+Nothing below has been run against a deployment yet; the UNVERIFIED items are what
+`scripts/multibaas-setup.ts` step (d) checks first.
+
+- **Plain fetch, no SDK.** `lib/multibaas/client.ts`: `Authorization: Bearer`, `/api/v0`, unwraps
+  `{status, message, result}`, 8 s deadline, typed `MultiBaasError` (`timeout`, `network`, `http`,
+  `envelope`, `parse`). The key is never in a message.
+- **`PUT /queries/{label}` takes the `EventQuery` itself** as the body (SDK `setEventQuery(label,
+  eventQuery2: EventQuery)`), not `{query}`.
+- **Six saved queries, not five.** `paid_totals`, `held_status`, `reserved_by_package`,
+  `reserved_sessions`, `sessions`, `recent` (`lib/multibaas/queries.ts`). `reserved_sessions`
+  exists because there is no distinct aggregator and the package table needs sessions per package.
+- **No nested filters anywhere.** Each event has one flat filter. `paid_totals` filters
+  `Transfer.from == payer` (checksummed) and selects `contract_address_alias`; rows from any token
+  other than `usdc` and transfers to the escrow (hold / reserve funding) are dropped in code.
+- **No count aggregator:** every count is taken from rows. Non-aggregated queries are read in pages
+  of 1000 until a short page (at most 10 pages, then an error rather than a truncated sum).
+- **One alias set per query, lowercase snake case,** so multi-event queries line up column by
+  column, and in case aliases come back lowercased. `event_signature` is selected to tell events
+  apart; `held_status` puts `expiresAt` / `approvalRef` / `expired` in one `detail` column and only
+  reads Refunded's (denied vs expired). `recent` leaves out `ClaimSet` (no amount).
+- **Values are parsed strictly:** amounts must be whole base units (`"123"`, `123`, `"123.000"`);
+  bytes32 and addresses must be hex. Anything else is a `parse` error → 503. No type conversions
+  may be set on the `usdc` or `escrow` labels, or amounts stop being base units.
+- **Dashboard (`/api/dashboard`)**: paid = sum and count of payer → anyone-but-escrow USDC
+  transfers; projects = distinct package keys paid (tx hash → `credits.tx_hash` → package) or ever
+  reserved; held = per tip, Released → approved, Refunded → denied / expired, else pending; refused
+  = `credits.outcome = 'refused'` count, `source: "decision_log"`; reserved = `reserved_by_package`
+  balances > 0. A payer transfer with no matching credit (the x402 smoke test) counts in paid but
+  maps to no package.
+- **Cache 60 s** (TICKETS says 15 s; 60 s because of the free plan's 30k calls a month: one refresh
+  is 6 calls). Invalidated when the webhook stores an escrow event; failures are not cached. The
+  route answers 503 `{error: "multibaas_unavailable", kind, detail}`; a DB failure is
+  `dashboard_unavailable`.
+- **Webhook (`/api/webhooks/multibaas`)**: HMAC-SHA256 over the exact body bytes then the timestamp
+  string, `timingSafeEqual`, timestamps more than 300 s off either way → 401. The body is read with
+  `arrayBuffer()`, not `text()`, so the bytes are exactly what was signed. Kept: items whose
+  `contract.addressLabel` (or `addressAlias`, the SDK's name for it) is `escrow` and whose name is
+  Held, Released, Refunded, Reserved, Claimed or SessionSettled; everything else is dropped before
+  any DB call. De-dup key `webhook_events.event_id = <txHash lowercase>:<indexInLog>`; the MultiBaas
+  delivery id is kept in the payload as `multibaasId`. Insert and notification run in one
+  transaction. Held → a `held` notification for every owner whose `payer_address` equals
+  `Held.payer`, with `hold_id` when the settler has already written the hold row.
+- **UNVERIFIED until run live:** event names as `eventName` (`"Transfer"`, not the signature);
+  filter value case for addresses; mixed input types in one alias column (`detail`); `orderBy` on an
+  alias in a non-aggregated union; value formats in rows (uint256 as string, bytes32 as hex);
+  whether `limit=1000` is honoured; the webhook's `addressLabel` field on this version; whether
+  redeliveries keep the same `id` (the de-dup key does not depend on it).
+- `scripts/multibaas-setup.ts` was not run: `~/.config/dominion/multibaas-url` and
+  `multibaas-key` do not exist yet and the escrow is not deployed.
+
+- **Layout.** The orchestration is `lib/settle/` (`settle.ts`, `store.ts`, `run.ts`, `expire.ts`,
+  production wiring in `deps.ts`); `worker/settler.ts` and `worker/expirer.ts` are thin loops.
+  Every outside call is a dependency, so `settle.test.ts` runs on Postgres with fakes and
+  `settle.anvil.test.ts` runs the real escrow calls on anvil `:8547`.
+- **Claim:** one `update … where id = (select … for update skip locked limit 1) returning id`,
+  oldest `settle_requested_at` first.
+- **Daily limit:** "today" is the UTC calendar day of `credits.decided_at`; spent is the sum of
+  `amount_micro` over the owner's credits with outcome `paid`, `capped`, `held` or `reserved`,
+  executed or not (a failed execution still counts, so a retry can never exceed the limit).
+  B ≤ 0 → every credit `dust` with `DAILY_LIMIT`, session `settled`, no `recordSession` (as in the
+  §7 pseudo-code).
+- **Scores** are recomputed from `usage` with the §5 weights and caps (`lib/settle/scores.ts`); the
+  CLI's caps are not trusted. Roles as in §5: top 3 starring, else the lead signal.
+- **Two phases.** Phase 1 (concurrency 3): registry, payee, change detection, `noCodeOnBase` for
+  every non-dust credit. Phase 2 (concurrency 3, amount desc): screen, decide, store, execute. The
+  split is needed because the spam rule counts payees across the whole session.
+- **Rows first.** All credits are inserted with outcome null before any lookup, so the roll lists
+  every package at once. Dust shares get `dust` + `DUST` at insert and are never resolved. `tip_id`
+  is set on every row at insert.
+- **Lookup failure** (registry, GitHub, claim read, push time, or mainnet RPC throwing twice) →
+  `refused` with a new `RESOLVE_FAILED` reason. Held needs a payee and reserved means "no wallet",
+  so neither fits; refusing keeps the money with the owner.
+- **Screen that throws** (e.g. the `screens` insert fails) → a screen with `error: "HTTP"` → held.
+- **Lookalike** compares against every payee observed for any other package (claims included, as
+  claims are observations too), read from `payee_observations`.
+- **Change detection** passes GitHub push times only for `drips` (`FUNDING.json`) and `tea`
+  (`tea.yaml`) payees.
+- **Execution failure keeps the decision.** The outcome stays; `tx_hash` stays null; a reason is
+  appended: the x402 refusal code when the client refused (`PAYTO_MISMATCH`, `NOT_PAYABLE`, …),
+  else a new `EXECUTION_FAILED` with the error's name only (messages can carry RPC URLs). A paid
+  credit that already has a `tx_hash` is never paid again.
+- **recordSession totals** count only executed amounts for paid (paid + capped), held and reserved;
+  refused counts decided amounts. The manifest is the credits (package, amount as a micro-USDC
+  string, outcome, payee, tx) sorted by package, canonical JSON with sorted keys, keccak256.
+  `ownerHash` = `owners.sub_hash`, else `keccak256(utf8(owner.id))`. A `recordSession` failure
+  marks the session `failed` (credits already executed stay executed).
+- **Holds row** `expires_at` = the time the `hold` tx returned + `hold_ttl_seconds`, so it is at or
+  after the chain's `expiresAt` (block time + TTL) and the expirer does not refund early.
+- **Expirer:** every 30 s, `pending` holds with `expires_at < now` → `refund(tipId)` from the
+  recorder → `expired`, `refund_tx`, `resolved_at`, and `EXPIRED` appended to the credit. A failed
+  refund leaves the hold pending for the next tick.
+- **`POST /api/sessions/:id/settle`:** 404 unknown id, 401 no owner, 403 another owner's session,
+  409 unless `status = 'uploaded'` and `settle_requested_at` is null (one conditional update, so two
+  presses race safely), else 202. The owner comes from the `ec_owner` iron-session cookie
+  (`{ownerId}`, password `SESSION_SECRET`, `lib/auth/owner.ts`), or from
+  `Authorization: Bearer <OWNER_DEV_TOKEN>` (constant-time compare) while `WORLD_REQUIRED` is not
+  `true`. `getOwnerSession(req)` reads through `webCookies(req)`; without a request it uses Next's
+  `cookies()`.
+- **Seed:** owner matched by `display_name`; the agent key is created only with `--write-config`,
+  and skipped when `~/.endcredits/config.json` already holds a live key of that owner. The token is
+  never printed. Approval runs when `ESCROW_ADDRESS` is set and the allowance is under 1000 USDC.
+- **New messages:** `RESOLVE_FAILED`, `EXECUTION_FAILED` (43 codes).
 ## E10
 
 ### CONFIRM: GitHub endpoints (26 Sep, docs.github.com read through r.jina.ai)
@@ -259,7 +552,70 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
   from the escrow directly (MultiBaas is on E9). A failed read puts `chain` or `payee` in
   `errors` and leaves the value null. `sessions` counts distinct sessions with a `reserved`
   credit for the package. A package not in our table is read from npm and not stored.
-## E9
+
+## E11
+
+- **Discovery doc, read live 26 Sep** (`curl https://auth.world.org/.well-known/openid-configuration`):
+  issuer `https://auth.world.org`; authorize `/api/v1/authorize`, token `/api/v1/token`, device
+  `/api/v1/device_authorization`, JWKS `/.well-known/jwks.json` (one RS256 key). Token auth methods
+  `client_secret_basic`, `client_secret_post`, `private_key_jwt` (RS256). ID token alg RS256 only.
+  `response_types` `code`, `response_modes` `query`, grants `authorization_code` and
+  `urn:ietf:params:oauth:grant-type:device_code`, scope `openid` only, PKCE `S256` only, prompt
+  `none` and `login`, acr `https://world.org/oidc/acr/orb-v3` only, subject type `pairwise`,
+  `request_uri` not supported. Claims `iss sub aud exp iat jti nonce auth_time acr amr`.
+- The endpoints are built from `WORLD_ISSUER` with those fixed paths; no discovery request at boot.
+- **Libraries:** `openid-client` 6.8 (authorize URL, PKCE, state, nonce, code grant, device grant)
+  and `jose` 6.2 (`compactVerify` against the issuer's remote JWKS). openid-client does not check the
+  ID token signature in the code flow (TLS token endpoint); our `verifyIdToken` does, and is the
+  check of record for every flow.
+- **Basic auth:** own `ClientAuth` sending `Basic base64(encodeURIComponent(id):encodeURIComponent(secret))`.
+  openid-client's `ClientSecretBasic` also encodes `_ - . ~`, so `app_…` goes out as `app%5F…`; a
+  server that does not form-decode the header would not know that client. Ours is identical for any
+  server when id and secret are unreserved characters.
+- **Callback URL:** the token request's `redirect_uri` is rebuilt from `APP_URL` + path + query,
+  not `req.url`, which carries the internal host behind the Railway proxy.
+- **openid-client claim errors** (nonce, iss, aud/azp, exp) are mapped to the same codes as
+  `verifyIdToken`; any other exchange failure is `TOKEN`. Its clock tolerance is its default 30 s,
+  same as ours.
+- **Approval nonce payload** adds `attempt` (the approval row id) to DESIGN §14.2's fields.
+  `approvals.nonce` is unique, and without it a retry of the same tip (after CANCELLED or
+  STALE_AUTH) would hash to the same nonce. `amount` is micro-USDC as a decimal string.
+  `approvalRef = keccak256(utf8(nonce))`.
+- **Sealed secrets:** the approval's PKCE verifier and the device code are sealed with E10's
+  `lib/crypto/seal.ts` (AES-256-GCM, key from `SESSION_SECRET`). A started approval is good for
+  10 minutes from `started_at` (then `STALE_AUTH` before any token call); a device session until
+  its `expires_at`. The sign-in's state,
+  nonce and verifier live in the `ec_world` iron-session cookie (10 min, httpOnly, sameSite lax,
+  path `/api/auth/world`), cleared on the callback whatever happens.
+- **Owner binding:** first World sign-in binds the first owner row (`created_at`, the same one dev
+  login used) only while its `iss` is null, as a conditional update; any other human after that is
+  `WRONG_HUMAN`. Sign-in failures redirect to `/owner?world=<CODE>` (`CANCELLED`, `STATE`, the token
+  codes, `WRONG_HUMAN`, `NO_OWNER`).
+- **Step-up start:** `POST /api/approve/:tipId/start` starts World instead of releasing when
+  `WORLD_REQUIRED=true` or `APPROVE_METHOD=world`, answering `{status: "verify", url}`. It needs
+  the owner bound to a World ID (else 409 `world_not_bound`) and the same hold checks as the
+  session path (404 / 409 / 410). The session path's 403 under `WORLD_REQUIRED` is replaced by this.
+- **Step-up callback:** order is state (400 `UNKNOWN_STATE`, also for a used or failed state),
+  `error` param (`CANCELLED`, any error value), verifier seal (expired → `STALE_AUTH`), exchange and
+  `verifyIdToken` with the row's nonce, `(iss, sub)` equal to the owner (`WRONG_HUMAN`), `auth_time`
+  (seconds) `>= floor(started_at)` in seconds (`STALE_AUTH`, also when missing), then the release
+  under the hold lock with the same checks as the session path. Every failure sets the approval
+  `failed` with its code and redirects to `/approve/<tipId>?result=<CODE>`; success redirects with
+  `result=APPROVED`. The callback does not need the owner cookie: the ID token is the proof.
+- For the page: `CANCELLED`, `STALE_AUTH`, `WRONG_HUMAN`, `NONCE`, `ACR` have their own messages;
+  `AMR` reads best as `ACR`; `SIG`, `ISS`, `AUD`, `EXP`, `SUB`, `TOKEN` show `VERIFY_FAILED`. New
+  messages: `UNKNOWN_STATE`, `VERIFY_FAILED`, and the CLI's `LOGIN_*`.
+- **Device grant:** `/api/agent/device/start` is unauthenticated (the CLI has no key yet) and not
+  rate limited. The poll `id` is a v4 uuid known only to that CLI; the device code never leaves the
+  server. One token request per poll call; the CLI owns the interval. `device_sessions.status`:
+  `pending`, `complete`, `denied`, `expired`, `failed`; a terminal status answers the same on every
+  later poll. The key is issued in one transaction with a conditional `pending → complete`, so two
+  racing polls issue one key. No binding on this path: the `(iss, sub)` must already be an owner.
+- **UNVERIFIED until a live World App run:** that World's token endpoint accepts our Basic header;
+  `auth_time` present in the step-up ID token and after `max_age=0`; the cancel redirect's exact
+  `error` value; whether the device grant's ID token carries `acr` orb-v3 and `amr` `pop` (we
+  require both); `verification_uri_complete` and `interval` in the device response; `aud` shape;
+  the production portal URL.
 
 Sources: `@curvegrid/multibaas-sdk` 1.1.1 types and docs (`npm pack`), the live pages
 `docs.curvegrid.com/multibaas/webhooks/` and `/event-indexing/` (26 Sep), and the CONFIRM-B notes.
@@ -312,7 +668,6 @@ Nothing below has been run against a deployment yet; the UNVERIFIED items are wh
   redeliveries keep the same `id` (the de-dup key does not depend on it).
 - `scripts/multibaas-setup.ts` was not run: `~/.config/dominion/multibaas-url` and
   `multibaas-key` do not exist yet and the escrow is not deployed.
-## E8 backend
 
 - **Owner auth (`lib/auth/owner.ts`).** iron-session cookie `ec_owner` = `{ownerId}`, password
   `SESSION_SECRET`, 7-day ttl, `httpOnly`, `sameSite=lax`, `secure` in production. Handlers read
@@ -611,7 +966,6 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
   receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
   `Transfer` log instead.
-## E7
 
 - **Layout.** The orchestration is `lib/settle/` (`settle.ts`, `store.ts`, `run.ts`, `expire.ts`,
   production wiring in `deps.ts`); `worker/settler.ts` and `worker/expirer.ts` are thin loops.

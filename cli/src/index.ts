@@ -1,6 +1,6 @@
-// endcredits init | key | start | record | settle | attribute (DESIGN §4)
+// endcredits init | key | login | start | record | settle | attribute (DESIGN §4, §14.4)
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import path from "node:path";
 import { cliMsg } from "../../lib/messages";
 import { flag, parseArgs } from "./args";
@@ -8,6 +8,7 @@ import { buildUpload, formatTable } from "./attribute";
 import { writeConfig } from "./config";
 import { readStdin } from "./hook";
 import { runInit } from "./init";
+import { runLogin } from "./login";
 import { ecHome, isSessionId, ledgerPath } from "./paths";
 import { runRecord } from "./record";
 import { openInBrowser, runSettleHook, settleSession, spawnDetachedSettle } from "./settle";
@@ -82,6 +83,13 @@ async function main(argv: string[]): Promise<number> {
       return init(args.flags.global === true);
     case "key":
       return key(arg, flag(args, "api"));
+    case "login":
+      return runLogin(ecHome(), flag(args, "api"), {
+        fetch,
+        say,
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        hostname,
+      });
     case "start":
       runStart(readStdin(), ecHome());
       return 0;
