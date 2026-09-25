@@ -47,3 +47,9 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T9.1 | `lib/multibaas/queries.ts`, `lib/multibaas/queries.test.ts`, `scripts/multibaas-setup.ts` (not run yet: no MultiBaas deployment), `docs/plan/decisions.md` (E9) | pending review |
 | T9.2 backend | `lib/multibaas/client.ts`, `rows.ts`, `dashboard.ts`, `repo.ts`, `deps.ts`, their tests, `lib/multibaas/__fixtures__/dashboard.ts`, `app/api/dashboard/route.ts` | pending review |
 | T9.3 | `lib/multibaas/webhook.ts`, `lib/multibaas/webhook.test.ts`, `lib/multibaas/repo.ts` (webhook repo), `app/api/webhooks/multibaas/route.ts` | pending review |
+| T11.1 | `lib/world/config.ts`, `exchange.ts`, `owner.ts`, `session.ts`, `oidc.ts`, `oidc.test.ts`, `lib/world/__fixtures__/idp.ts`, `app/api/auth/world/{start,callback}/route.ts`, `package.json` (`openid-client`, `jose`), `docs/plan/decisions.md` (E11) | pending review |
+| T11.2 | `lib/world/verify.ts`, `lib/world/verify.test.ts` | pending review |
+| T11.3 | `lib/world/nonce.ts`, `nonce.test.ts`, `stepup.ts`, `approve-callback.ts`, `app/api/approve/callback/route.ts`, `lib/approve/actions.ts` (shared release outcome), `lib/approve/hold.ts` (package key), `lib/approve/handlers.ts` (start hands off to World), `lib/messages.ts` (`UNKNOWN_STATE`, `VERIFY_FAILED`) | pending review |
+| T11.4 | `lib/world/stepup.test.ts`, `lib/approve/approve.test.ts` (WORLD_REQUIRED start), `lib/messages.test.ts` | pending review |
+| T11.5 | `lib/world/device.ts`, `device.test.ts`, `app/api/agent/device/{start,poll}/route.ts`, `cli/src/login.ts`, `cli/src/login.test.ts`, `cli/src/index.ts`, `lib/messages.ts` (`LOGIN_*`) | pending review |
+| T11.6 | `docs/world-debrief.md` (build-time notes; live parts left for the human) | pending review |
