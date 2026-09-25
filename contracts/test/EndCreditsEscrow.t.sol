@@ -233,4 +233,33 @@ contract EndCreditsEscrowTest is Test {
         vm.prank(stranger);
         escrow.refund(TIP);
     }
+
+    // ------------------------------------------------------------- reserve
+
+    function _reserve(uint256 amount) internal {
+        vm.prank(payer);
+        escrow.reserve(PKG, amount, SESSION);
+    }
+
+    function test_reserve_accumulatesAndEmits() public {
+        bytes32 session2 = keccak256("session-2");
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Reserved(PKG, payer, AMOUNT, SESSION);
+        _reserve(AMOUNT);
+
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Reserved(PKG, payer, 2 * AMOUNT, session2);
+        vm.prank(payer);
+        escrow.reserve(PKG, 2 * AMOUNT, session2);
+
+        assertEq(escrow.reserved(PKG), 3 * AMOUNT);
+        assertEq(escrow.totalReserved(), 3 * AMOUNT);
+        assertEq(usdc.balanceOf(address(escrow)), 3 * AMOUNT);
+        assertEq(usdc.balanceOf(payer), START - 3 * AMOUNT);
+    }
+
+    function test_reserve_revertsOnZeroAmount() public {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.ZeroAmount.selector));
+        _reserve(0);
+    }
 }
