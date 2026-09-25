@@ -4,7 +4,7 @@ import { getAddress } from "viem";
 import { openFundingPr } from "../github/claim";
 import { githubFor, isReply, loadContext } from "./context";
 import type { ClaimDeps } from "./deps";
-import { claimView, fail, reply, type Reply } from "./view";
+import { claimView, fail, reply, type Note, type Reply } from "./view";
 
 export async function openPr(name: string, maintainerId: string | undefined, deps: ClaimDeps): Promise<Reply> {
   const ctx = await loadContext(name, maintainerId, deps);
@@ -22,9 +22,9 @@ export async function openPr(name: string, maintainerId: string | undefined, dep
     prNumber: pr.mode === "api" ? pr.number : null,
     prUrl: pr.url,
   });
-  const note =
+  const note: Note =
     pr.mode === "api"
-      ? { code: "PR_OPENED" as const, vars: { number: pr.number } }
-      : { code: "PR_LINK" as const, vars: { repo: ctx.repo, branch: pr.base } };
+      ? { code: "PR_OPENED", vars: { number: pr.number } }
+      : { code: "PR_LINK", vars: { repo: ctx.repo, branch: pr.base } };
   return reply(claimView(ctx.repo, updated, note));
 }
