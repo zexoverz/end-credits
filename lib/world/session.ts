@@ -1,6 +1,7 @@
 // `ec_world`: the sign-in's state, nonce and PKCE verifier, sealed in an iron-session cookie for
 // 10 minutes (DESIGN §14.1). Also the seal for secrets kept in the DB (approval verifier, device code).
-import { getIronSession, sealData, unsealData, webCookies, type SessionOptions } from "iron-session";
+import { getIronSession, webCookies, type SessionOptions } from "iron-session";
+import { seal, unseal } from "../crypto/seal";
 import { readEnv } from "../env";
 
 export const WORLD_COOKIE = "ec_world";
@@ -43,14 +44,14 @@ export async function takeSignInChecks(req: Request, out: Headers): Promise<Sign
   return state && nonce && codeVerifier ? { state, nonce, codeVerifier } : null;
 }
 
-/** Sealed with SESSION_SECRET (iron-session's seal), for a value that must sit in the DB. */
-export const sealSecret = (value: string, ttlSeconds: number) =>
-  sealData({ v: value }, { password: readEnv("SESSION_SECRET"), ttl: ttlSeconds });
+/** AES-256-GCM under SESSION_SECRET (lib/crypto/seal), for a value that must sit in the DB. */
+export const sealSecret = (value: string) => seal(value, readEnv("SESSION_SECRET"));
 
-export async function unsealSecret(sealed: string, ttlSeconds: number): Promise<string | null> {
-  const data = await unsealData<{ v?: string }>(sealed, {
-    password: readEnv("SESSION_SECRET"),
-    ttl: ttlSeconds,
-  });
-  return typeof data.v === "string" ? data.v : null;
+/** Null when the value does not open (tampered, or sealed under another secret). */
+export function unsealSecret(sealed: string): string | null {
+  try {
+    return unseal(sealed, readEnv("SESSION_SECRET"));
+  } catch {
+    return null;
+  }
 }

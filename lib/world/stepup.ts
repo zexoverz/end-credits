@@ -66,7 +66,7 @@ export async function startWorldApproval(
       payload,
       nonce,
       state,
-      codeVerifierEnc: await sealSecret(codeVerifier, APPROVAL_TTL_SECONDS),
+      codeVerifierEnc: sealSecret(codeVerifier),
       startedAt: now,
       status: "pending",
     });

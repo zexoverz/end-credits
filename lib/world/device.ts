@@ -19,7 +19,6 @@ import { verifyIdToken, WorldTokenError, type VerifiedIdToken } from "./verify";
 
 const DEFAULT_INTERVAL = 5;
 const DEFAULT_LABEL = "endcredits login";
-const SEAL_SLACK_SECONDS = 60;
 
 const noStore = { "cache-control": "no-store" };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: noStore });
@@ -35,7 +34,7 @@ export async function handleDeviceStart(_req: Request, deps: WorldDeps = {}): Pr
   const [row] = await db()
     .insert(deviceSessions)
     .values({
-      deviceCodeEnc: await sealSecret(r.device_code, r.expires_in + SEAL_SLACK_SECONDS),
+      deviceCodeEnc: sealSecret(r.device_code),
       userCode: r.user_code,
       verificationUri: r.verification_uri,
       expiresAt: new Date(now.getTime() + r.expires_in * 1000),
@@ -133,9 +132,7 @@ export async function handleDevicePoll(req: Request, deps: WorldDeps = {}): Prom
     await setStatus(id, "expired");
     return json({ status: "expired_token" }, 410);
   }
-  const deviceCode = row.deviceCodeEnc
-    ? await unsealSecret(row.deviceCodeEnc, 24 * 3600).catch(() => null)
-    : null;
+  const deviceCode = row.deviceCodeEnc ? unsealSecret(row.deviceCodeEnc) : null;
   if (!deviceCode) {
     await setStatus(id, "expired");
     return json({ status: "expired_token" }, 410);

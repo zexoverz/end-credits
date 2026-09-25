@@ -140,9 +140,9 @@ export async function handleApproveCallback(
   };
 
   if (params.get("error")) return fail("CANCELLED");
-  const codeVerifier = a.codeVerifierEnc
-    ? await unsealSecret(a.codeVerifierEnc, APPROVAL_TTL_SECONDS).catch(() => null)
-    : null;
+  // A started approval lives 10 minutes; after that it has to start again.
+  const tooOld = now.getTime() - a.startedAt.getTime() > APPROVAL_TTL_SECONDS * 1000;
+  const codeVerifier = a.codeVerifierEnc && !tooOld ? unsealSecret(a.codeVerifierEnc) : null;
   if (!codeVerifier) return fail("STALE_AUTH");
 
   let identity: VerifiedIdToken;
