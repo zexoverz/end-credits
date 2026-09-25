@@ -2,7 +2,7 @@
 export const CLAIM_COPY = {
   REPO: "Repository",
   NO_REPO: "npm lists no GitHub repository for this package, so it cannot be claimed here.",
-  NOTHING_RESERVED: "Nothing is reserved for {package} yet. You can still add a wallet so agents pay you directly.",
+  NOTHING_RESERVED: "Nothing is reserved for {package} yet.",
   CHAIN_ERROR: "Could not read the escrow on Base Sepolia. The reserved amount is unknown right now.",
   PAYEE_ERROR: "Could not check whether this package already lists a wallet.",
   ALSO_ACCEPTS: "Also accepts",
