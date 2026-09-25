@@ -13,6 +13,7 @@ export const MESSAGES = {
   SPAM: "Refused: this address is the payee of {count} packages in this session, each new or under 1,000 weekly downloads.",
   PAYTO_MISMATCH: "Refused: the payment request names a different address than the one screened.",
   CHALLENGE_MISMATCH: "Refused: the payment request does not match this credit.",
+  NOT_PAYABLE: "Not paid: this credit has no fresh paid decision to pay against.",
   RESERVED: "Reserved {amount} USDC for {package}. No wallet yet; the maintainer can claim it.",
   DUST: "Under 0.01 USDC. Not sent.",
   DAILY_LIMIT: "Daily limit reached. Nothing was sent.",
