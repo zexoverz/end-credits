@@ -159,6 +159,15 @@ describe("multibaas webhook", () => {
     expect(d.invalidate).not.toHaveBeenCalled();
   });
 
+  it("an event named Held from any other contract is dropped", async () => {
+    const { repo } = memoryRepo();
+    const spoof = held();
+    spoof.data.event.contract = { ...spoof.data.event.contract, addressLabel: "usdc" };
+    const res = await handleMultiBaasWebhook(request([spoof]), deps(repo));
+    expect(res.status).toBe(200);
+    expect(repo.insertEvent).not.toHaveBeenCalled();
+  });
+
   it("an escrow event outside the dashboard set (ClaimSet) is dropped", async () => {
     const { repo } = memoryRepo();
     const res = await handleMultiBaasWebhook(request([escrowEvent("ClaimSet", [])]), deps(repo));
