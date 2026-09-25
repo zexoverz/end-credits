@@ -14,3 +14,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T0.3 | `lib/db/schema.ts`, `lib/db/client.ts`, `drizzle.config.ts`, `drizzle/0000_init.sql` | pending review |
 | T0.4 | `lib/env.ts`, `lib/env.test.ts`, `instrumentation.ts` | pending review |
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
+| T6.3 prep | `contracts/script/Deploy.s.sol` (MultiBaas link), `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules` (`forge-multibaas`), `docs/plan/decisions.md`; no Base Sepolia deploy yet | pending review |
+| T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
