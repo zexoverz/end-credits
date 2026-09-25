@@ -55,7 +55,7 @@ export function fromMicro(micro: bigint): string {
 }
 
 export function totals(credits: CreditView[]): Totals {
-  const sum = (xs: CreditView[]) => xs.reduce((a, c) => a + toMicro(c.amount), 0n);
+  const sum = (xs: CreditView[]) => xs.reduce((a, c) => a + toMicro(c.amount ?? "0"), 0n);
   const paid = credits.filter((c) => c.outcome === "paid" || c.outcome === "capped");
   const held = credits.filter((c) => c.outcome === "held");
   const reserved = credits.filter((c) => c.outcome === "reserved");
