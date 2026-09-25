@@ -90,9 +90,14 @@ async function ownerExists(ownerId: string): Promise<boolean> {
 
 export const unauthorized = () => Response.json({ error: "unauthorized" }, { status: 401 });
 
+/** The owner behind this request (dev bearer, then cookie), unchecked against the table. */
+export async function currentOwner(req?: Request): Promise<OwnerSession | null> {
+  return (req && (await ownerFromBearer(req))) || (await getOwnerSession(req));
+}
+
 /** The owner behind this request (dev bearer, then cookie), or throws a 401 Response. */
 export async function requireOwner(req?: Request): Promise<OwnerSession> {
-  const owner = (req && (await ownerFromBearer(req))) || (await getOwnerSession(req));
+  const owner = await currentOwner(req);
   if (!owner || !(await ownerExists(owner.ownerId))) throw unauthorized();
   return owner;
 }
