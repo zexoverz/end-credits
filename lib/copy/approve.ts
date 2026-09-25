@@ -25,6 +25,7 @@ export const APPROVE_COPY = {
   STATUS_APPROVED: "Approved",
   STATUS_DENIED: "Denied",
   STATUS_EXPIRED: "Expired",
+  EXPIRED_REFUND_PENDING: "Not approved in time. The refund to the owner is on its way.",
   LAST_ATTEMPT: "Last attempt failed:",
   // Action errors from POST /start and /deny.
   ERR_UNAUTHORIZED: "Your owner session has ended. Sign in again.",

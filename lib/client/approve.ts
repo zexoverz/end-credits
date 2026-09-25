@@ -93,6 +93,8 @@ const FINAL_CODE: Record<Exclude<ApproveStatus, "pending">, MessageCode> = {
  */
 export function outcomeNotice(view: ApproveView, result: string | null): Notice | null {
   if (view.status !== "pending") {
+    // Past expiry but before the expirer's refund, nothing has been returned yet.
+    if (view.status === "expired" && !view.message) return { kind: "info", text: APPROVE_COPY.EXPIRED_REFUND_PENDING };
     const text =
       view.message ?? msg(FINAL_CODE[view.status], { amount: view.amount, address: view.payee ?? "" });
     return { kind: view.status === "approved" ? "ok" : "info", text };

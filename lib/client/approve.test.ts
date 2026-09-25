@@ -89,6 +89,12 @@ describe("outcomeNotice", () => {
       "Denied. 0.25 USDC returned to the owner.",
     );
   });
+  it("does not claim a refund before the expirer ran", () => {
+    expect(outcomeNotice(view({ status: "expired" }), null)?.text).toBe(
+      "Not approved in time. The refund to the owner is on its way.",
+    );
+    expect(outcomeNotice(view({ status: "expired", message: "Not approved in time. 0.25 USDC returned to the owner." }), null)?.text).toContain("returned");
+  });
   it("ignores result=APPROVED while the server still says pending", () => {
     expect(outcomeNotice(view(), "APPROVED")).toBeNull();
   });
