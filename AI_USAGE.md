@@ -31,6 +31,8 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
 | T5.2 | `lib/x402/constants.ts`, `lib/x402/receipt.ts`, `lib/x402/receipt.test.ts`, `lib/x402/server.ts`, `lib/x402/server.test.ts`, `lib/x402/repo.ts`, `lib/x402/deps.ts`, `app/api/x402/credit/[creditId]/route.ts`, `lib/messages.ts` (`NOT_PAYABLE`), `lib/messages.test.ts` | pending review |
 | T5.3 | `lib/x402/client.ts`, `lib/x402/client.test.ts`, `scripts/x402-smoke.ts`; the smoke payment on Base Sepolia was run by the agent | pending review |
+| T8.2 backend | `lib/history/history.ts`, `lib/history/history.test.ts`, `app/api/history/route.ts`, `lib/money.ts` | pending review |
+| T8.3 backend | `lib/auth/owner.ts`, `lib/auth/dev.ts`, their tests, `app/api/auth/{dev,logout}/route.ts`, `lib/owner/*`, `app/api/owner/**`, `lib/approve/*`, `app/api/approve/[tipId]/**`, `lib/__fixtures__/owner-db.ts`, `docs/plan/decisions.md` (E8 backend) | pending review |
 | T2.1 | `lib/registry/npm.ts`, `lib/registry/npm.test.ts`, `lib/registry/npm.live.test.ts` | pending review |
 | T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
 | T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |
