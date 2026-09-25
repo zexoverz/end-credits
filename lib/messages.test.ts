@@ -17,6 +17,6 @@ describe("msg", () => {
   });
 
   it("has every code from DESIGN §11 plus the ones added during the build (decisions.md)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(40);
+    expect(Object.keys(MESSAGES)).toHaveLength(41);
   });
 });
