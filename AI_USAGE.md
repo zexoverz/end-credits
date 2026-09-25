@@ -12,6 +12,13 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T0.3 | `lib/db/schema.ts`, `lib/db/client.ts`, `drizzle.config.ts`, `drizzle/0000_init.sql` | pending review |
 | T0.4 | `lib/env.ts`, `lib/env.test.ts`, `instrumentation.ts` | pending review |
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
+| T4.1 | `scripts/probe-intercepta.ts` (not run yet: no key) | pending review |
+| T4.2 | `lib/intercepta/client.ts`, `http.ts`, `schemas.ts`, `cache.ts`, `repo.ts`, `__fixtures__/memory-repo.ts`, `client.test.ts`, `client.live.test.ts`, `cache.test.ts`, `lib/db/schema.ts`, `drizzle/0001_screens_impersonation.sql` | pending review |
+| T4.3 | `lib/intercepta/mapping.ts`, `mapping.test.ts` | pending review |
+| T4.4 | failure policy in `lib/intercepta/http.ts`, `client.ts`, `lib/decision/matrix.ts`; tests in `client.test.ts`, `matrix.test.ts` | pending review |
+| T4.5 | `lib/decision/types.ts`, `matrix.ts`, `lookalike.ts`, their tests, `lib/messages.ts` (`IMPERSONATION`) | pending review |
+| T4.6 | `lib/decision/spam.ts`, `spam.test.ts` | pending review |
+| T4.7 | `lib/decision/no-code.ts`, `no-code.test.ts` | pending review |
 | T2.1 | `lib/registry/npm.ts`, `lib/registry/npm.test.ts`, `lib/registry/npm.live.test.ts` | pending review |
 | T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
 | T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |

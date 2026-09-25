@@ -8,6 +8,8 @@ export const MESSAGES = {
   HELD_NO_CODE: "Held: {address} is a contract on Ethereum with no code on Base.",
   SCREEN_UNAVAILABLE: "Held: screening unavailable ({error}). Nothing is paid without a screen.",
   REFUSED_TRAIT: "Refused. Intercepta: {description}",
+  IMPERSONATION:
+    "Refused. Intercepta: this address impersonates {original} (address poisoning).",
   TOKEN_PIN: "Refused: the payment token is not Base Sepolia USDC.",
   LOOKALIKE: "Refused: {address} looks like {known} ({knownPackage}) but is a different address.",
   SPAM: "Refused: this address is the payee of {count} packages in this session, each new or under 1,000 weekly downloads.",
