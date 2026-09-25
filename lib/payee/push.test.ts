@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { memoryStore } from "./__fixtures__/memory-store";
+import { CHANGE_WINDOW_DAYS, recentlyChanged } from "./change";
 import { firstSeenPush } from "./push";
 
 const API = "https://api.github.com/repos/o/r";
@@ -121,5 +123,17 @@ describe.skipIf(!process.env.LIVE)("firstSeenPush (live GitHub Activity API)", (
       githubToken,
     });
     expect(t).toEqual(new Date("2024-04-04T13:55:00Z"));
+  });
+
+  it("recentlyChanged: a never-observed prettier FUNDING.json from 2024 is not a change", async () => {
+    const now = new Date();
+    const since = new Date(now.getTime() - CHANGE_WINDOW_DAYS * 86_400_000);
+    const pushedAt = () => firstSeenPush("prettier/prettier", "FUNDING.json", { since, githubToken });
+    expect(
+      await recentlyChanged(memoryStore(), "p", "0x3A39F5E9BFe0a90e394982492e166C5635893141", {
+        now,
+        pushedAt,
+      }),
+    ).toEqual({ changed: false, days: 0 });
   });
 });
