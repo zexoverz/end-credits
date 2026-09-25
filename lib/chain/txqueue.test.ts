@@ -112,11 +112,58 @@ describe("txqueue", () => {
 
   it("throws the decoded custom error when the call would revert, without sending", async () => {
     const io = fakeIo({ simulate: vi.fn().mockRejectedValue(revert("TipExists")) });
-    const err = await createTxQueue(io).submit(A, call).catch((e) => e);
+    const err = await createTxQueue(io, { staleDelayMs: 0 }).submit(A, call).catch((e) => e);
     expect(err).toBeInstanceOf(TxRevertedError);
     expect(err.errorName).toBe("TipExists");
     expect(err.message).toBe("release reverted: TipExists");
     expect(io.write).not.toHaveBeenCalled();
+  });
+
+  it("re-simulates after a stale revert and sends once", async () => {
+    const simulate = vi
+      .fn<TxIo["simulate"]>()
+      .mockRejectedValueOnce(revert("TipExists"))
+      .mockResolvedValueOnce(undefined);
+    const io = fakeIo({ simulate });
+    await createTxQueue(io, { staleDelayMs: 0 }).submit(A, call);
+    expect(simulate).toHaveBeenCalledTimes(2);
+    expect(io.write).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws the named error after 3 simulations that all revert, never sending", async () => {
+    const simulate = vi.fn<TxIo["simulate"]>().mockRejectedValue(revert("NotRecorder"));
+    const io = fakeIo({ simulate });
+    const err = await createTxQueue(io, { staleDelayMs: 0 }).submit(A, call).catch((e) => e);
+    expect(err).toBeInstanceOf(TxRevertedError);
+    expect(err.errorName).toBe("NotRecorder");
+    expect(simulate).toHaveBeenCalledTimes(3);
+    expect(io.write).not.toHaveBeenCalled();
+  });
+
+  it("waits between simulations", async () => {
+    vi.useFakeTimers();
+    try {
+      const simulate = vi
+        .fn<TxIo["simulate"]>()
+        .mockRejectedValueOnce(revert("TipExists"))
+        .mockResolvedValueOnce(undefined);
+      const io = fakeIo({ simulate });
+      const done = createTxQueue(io, { staleDelayMs: 1_500 }).submit(A, call);
+      await vi.advanceTimersByTimeAsync(1_499);
+      expect(simulate).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await done;
+      expect(simulate).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not retry a simulation that fails without a revert", async () => {
+    const simulate = vi.fn<TxIo["simulate"]>().mockRejectedValue(new Error("fetch failed"));
+    const io = fakeIo({ simulate });
+    await expect(createTxQueue(io, { staleDelayMs: 0 }).submit(A, call)).rejects.toThrow("fetch failed");
+    expect(simulate).toHaveBeenCalledTimes(1);
   });
 
   it("names the custom error when a sent tx reverts", async () => {

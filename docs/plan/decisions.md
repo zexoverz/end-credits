@@ -634,3 +634,43 @@ payment. Found while wiring E7.
   count of refused credits, not an amount, since refused money never leaves the owner.
 - **Polling** every 1 s while `uploaded` or `settling`; stops on `settled`, `failed` or 404. A
   5xx or network error keeps the last view on screen, shows the error and keeps retrying.
+## E8/E9 frontend: dashboard and landing
+
+- `/dashboard` is a server page around one client view. It fetches `/api/dashboard` on load, every
+  30 s and on **Refresh**, one request at a time. The route's own 60 s cache means most refreshes cost
+  no MultiBaas calls.
+- Any failed fetch replaces the numbers with the error (`HTTP 503 · multibaas_unavailable (network):
+  <detail>`). The last good numbers are not kept on screen, so nothing shown can be older than the
+  error above it.
+- `recent[].at` comes back as Postgres text (`2026-09-25 18:46:24+00`), not ISO; `parseTime` in
+  `lib/client/dashboard.ts` reads both and shows `—` for anything it cannot parse, never "now".
+- Held lists pending first. Packages sort by paid + reserved (as integers from `micro`), then
+  sessions, then name. Recent sorts by block, newest first.
+- A recent event's subject is shown as the package name when it is a package key the table knows
+  (Reserved, Claimed); tip ids and session ids stay shortened hex. The API has no tip → package map.
+- `/` is static. The measurement is SPEC §6.1 (41.6% / 2.1%, top 1,000, 25 Sep 2026), copied into
+  `lib/copy/landing.ts`; change both together. `NOT_A_PAYWALL` is read from `lib/messages.ts`.
+- Checked 26 Sep against the live MultiBaas with an empty local DB: cards showed 5 denied holds
+  (0.05 USDC), 10 recent escrow events with Basescan links; the bad-host run showed the 503 detail
+  and no numbers. Refused and package names need the production DB, so they read 0 / none locally.
+## Stale RPC reads (26 Sep)
+
+- **What happened:** `https://sepolia.base.org` is load-balanced over nodes that lag each other.
+  `hold(tipId)` mined (receipt status 1), the `refund(tipId)` right after was simulated on a node
+  that had not seen the hold, reverted `NotPending`, and the queue threw before sending. 0.01 USDC
+  sat in escrow until refunded by hand. A `tipOf` read just after the hold receipt also said `none`.
+- **Fix:** `createTxQueue` re-simulates when the pre-send simulation reverts with a custom error:
+  waits `staleDelayMs` (1500) and tries again, up to `staleRetries` (2) more times, then throws
+  `TxRevertedError` with the decoded name. A genuine revert costs about 3 s before it is named.
+  Errors that are not a revert (network, RPC) are thrown at once, as before.
+- **Why no block pin:** the failing pair crosses keys (hold is payer, refund is recorder), so a
+  per-key "at least the receipt's block" pin would not have covered it. Pinning `eth_call` to a
+  block number would also freeze a later simulation at an old block, and a `getBlockNumber()` gate
+  can hit a different node than the call it gates. Retrying the simulation is enough for writes:
+  a wrong "pending" answer can only make us send, and the chain then reverts the tx for real.
+- **Reads are not fixed here.** `tipOf`, `reserved` and friends can still be a block or two behind
+  right after a receipt; callers that act on a read made straight after their own write should
+  trust the receipt, not the read.
+- Live check, 26 Sep: hold then immediate refund, 3 times on `sepolia.base.org`, all refunded
+  (holds `0xd36dcf08…`, `0x68f22392…`, `0xb964ad55…`; refunds `0xcd5853f2…`, `0x13fee051…`,
+  `0xf1d0a896…`). Not logged whether a re-simulation fired on these runs.
