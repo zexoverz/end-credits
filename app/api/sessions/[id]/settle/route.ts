@@ -2,7 +2,7 @@
 // Sets settle_requested_at once; the settler picks the session up. Any other state → 409.
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { getOwnerSession, hasOwnerDevToken } from "@/lib/auth/owner";
+import { devTokenMatches, getOwnerSession } from "@/lib/auth/owner";
 import { db } from "@/lib/db/client";
 import { sessions } from "@/lib/db/schema";
 
@@ -21,7 +21,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .limit(1);
   if (!session) return error(404, "not_found");
 
-  const ownerId = hasOwnerDevToken(req) ? session.ownerId : (await getOwnerSession(req)).ownerId;
+  const bearer = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+  const ownerId = bearer && devTokenMatches(bearer) ? session.ownerId : (await getOwnerSession(req))?.ownerId;
   if (!ownerId) return error(401, "unauthorized");
   if (ownerId !== session.ownerId) return error(403, "forbidden");
 

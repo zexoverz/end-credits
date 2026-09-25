@@ -42,3 +42,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T7.2 | `lib/auth/owner.ts`, `app/api/sessions/[id]/settle/route.ts`, `app/api/sessions/[id]/settle/settle.test.ts` | pending review |
 | T7.3 | `lib/settle/expire.ts`, `lib/settle/expire.test.ts`, `worker/expirer.ts` | pending review |
 | E7 seed | `scripts/seed.ts` (run twice against a local Postgres; `--write-config` not run) | pending review |
+| T8.2 backend | `lib/history/history.ts`, `lib/history/history.test.ts`, `app/api/history/route.ts`, `lib/money.ts` | pending review |
+| T8.3 backend | `lib/auth/owner.ts`, `lib/auth/dev.ts`, their tests, `app/api/auth/{dev,logout}/route.ts`, `lib/owner/*`, `app/api/owner/**`, `lib/approve/*`, `app/api/approve/[tipId]/**`, `lib/__fixtures__/owner-db.ts`, `docs/plan/decisions.md` (E8 backend) | pending review |
