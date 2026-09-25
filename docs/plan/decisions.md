@@ -567,7 +567,6 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
   receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
   `Transfer` log instead.
-=======
 - **Ledger.** One line per tool call at most. A Bash install wins over Bash reads. Reads pulled out
   of Bash become `{t:"read", ps:[…]}` (up to 20 paths), only from segments whose command is a reader
   (`cat head tail less more grep egrep rg ag find fd ls tree sed awk wc bat file stat jq`), so
