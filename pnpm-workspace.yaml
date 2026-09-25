@@ -1,0 +1,8 @@
+packages:
+  - "."
+  - "cli"
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+onlyBuiltDependencies:
+  - esbuild

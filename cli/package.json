@@ -1,0 +1,15 @@
+{
+  "name": "endcredits",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "endcredits": "dist/endcredits.mjs"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/endcredits.mjs --banner:js=\"#!/usr/bin/env node\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
