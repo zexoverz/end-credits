@@ -20,13 +20,6 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T1.5 | `lib/attribution/score.ts`, `lib/attribution/docs.ts`, `lib/attribution/score.test.ts` | pending review |
 | T1.6 | `cli/src/attribute.ts`, `cli/src/settle.ts`, `cli/src/fixture.ts`, `cli/src/index.ts`, their tests | pending review |
 | T1.7 | `lib/sessions/schema.ts`, `lib/sessions/auth.ts`, `lib/sessions/ingest.ts`, `lib/sessions/view.ts`, `app/api/sessions/route.ts`, `app/api/sessions/[id]/route.ts`, `lib/sessions/schema.test.ts`, `app/api/sessions/sessions.test.ts` | pending review |
-| T2.1 | `lib/registry/npm.ts`, `lib/registry/npm.test.ts`, `lib/registry/npm.live.test.ts` | pending review |
-| T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
-| T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |
-| T2.4 | `lib/payee/change.ts`, `lib/payee/change.test.ts` | pending review |
-| T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
-| T2.6 | `lib/payee/push.ts`, `lib/payee/push.test.ts`, `lib/payee/change.ts`, `lib/payee/change.test.ts`, `docs/plan/decisions.md` (Activity API CONFIRM) | pending review |
-| T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |
 | T4.1 | `scripts/probe-intercepta.ts` (not run yet: no key) | pending review |
 | T4.2 | `lib/intercepta/client.ts`, `http.ts`, `schemas.ts`, `cache.ts`, `repo.ts`, `__fixtures__/memory-repo.ts`, `client.test.ts`, `client.live.test.ts`, `cache.test.ts`, `lib/db/schema.ts`, `drizzle/0001_screens_impersonation.sql` | pending review |
 | T4.3 | `lib/intercepta/mapping.ts`, `mapping.test.ts` | pending review |
@@ -58,3 +51,10 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T11.4 | `lib/world/stepup.test.ts`, `lib/approve/approve.test.ts` (WORLD_REQUIRED start), `lib/messages.test.ts` | pending review |
 | T11.5 | `lib/world/device.ts`, `device.test.ts`, `app/api/agent/device/{start,poll}/route.ts`, `cli/src/login.ts`, `cli/src/login.test.ts`, `cli/src/index.ts`, `lib/messages.ts` (`LOGIN_*`) | pending review |
 | T11.6 | `docs/world-debrief.md` (build-time notes; live parts left for the human) | pending review |
+| T2.1 | `lib/registry/npm.ts`, `lib/registry/npm.test.ts`, `lib/registry/npm.live.test.ts` | pending review |
+| T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
+| T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |
+| T2.4 | `lib/payee/change.ts`, `lib/payee/change.test.ts` | pending review |
+| T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
+| T2.6 | `lib/payee/push.ts`, `lib/payee/push.test.ts`, `lib/payee/change.ts`, `lib/payee/change.test.ts`, `docs/plan/decisions.md` (Activity API CONFIRM) | pending review |
+| T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |

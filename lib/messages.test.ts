@@ -16,7 +16,7 @@ describe("msg", () => {
     );
   });
 
-  it("has every code from DESIGN §11, plus SPOOF_REPO (T2.5), IMPERSONATION (E4), NOT_PAYABLE (E5), RESOLVE_FAILED and EXECUTION_FAILED (E7), PR_LINK (E10), UNKNOWN_STATE and VERIFY_FAILED (E11)", () => {
+  it("has every code from DESIGN §11 plus the ones added during the build (decisions.md)", () => {
     expect(Object.keys(MESSAGES)).toHaveLength(46);
   });
 
