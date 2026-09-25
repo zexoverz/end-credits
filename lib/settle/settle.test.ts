@@ -21,6 +21,7 @@ const clean: Screen = { toxicScore: 0, traits: [], tokenAction: "info", tokenDet
 
 describe.skipIf(!DB_URL)("settleSession (integration)", () => {
   let mod: typeof import("./settle");
+  let run: typeof import("./run");
   let store: typeof import("./store");
   let s: typeof import("../db/schema");
   let database: import("./store").Database;
@@ -29,6 +30,7 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = DB_URL;
     mod = await import("./settle");
+    run = await import("./run");
     store = await import("./store");
     s = await import("../db/schema");
     const { db } = await import("../db/client");
@@ -267,17 +269,35 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
     expect(calls.reserve).toEqual([]);
   });
 
-  it("claims one waiting session at a time and skips ones not asked to settle", async () => {
-    const { id } = await seedSession({});
-    await database.update(s.sessions).set({ settleRequestedAt: null }).where(eq(s.sessions.id, id));
-    const claimed: string[] = [];
-    for (let i = 0; i < 50; i++) {
-      const next = await store.claimNextSession(database);
-      if (!next) break;
-      claimed.push(next);
-    }
-    expect(claimed).not.toContain(id);
+  // Sessions asked to settle at the epoch sort first, so a single claim takes ours and leaves
+  // sessions from other test files alone.
+  const EPOCH = new Date(0);
+
+  it("claims the oldest waiting session and skips ones not asked to settle", async () => {
+    const unasked = await seedSession({});
+    await database.update(s.sessions).set({ settleRequestedAt: null }).where(eq(s.sessions.id, unasked.id));
+    const asked = await seedSession({});
+    await database.update(s.sessions).set({ settleRequestedAt: EPOCH }).where(eq(s.sessions.id, asked.id));
+
+    expect(await store.claimNextSession(database)).toBe(asked.id);
+    const status = async (id: string) =>
+      (await database.select().from(s.sessions).where(eq(s.sessions.id, id)))[0].status;
+    expect(await status(asked.id)).toBe("settling");
+    expect(await status(unasked.id)).toBe("uploaded");
+  });
+
+  it("marks the session failed when settlement crashes", async () => {
+    const name = `crash-${suffix()}`;
+    const { id } = await seedSession({ [name]: { import: 1 } });
+    await database.update(s.sessions).set({ settleRequestedAt: EPOCH }).where(eq(s.sessions.id, id));
+    const { deps } = fakes({ [name]: randomAddress() }, {});
+    deps.escrow.recordSession = async () => {
+      throw new Error("rpc down");
+    };
+    const lines: string[] = [];
+    expect(await run.settleNext({ ...deps, log: (l) => lines.push(l) })).toBe(id);
     const [row] = await database.select().from(s.sessions).where(eq(s.sessions.id, id));
-    expect(row.status).toBe("uploaded");
+    expect(row.status).toBe("failed");
+    expect(lines.join("\n")).toContain(id);
   });
 });
