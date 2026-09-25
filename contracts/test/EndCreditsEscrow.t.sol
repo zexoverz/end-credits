@@ -262,4 +262,47 @@ contract EndCreditsEscrowTest is Test {
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.ZeroAmount.selector));
         _reserve(0);
     }
+
+    // ------------------------------------------------------------ setClaim
+
+    function _setClaim(address who) internal {
+        vm.prank(recorder);
+        escrow.setClaim(PKG, who, EVIDENCE);
+    }
+
+    function test_setClaim_emitsWithPrevious() public {
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.ClaimSet(PKG, maintainerA, address(0), EVIDENCE);
+        _setClaim(maintainerA);
+
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.ClaimSet(PKG, maintainerB, maintainerA, EVIDENCE);
+        _setClaim(maintainerB);
+
+        assertEq(escrow.claimOf(PKG), maintainerB);
+    }
+
+    function test_setClaim_revertsForNonRecorder() public {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
+        vm.prank(stranger);
+        escrow.setClaim(PKG, stranger, EVIDENCE);
+    }
+
+    function test_setClaim_revertsOnZeroPayee() public {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.ZeroPayee.selector));
+        vm.prank(recorder);
+        escrow.setClaim(PKG, address(0), EVIDENCE);
+    }
+
+    function test_setClaim_samePayeeIsNotAChange() public {
+        _setClaim(maintainerA);
+        _setClaim(maintainerA);
+        (, uint64 changedAt, bool changed) = escrow.claims(PKG);
+        assertFalse(changed);
+        assertEq(changedAt, 0);
+
+        _reserve(AMOUNT);
+        escrow.claim(PKG);
+        assertEq(usdc.balanceOf(maintainerA), AMOUNT);
+    }
 }
