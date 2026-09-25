@@ -4,8 +4,11 @@ import path from "node:path";
 import { cliMsg } from "../../lib/messages";
 import { flag, parseArgs } from "./args";
 import { writeConfig } from "./config";
+import { readStdin } from "./hook";
 import { runInit } from "./init";
 import { ecHome } from "./paths";
+import { runRecord } from "./record";
+import { runStart } from "./start";
 
 const INIT_CODES = {
   added: "INIT_ADDED",
@@ -43,6 +46,12 @@ async function main(argv: string[]): Promise<number> {
       return init(args.flags.global === true);
     case "key":
       return key(arg, flag(args, "api"));
+    case "start":
+      runStart(readStdin(), ecHome());
+      return 0;
+    case "record":
+      runRecord(readStdin(), ecHome());
+      return 0;
     default:
       say(cliMsg("USAGE"));
       return 1;
