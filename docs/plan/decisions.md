@@ -480,3 +480,9 @@ Nothing below has been run against a deployment yet; the UNVERIFIED items are wh
   redeliveries keep the same `id` (the de-dup key does not depend on it).
 - `scripts/multibaas-setup.ts` was not run: `~/.config/dominion/multibaas-url` and
   `multibaas-key` do not exist yet and the escrow is not deployed.
+
+## Screen age (26 Sep)
+
+Address screens are reused for 5 minutes, token screens for 1 hour. The x402 route refuses to pay on
+an address screen older than 10 minutes, so a 1 hour reuse would decide `paid` and then fail at
+payment. Found while wiring E7.
