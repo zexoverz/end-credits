@@ -12,3 +12,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T0.3 | `lib/db/schema.ts`, `lib/db/client.ts`, `drizzle.config.ts`, `drizzle/0000_init.sql` | pending review |
 | T0.4 | `lib/env.ts`, `lib/env.test.ts`, `instrumentation.ts` | pending review |
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
+| T5.2 | `lib/x402/constants.ts`, `lib/x402/receipt.ts`, `lib/x402/receipt.test.ts`, `lib/x402/server.ts`, `lib/x402/server.test.ts`, `lib/x402/repo.ts`, `lib/x402/deps.ts`, `app/api/x402/credit/[creditId]/route.ts`, `lib/messages.ts` (`NOT_PAYABLE`), `lib/messages.test.ts` | pending review |
+| T5.3 | `lib/x402/client.ts`, `lib/x402/client.test.ts`, `scripts/x402-smoke.ts`; the smoke payment on Base Sepolia was run by the agent | pending review |
