@@ -52,7 +52,7 @@ export function claimDepsFromEnv(): ClaimDeps {
     chain: claimChain,
     screen: quickScanWallet,
     loadPackage: (name) => loadPackage(name),
-    payeeOf: async (pkg) =>
+    payeeOf: async (pkg, opts) =>
       resolvePayee(
         {
           id: pkg.id,
@@ -63,7 +63,7 @@ export function claimDepsFromEnv(): ClaimDeps {
           funding: (await loadPackage(pkg.name).catch(() => null))?.funding ?? null,
         },
         {
-          store: dbObservations(),
+          store: opts?.observe === false ? { ...dbObservations(), record: async () => {} } : dbObservations(),
           githubToken: readToken,
           claimOf: async (key) => {
             const { payee } = await claimChain.claimState(key);

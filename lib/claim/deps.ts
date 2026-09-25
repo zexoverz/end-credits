@@ -30,6 +30,7 @@ export type ClaimDeps = {
   chain: ClaimChain;
   screen(address: Address): Promise<WalletScreen>;
   loadPackage(name: string): Promise<NpmPackageWithDownloads>;
-  payeeOf(pkg: PackageRow): Promise<Resolution>;
+  // `observe: false` for page reads, so a page view writes no payee_observations row.
+  payeeOf(pkg: PackageRow, opts?: { observe?: boolean }): Promise<Resolution>;
   now?: () => Date;
 };
