@@ -42,6 +42,36 @@ describe("recentlyChanged", () => {
     expect((await recentlyChanged(store, "p", B, { now: NOW })).changed).toBe(false);
   });
 
+  it("a never-observed file pushed inside 30 days is a change, dated from the push (T2.6)", async () => {
+    const store = memoryStore([obs(B, 0)]);
+    const pushedAt = async () => daysAgo(5);
+    expect(await recentlyChanged(store, "p", B, { now: NOW, pushedAt })).toEqual({
+      changed: true,
+      days: 5,
+    });
+  });
+
+  it("a push older than 30 days, or none found, is not a change", async () => {
+    const store = memoryStore([obs(B, 0)]);
+    for (const pushedAt of [async () => daysAgo(31), async () => null]) {
+      expect(await recentlyChanged(store, "p", B, { now: NOW, pushedAt })).toEqual({
+        changed: false,
+        days: 0,
+      });
+    }
+  });
+
+  it("skips the push lookup when our own observations cover the window", async () => {
+    const store = memoryStore([obs(B, 40), obs(B, 0)]);
+    let called = false;
+    const pushedAt = async () => {
+      called = true;
+      return daysAgo(5);
+    };
+    expect((await recentlyChanged(store, "p", B, { now: NOW, pushedAt })).changed).toBe(false);
+    expect(called).toBe(false);
+  });
+
   it("ignores other packages", async () => {
     const store = memoryStore([obs(A, 5, "other"), obs(B, 1)]);
     expect((await recentlyChanged(store, "p", B, { now: NOW })).changed).toBe(false);
