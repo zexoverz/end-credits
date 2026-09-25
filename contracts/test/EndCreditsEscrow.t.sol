@@ -399,4 +399,39 @@ contract EndCreditsEscrowTest is Test {
         vm.prank(stranger);
         escrow.recordSession(SESSION, bytes32(0), 1, 1, 0, 0, 0, bytes32(0));
     }
+
+    // ---------------------------------------------------------------- fuzz
+
+    function testFuzz_holdRefund_returnsExactAmount(uint256 amount, uint64 ttl, bool byRecorder) public {
+        amount = bound(amount, 1, type(uint128).max);
+        ttl = uint64(bound(ttl, escrow.MIN_TTL(), escrow.MAX_TTL()));
+        address funder = makeAddr("funder");
+        usdc.mint(funder, amount);
+        vm.startPrank(funder);
+        usdc.approve(address(escrow), amount);
+        escrow.hold(TIP, PKG, payee, amount, REASON, ttl);
+        vm.stopPrank();
+        assertEq(usdc.balanceOf(funder), 0);
+        assertEq(escrow.totalPending(), amount);
+
+        if (byRecorder) {
+            vm.prank(recorder);
+        } else {
+            vm.warp(block.timestamp + ttl);
+            vm.prank(stranger);
+        }
+        escrow.refund(TIP);
+
+        assertEq(usdc.balanceOf(funder), amount);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+        assertEq(escrow.totalPending(), 0);
+    }
+
+    function test_hold_revertsAboveUint128() public {
+        uint256 amount = uint256(type(uint128).max) + 1;
+        usdc.mint(payer, amount);
+        vm.expectRevert(abi.encodeWithSignature("SafeCastOverflowedUintDowncast(uint8,uint256)", 128, amount));
+        vm.prank(payer);
+        escrow.hold(TIP, PKG, payee, amount, REASON, TTL);
+    }
 }
