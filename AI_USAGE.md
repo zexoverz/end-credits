@@ -60,3 +60,4 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |
 | T9.2 (frontend) | `app/dashboard/page.tsx`, `app/dashboard/dashboard-view.tsx`, `app/dashboard/sections.tsx`, `lib/client/dashboard.ts`, `lib/client/dashboard.test.ts`, `lib/copy/dashboard.ts`, `docs/plan/decisions.md` (E8/E9 frontend) | pending review |
 | T8.4 | `app/page.tsx`, `lib/copy/landing.ts` | pending review |
+| fix-stale-rpc | `lib/chain/txqueue.ts`, `lib/chain/txqueue.test.ts`, `docs/plan/decisions.md` (Stale RPC reads) | pending review |
