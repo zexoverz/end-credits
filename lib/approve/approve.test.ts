@@ -4,6 +4,7 @@ import { keccak256, type Hex } from "viem";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { TxRevertedError } from "../chain/txqueue";
 import { msg } from "../messages";
+import { ISSUER, worldEnv } from "../world/__fixtures__/idp";
 import {
   connect,
   fakeChain,
@@ -101,14 +102,26 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
     expect(credit.outcome).toBe("held");
   });
 
-  it("WORLD_REQUIRED=true: session approve is 403 and releases nothing", async () => {
+  it("WORLD_REQUIRED=true: start only returns a World URL and releases nothing", async () => {
     process.env.WORLD_REQUIRED = "true";
+    worldEnv();
+    const [o] = await db.select().from(s.owners).where(eq(s.owners.id, ownerId));
+    if (!o.subHash) {
+      await db
+        .update(s.owners)
+        .set({ iss: ISSUER, sub: `approve-test-${ownerId}`, subHash: `0x${"11".repeat(32)}` })
+        .where(eq(s.owners.id, ownerId));
+    }
     const seeded = await seedHold(db, s, ownerId);
     const chain = fakeChain();
     const res = await start(seeded.tipId, chain);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect((await res.json()).url).toMatch(new RegExp(`^${ISSUER}/api/v1/authorize\\?`));
     expect(chain.calls.release).toHaveLength(0);
-    expect((await rows(seeded.tipId)).hold.status).toBe("pending");
+    const { hold, credit, approvals } = await rows(seeded.tipId);
+    expect(hold.status).toBe("pending");
+    expect(credit.outcome).toBe("held");
+    expect(approvals.map((a) => [a.method, a.status])).toEqual([["world", "pending"]]);
   });
 
   it("401 without an owner session, for approve and deny", async () => {

@@ -1,17 +1,21 @@
 // HTTP handlers behind app/api/approve/*. Route files pass the production chain; tests a fake.
 import { currentOwner, withOwner, worldRequired } from "../auth/owner";
+import type { WorldDeps } from "../world/config";
+import { approveWithWorld, startWorldApproval } from "../world/stepup";
 import { approveWithSession, denyHold, type ActionError, type ApproveChain } from "./actions";
 import { isTipId } from "./hold";
 import { approveView } from "./view";
 
 export interface ApproveDeps {
   chain: ApproveChain;
+  /** Test seams for the World step-up; production passes none. */
+  world?: WorldDeps;
 }
 
 const notFound = () => Response.json({ error: "not_found" }, { status: 404 });
 const noStore = { "cache-control": "no-store" };
 
-function errorResponse(r: ActionError): Response {
+function errorResponse(r: ActionError | { error: string; status: number }): Response {
   const { status, ...body } = r;
   return Response.json(body, { status });
 }
@@ -24,9 +28,14 @@ export async function handleApproveView(req: Request, tipId: string): Promise<Re
 
 export function handleApproveStart(req: Request, tipId: string, deps: ApproveDeps): Promise<Response> {
   return withOwner(req, async ({ ownerId }) => {
-    // With World required, approval is the World step-up only (E11).
-    if (worldRequired()) return Response.json({ error: "world_required" }, { status: 403 });
     if (!isTipId(tipId)) return notFound();
+    // With World required (or APPROVE_METHOD=world), approval is the World step-up only (E11):
+    // the session never releases, it only starts a verification.
+    if (approveWithWorld()) {
+      const w = await startWorldApproval(ownerId, tipId, deps.world);
+      if (!("ok" in w)) return errorResponse(w);
+      return Response.json({ status: "verify", url: w.url }, { headers: noStore });
+    }
     const r = await approveWithSession(ownerId, tipId, deps.chain);
     if (!("ok" in r)) return errorResponse(r);
     return Response.json({ status: "approved", releaseTx: r.releaseTx, message: r.message });
