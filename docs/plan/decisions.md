@@ -335,3 +335,41 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
   receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
   `Transfer` log instead.
+## E8 backend
+
+- **Owner auth (`lib/auth/owner.ts`).** iron-session cookie `ec_owner` = `{ownerId}`, password
+  `SESSION_SECRET`, 7-day ttl, `httpOnly`, `sameSite=lax`, `secure` in production. Handlers read
+  and write it through iron-session's `webCookies(req, headers)`, so they run in tests without a
+  Next request scope; `getOwnerSession()` / `requireOwner()` with no argument read Next's
+  `cookies()`. `requireOwner` also checks the owner row still exists.
+- **Dev login.** `OWNER_DEV_TOKEN` is compared as `timingSafeEqual(sha256(a), sha256(b))`, so length
+  does not leak. Both the cookie login and the dev bearer bind to the first owner row
+  (`created_at`, then `id`) and are off when `WORLD_REQUIRED=true` (login answers 403). No rate
+  limit on `/api/auth/dev`; the token is 32+ random bytes.
+- **One release per tip.** Approve and deny lock the hold row (`FOR UPDATE OF holds`) for the whole
+  call, chain tx included. A second click waits, then sees the hold resolved and gets 409. A chain
+  error rolls the transaction back (hold stays `pending`, credit stays `held`) and answers 502 with
+  the custom error name; approve then writes a `failed` approval row with that code.
+- Checks in order: owner (401), `WORLD_REQUIRED` for session approve (403), tip id shape and the
+  hold belonging to this owner (404, so a tip id of someone else's hold is not confirmed), status
+  `pending` (409), not expired (410). **Deny after expiry is also 410**: the expirer refunds it and
+  appends `EXPIRED`.
+- The session approval row is written once, `status 'approved'`, after the release is mined, with
+  `nonce` = 32 random bytes and `approvalRef = keccak256(nonce)` sent to `release`.
+- Owner decisions are appended to `credits.reasons` with `source: "owner"` (a fourth source next to
+  `intercepta`, `policy`, `payee`). Approve sets `outcome 'paid'`, `tx_hash` = release tx,
+  `settled_at`; deny keeps `outcome 'held'` and the hold tx in `tx_hash`, and the refund tx goes to
+  `holds.refund_tx`.
+- **`GET /api/approve/:tipId` is public**, like the roll: the package, amount and reason are on the
+  roll already; it adds the full payee (what is being approved) and whether the viewer is signed in
+  and is the owner. `status` is `expired` once `expires_at` passes, before the expirer runs.
+- **`GET /api/history` is public**, payees shortened as on the roll, every decided credit
+  (`decided_at` set) newest first, 200 max. `txUrl` is a Basescan link only for a 32-byte hash.
+- **Settings bounds:** budget and cap 0.01 to 100 USDC, daily limit 0.01 to 1000, at most 6
+  decimals, strings only; hold TTL 60 s to 7 days (the escrow's `MIN_TTL`/`MAX_TTL`); the cap may
+  not exceed the session budget (checked against the stored row under a lock).
+- **Payer balance:** read with a 5 s timeout; any failure is `error: "rpc_unavailable"`, never the
+  RPC message, which can carry the provider URL.
+- **Agent keys:** `ec_` + 32 random bytes base64url, shown once; `agent_keys.token_hash` is its
+  sha256 hex (the hash `POST /api/sessions` checks). `bound_via 'dev'`. Revoking someone else's key
+  is 404; revoking twice keeps the first time.
