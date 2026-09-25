@@ -34,7 +34,7 @@ export const CLAIM_COPY = {
   WALLET_OR: "Or use an existing address",
   WALLET_USE: "Use this address",
   WALLET_INVALID: "That is not an Ethereum address.",
-  WALLET_SET: "Wallet {address}",
+  WALLET_SET: "Wallet",
 
   PR_WHY: "Adds FUNDING.json with your wallet address to {repo}. Nothing else changes.",
   PR_BUTTON: "Open pull request",
