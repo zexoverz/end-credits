@@ -16,3 +16,4 @@ next-env.d.ts
 *.pem
 .claude/worktrees/
 contracts/broadcast/*/31337/
+.vitest/
