@@ -40,6 +40,20 @@ export function serverMetadata(issuer: string): client.ServerMetadata {
   };
 }
 
+/**
+ * `client_secret_basic` with `encodeURIComponent` on id and secret. openid-client's own also encodes
+ * `-`, `_`, `.`, `~` (RFC 6749 §2.3.1), which a server that does not form-decode the header would
+ * read as a different client id (`app_…` becomes `app%5F…`). Both kinds of server read this one
+ * the same for id and secret made of unreserved characters.
+ */
+export function basicAuth(clientId: string, clientSecret: string): client.ClientAuth {
+  const value = `${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`;
+  const header = `Basic ${Buffer.from(value).toString("base64")}`;
+  return (_as, _client, _body, headers) => {
+    headers.set("authorization", header);
+  };
+}
+
 /** Confidential client, `client_secret_basic` (DESIGN §14.1). */
 export function worldConfig(deps: WorldDeps = {}): client.Configuration {
   const s = worldSettings();
@@ -47,7 +61,7 @@ export function worldConfig(deps: WorldDeps = {}): client.Configuration {
     serverMetadata(s.issuer),
     s.clientId,
     undefined,
-    client.ClientSecretBasic(s.clientSecret),
+    basicAuth(s.clientId, s.clientSecret),
   );
   config.timeout = 10;
   if (deps.fetch) config[client.customFetch] = deps.fetch;
