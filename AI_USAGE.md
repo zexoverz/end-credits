@@ -12,6 +12,13 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T0.3 | `lib/db/schema.ts`, `lib/db/client.ts`, `drizzle.config.ts`, `drizzle/0000_init.sql` | pending review |
 | T0.4 | `lib/env.ts`, `lib/env.test.ts`, `instrumentation.ts` | pending review |
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
+| T2.1 | `lib/registry/npm.ts`, `lib/registry/npm.test.ts`, `lib/registry/npm.live.test.ts` | pending review |
+| T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
+| T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |
+| T2.4 | `lib/payee/change.ts`, `lib/payee/change.test.ts` | pending review |
+| T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
+| T2.6 | `lib/payee/push.ts`, `lib/payee/push.test.ts`, `lib/payee/change.ts`, `lib/payee/change.test.ts`, `docs/plan/decisions.md` (Activity API CONFIRM) | pending review |
+| T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |
 | T1.2 | `cli/src/init.ts`, `cli/src/config.ts`, `cli/src/paths.ts`, `cli/src/args.ts`, `cli/src/index.ts`, their tests, `lib/messages.ts` (CLI strings) | pending review |
 | T1.4 | `lib/attribution/specifier.ts`, `lib/attribution/specifier.test.ts` | pending review |
 | T1.3 | `cli/src/start.ts`, `cli/src/record.ts`, `cli/src/bash.ts`, `cli/src/hook.ts`, `lib/attribution/types.ts`, their tests, `cli/src/hooks.process.test.ts` | pending review |

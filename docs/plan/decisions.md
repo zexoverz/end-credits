@@ -67,6 +67,64 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
   also reads other network keys (`filecoin`, `optimism`, …); we read `ethereum` first, then any other
   `drips.*.ownedBy`.
 
+## E2 and E3 (26 Sep)
+
+- **Registry:** `repository` is read from the requested version (default `latest`), falling back to
+  the top-level doc; `funding` the same. Repo names are lowercased, as in `measure-funding.py`.
+  Funding links keep only `github.com/sponsors/*` and `opencollective.com/*`. In-memory 1 h cache
+  keyed by `name@version`.
+- **Addresses:** a mixed-case address with a wrong EIP-55 checksum, and the zero address, are
+  `PAYEE_INVALID` (strict viem `isAddress`, then `getAddress`). A typo is not a payee.
+- **Invalid falls through:** an invalid address in `FUNDING.json` does not stop resolution; tea and
+  npm funding are still tried. `PAYEE_INVALID` is returned only when nothing valid is found.
+- **GitHub errors:** a raw-file 404 is "no file"; any other status throws so the caller retries,
+  rather than reading an outage as "no payee".
+- **Claim observation** `source_url` is `claim:<packageKey>`.
+- **Anti-spoof (T2.5):** checked after the claim and before the repo files. Mismatch, missing
+  `package.json`, or unparsable JSON → no payee, `SPOOF_REPO`, and npm funding is not tried either.
+  Exception: a root `package.json` with `"private": true` and no `repository.directory` is a workspace
+  root and passes unchecked. Without it `zod` (root has no name) and `date-fns` (root is
+  `@date-fns/root`) would both be reserved as spoofs. A claim is not subject to the check.
+- **Change window:** `days` counts from the first observation of the new address after the last
+  observation of the old one.
+
+### CONFIRM: GitHub Activity API (T2.6)
+
+Checked with `gh api` on 26 Sep. `GET /repos/{o}/{r}/activity?ref=<branch>` returns
+`{before, after, ref, timestamp, activity_type, actor}` per push, newest first, cursor-paginated via
+the `Link` header; `activity_type` is one of `push`, `force_push`, `pr_merge`, `branch_creation`,
+`branch_deletion`, … Works unauthenticated (60/h). History reaches back to at least March 2023
+(prettier, qs). It has no path filter.
+
+- `ljharb/qs` `tea.yaml`: commit `c4d29f35ac`, commit date `2024-03-19T19:51:35Z`; the activity entry
+  with `after = c4d29f35ac` is a `force_push` at `2024-03-19T23:39:26Z`. The server time differs from
+  the commit date, which is the point.
+- `prettier/prettier` `FUNDING.json`: commit `d498b6f2a5`, a `pr_merge` at `2024-04-04T13:55:00Z`.
+
+`firstSeenPush(repo, path, {since})` (`lib/payee/push.ts`): the commits API gives only the SHA of the
+last commit touching the file on the default branch (its dates are never read); the Activity API is
+paged back to `since`; the push whose `after` is that SHA wins, else up to 10 pushes are checked with
+the compare API for the SHA inside a multi-commit push. Not found inside the window → `null`.
+
+`recentlyChanged` calls it only when no different address is in the window and our first observation
+of the package is younger than 30 days (so "never observed" included). Push inside 30 days →
+changed, `days` from the push. Two consequences:
+- the last commit touching the file may be a formatting change, which then reads as a change; the
+  cost is a hold, not a payment.
+- a fixture repo created this week with a `FUNDING.json` holds on first sight. Fine for
+  `moved-payout` (held anyway) and `left-padder-pro` (refused first).
+
+### Split (T3.1)
+
+- The over-cap test is exact (`remaining × score > cap × total`), not on the floored share, so the
+  result equals continuous water-filling floored once; that is what makes the monotonic property
+  hold exactly.
+- A capped amount under the dust floor (cap < 0.01) is `dust`, not `capped`. Dust is not
+  redistributed. Zero scores are left out of the result. Non-integer scores and negative money throw.
+- Guard checks, done by hand: replacing the over-cap filter with `[]` fails "never pays more than
+  the cap" and the two cap cases; replacing `amount < DUST_FLOOR` with `false` fails "never sends a
+  nonzero amount under the dust floor" and the two dust cases. Removing the 30-day window in
+  `recentlyChanged` fails "last seen over 30 days ago is not a change".
 ## E1
 
 - **Ledger.** One line per tool call at most. A Bash install wins over Bash reads. Reads pulled out
