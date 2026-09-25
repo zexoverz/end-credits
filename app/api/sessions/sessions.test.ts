@@ -153,10 +153,10 @@ describe.skipIf(!DB_URL)("sessions API (integration)", () => {
       const [a, b, c, d] = await Promise.all(["a", "b", "c", "d"].map(pkgRow));
       const payee = "0x1234567890abcdef1234567890abcdef12345678";
       await db().insert(s.credits).values([
-        { sessionId: id, packageId: a.id, score: 2, amountMicro: 90_000n, role: "thanks", outcome: "paid", payee },
-        { sessionId: id, packageId: b.id, score: 9, amountMicro: 100_000n, role: "starring", outcome: "held", reasons: ["HELD_MEDIUM"] },
-        { sessionId: id, packageId: c.id, score: 12, amountMicro: 250_000n, role: "starring", outcome: "paid", capped: true, payee, txHash: "0xabc" },
-        { sessionId: id, packageId: d.id, score: 3, amountMicro: 50_000n, role: "research", outcome: "reserved" },
+        { sessionId: id, packageId: a.id, score: 2, amountMicro: BigInt(90_000), role: "thanks", outcome: "paid", payee },
+        { sessionId: id, packageId: b.id, score: 9, amountMicro: BigInt(100_000), role: "starring", outcome: "held", reasons: ["HELD_MEDIUM"] },
+        { sessionId: id, packageId: c.id, score: 12, amountMicro: BigInt(250_000), role: "starring", outcome: "paid", capped: true, payee, txHash: "0xabc" },
+        { sessionId: id, packageId: d.id, score: 3, amountMicro: BigInt(50_000), role: "research", outcome: "reserved" },
       ]);
       const res = await read(id);
       expect(res.status).toBe(200);
