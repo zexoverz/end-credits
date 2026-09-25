@@ -38,3 +38,7 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
 | T5.2 | `lib/x402/constants.ts`, `lib/x402/receipt.ts`, `lib/x402/receipt.test.ts`, `lib/x402/server.ts`, `lib/x402/server.test.ts`, `lib/x402/repo.ts`, `lib/x402/deps.ts`, `app/api/x402/credit/[creditId]/route.ts`, `lib/messages.ts` (`NOT_PAYABLE`), `lib/messages.test.ts` | pending review |
 | T5.3 | `lib/x402/client.ts`, `lib/x402/client.test.ts`, `scripts/x402-smoke.ts`; the smoke payment on Base Sepolia was run by the agent | pending review |
+| T7.1 | `lib/settle/scores.ts`, `manifest.ts`, `store.ts`, `settle.ts`, `run.ts`, `deps.ts`, their tests (`settle.test.ts` on Postgres, `settle.anvil.test.ts` on anvil + Postgres), `worker/loop.ts`, `loop.test.ts`, `worker/settler.ts`, `worker/index.ts`, `lib/messages.ts` (`RESOLVE_FAILED`, `EXECUTION_FAILED`), `lib/messages.test.ts` | pending review |
+| T7.2 | `lib/auth/owner.ts`, `app/api/sessions/[id]/settle/route.ts`, `app/api/sessions/[id]/settle/settle.test.ts` | pending review |
+| T7.3 | `lib/settle/expire.ts`, `lib/settle/expire.test.ts`, `worker/expirer.ts` | pending review |
+| E7 seed | `scripts/seed.ts` (run twice against a local Postgres; `--write-config` not run) | pending review |
