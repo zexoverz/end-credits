@@ -2,6 +2,7 @@
 // identifies the owner.
 import { eq } from "drizzle-orm";
 import { formatUnits } from "viem";
+import { rank } from "../attribution/score";
 import { WEIGHT, type Signal } from "../attribution/types";
 import { db } from "../db/client";
 import { credits, packages, sessions, usage } from "../db/schema";
@@ -13,7 +14,7 @@ export interface CreditView {
   package: string;
   role: string;
   outcome: string | null;
-  amount: string;
+  amount: string | null;
   capped: boolean;
   reasons: unknown;
   signal: MainSignal | null;
@@ -67,6 +68,34 @@ export function rollOrder(a: Row, b: Row): number {
   return a.name < b.name ? -1 : 1;
 }
 
+/** Roll rows from the uploaded usage, before the settler has created credits: same scoring and
+ *  roles as the CLI, no outcome or amount yet. */
+export function previewCredits(rows: UsageRow[]): CreditView[] {
+  const byPkg = new Map<string, Partial<Record<Signal, { count: number }>>>();
+  for (const r of rows) {
+    const signals = byPkg.get(r.packageName) ?? {};
+    signals[r.signal as Signal] = { count: r.count };
+    byPkg.set(r.packageName, signals);
+  }
+  const scored = [...byPkg].map(([name, signals]) => ({
+    name,
+    signals,
+    score: Object.entries(signals).reduce((sum, [s, u]) => sum + weightOf(s) * (u?.count ?? 0), 0),
+  }));
+  const main = mainSignals(rows);
+  return rank(scored.filter((p) => p.score > 0)).map((p) => ({
+    package: p.name,
+    role: p.role,
+    outcome: null,
+    amount: null,
+    capped: false,
+    reasons: [],
+    signal: main.get(p.name) ?? null,
+    txHash: null,
+    payee: null,
+  }));
+}
+
 export async function sessionView(id: string): Promise<SessionView | null> {
   const [session] = await db().select().from(sessions).where(eq(sessions.id, id)).limit(1);
   if (!session) return null;
@@ -84,12 +113,11 @@ export async function sessionView(id: string): Promise<SessionView | null> {
     .from(credits)
     .innerJoin(packages, eq(packages.id, credits.packageId))
     .where(eq(credits.sessionId, id));
-  const signals = mainSignals(
-    await db()
-      .select({ packageName: usage.packageName, signal: usage.signal, count: usage.count })
-      .from(usage)
-      .where(eq(usage.sessionId, id)),
-  );
+  const usageRows = await db()
+    .select({ packageName: usage.packageName, signal: usage.signal, count: usage.count })
+    .from(usage)
+    .where(eq(usage.sessionId, id));
+  const signals = mainSignals(usageRows);
   return {
     id: session.id,
     status: session.status,
@@ -98,7 +126,7 @@ export async function sessionView(id: string): Promise<SessionView | null> {
     startedAt: session.startedAt?.toISOString() ?? null,
     endedAt: session.endedAt?.toISOString() ?? null,
     recordTx: session.recordTx,
-    credits: [...rows].sort(rollOrder).map((r) => ({
+    credits: rows.length === 0 ? previewCredits(usageRows) : [...rows].sort(rollOrder).map((r) => ({
       package: r.name,
       role: r.role,
       outcome: r.outcome,
