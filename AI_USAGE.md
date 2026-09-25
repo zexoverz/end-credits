@@ -7,3 +7,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | Ticket | Files written or changed with AI | Reviewed by the builder |
 |---|---|---|
 | plan | `docs/plan/*` drafted with Claude from the builder's research and decisions | every section |
+| T6.1 | `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules`, `contracts/src/EndCreditsEscrow.sol`, `contracts/test/mocks/MockUSDC.sol`, `contracts/script/Deploy.s.sol`, `docs/plan/decisions.md` | pending review |
+| T6.2 | `contracts/test/EndCreditsEscrow.t.sol`, `contracts/test/EndCreditsEscrow.invariant.t.sol`, `docs/plan/decisions.md` (mutation table) | pending review |
