@@ -123,3 +123,94 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
 - T4.1 probe: `~/.config/dominion/intercepta-key` did not exist on 26 Sep, so
   `scripts/probe-intercepta.ts` is written (10 requests) but not run, and
   `docs/intercepta-probe.md` does not exist yet.
+## E2 and E3 (26 Sep)
+
+- **Registry:** `repository` is read from the requested version (default `latest`), falling back to
+  the top-level doc; `funding` the same. Repo names are lowercased, as in `measure-funding.py`.
+  Funding links keep only `github.com/sponsors/*` and `opencollective.com/*`. In-memory 1 h cache
+  keyed by `name@version`.
+- **Addresses:** a mixed-case address with a wrong EIP-55 checksum, and the zero address, are
+  `PAYEE_INVALID` (strict viem `isAddress`, then `getAddress`). A typo is not a payee.
+- **Invalid falls through:** an invalid address in `FUNDING.json` does not stop resolution; tea and
+  npm funding are still tried. `PAYEE_INVALID` is returned only when nothing valid is found.
+- **GitHub errors:** a raw-file 404 is "no file"; any other status throws so the caller retries,
+  rather than reading an outage as "no payee".
+- **Claim observation** `source_url` is `claim:<packageKey>`.
+- **Anti-spoof (T2.5):** checked after the claim and before the repo files. Mismatch, missing
+  `package.json`, or unparsable JSON → no payee, `SPOOF_REPO`, and npm funding is not tried either.
+  Exception: a root `package.json` with `"private": true` and no `repository.directory` is a workspace
+  root and passes unchecked. Without it `zod` (root has no name) and `date-fns` (root is
+  `@date-fns/root`) would both be reserved as spoofs. A claim is not subject to the check.
+- **Change window:** `days` counts from the first observation of the new address after the last
+  observation of the old one.
+
+### CONFIRM: GitHub Activity API (T2.6)
+
+Checked with `gh api` on 26 Sep. `GET /repos/{o}/{r}/activity?ref=<branch>` returns
+`{before, after, ref, timestamp, activity_type, actor}` per push, newest first, cursor-paginated via
+the `Link` header; `activity_type` is one of `push`, `force_push`, `pr_merge`, `branch_creation`,
+`branch_deletion`, … Works unauthenticated (60/h). History reaches back to at least March 2023
+(prettier, qs). It has no path filter.
+
+- `ljharb/qs` `tea.yaml`: commit `c4d29f35ac`, commit date `2024-03-19T19:51:35Z`; the activity entry
+  with `after = c4d29f35ac` is a `force_push` at `2024-03-19T23:39:26Z`. The server time differs from
+  the commit date, which is the point.
+- `prettier/prettier` `FUNDING.json`: commit `d498b6f2a5`, a `pr_merge` at `2024-04-04T13:55:00Z`.
+
+`firstSeenPush(repo, path, {since})` (`lib/payee/push.ts`): the commits API gives only the SHA of the
+last commit touching the file on the default branch (its dates are never read); the Activity API is
+paged back to `since`; the push whose `after` is that SHA wins, else up to 10 pushes are checked with
+the compare API for the SHA inside a multi-commit push. Not found inside the window → `null`.
+
+`recentlyChanged` calls it only when no different address is in the window and our first observation
+of the package is younger than 30 days (so "never observed" included). Push inside 30 days →
+changed, `days` from the push. Two consequences:
+- the last commit touching the file may be a formatting change, which then reads as a change; the
+  cost is a hold, not a payment.
+- a fixture repo created this week with a `FUNDING.json` holds on first sight. Fine for
+  `moved-payout` (held anyway) and `left-padder-pro` (refused first).
+
+### Split (T3.1)
+
+- The over-cap test is exact (`remaining × score > cap × total`), not on the floored share, so the
+  result equals continuous water-filling floored once; that is what makes the monotonic property
+  hold exactly.
+- A capped amount under the dust floor (cap < 0.01) is `dust`, not `capped`. Dust is not
+  redistributed. Zero scores are left out of the result. Non-integer scores and negative money throw.
+- Guard checks, done by hand: replacing the over-cap filter with `[]` fails "never pays more than
+  the cap" and the two cap cases; replacing `amount < DUST_FLOOR` with `false` fails "never sends a
+  nonzero amount under the dust floor" and the two dust cases. Removing the 30-day window in
+  `recentlyChanged` fails "last seen over 30 days ago is not a change".
+## E1
+
+- **Ledger.** One line per tool call at most. A Bash install wins over Bash reads. Reads pulled out
+  of Bash become `{t:"read", ps:[…]}` (up to 20 paths), only from segments whose command is a reader
+  (`cat head tail less more grep egrep rg ag find fd ls tree sed awk wc bat file stat jq`), so
+  `rm -rf node_modules/x` is not a read. Grep/Glob use `path`, then `pattern`.
+- `start` keeps the first snapshot when a session resumes (SessionStart fires again on
+  resume/clear/compact).
+- **Settle.** The hook writes `<id>.end.json` (`endedAt`, `cwd`) and spawns a detached
+  `endcredits settle --session <id>`, returning in ~90 ms. On success the child writes
+  `<id>.done.json` and deletes the ledger, start and end files; a later retry reopens the same roll
+  without uploading. On failure everything is kept and the error goes to `errors.log`. A session
+  with no installed package used uploads nothing. The opened URL must be on the configured `apiUrl`
+  origin, else `{apiUrl}/credits/<id>` is opened. `ENDCREDITS_NO_OPEN=1` skips the tab.
+- **Timing.** The bundled `record` process, node boot included, takes ~36 ms on a 1 MB Write.
+- **repoLabel** is the `name` in `cwd/package.json`, omitted when absent. Never a path.
+- **Docs mapping.** A `homepage` on a shared host (github.com, gitlab.com, bitbucket.org,
+  npmjs.com, unpkg.com, cdn.jsdelivr.net) is not a host match; a GitHub homepage counts as the repo
+  URL. unpkg and jsdelivr also match `/<name>/…` and `/<name>`. An ambiguous match is sent as
+  evidence `ambiguous <url>`. "Name in the path" checks the full name or the part after the scope.
+- **dep_added** follows DESIGN §5 literally: `(end − start) ∪ add lines`, so an install command for a
+  package already present still counts once. `import` sends no evidence (file hashes stay local).
+- **session_key** = `keccak256` of the UTF-8 bytes of the `sessions.id` uuid string (viem
+  `keccak256(stringToBytes(id))`).
+- **POST /api/sessions** answers 201 when created, 200 with the same `{id, url}` on a re-upload.
+  Idempotency is the `(owner_id, claude_session_id)` unique key with `ON CONFLICT DO NOTHING`, one
+  path for retries and races. Errors are machine codes (`unauthorized`, `invalid_body`,
+  `invalid_json`, `too_large`), not UI text. Body ≤ 2 MB; evidence ≤ cap entries of ≤ 512 chars.
+- **GET /api/sessions/:id**: amounts via `formatUnits(micro, 6)` (`"0.25"`), payee `0x1234…5678`,
+  404 for a non-uuid id. `credits` is empty until the settler writes them.
+- CLI output lives in `CLI_MESSAGES` in `lib/messages.ts`, apart from the DESIGN §11 codes.
+- `next dev` rewrites the repo `AGENTS.md` (Next 16 `agentRules`). Not changed here; revert it or
+  set `agentRules: false` in `next.config.ts`.

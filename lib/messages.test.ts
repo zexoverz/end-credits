@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MESSAGES, msg } from "./messages";
+import { MESSAGES, cliMsg, msg } from "./messages";
 
 describe("msg", () => {
   it("fills every placeholder", () => {
@@ -16,7 +16,7 @@ describe("msg", () => {
     );
   });
 
-  it("has every code from DESIGN §11, plus IMPERSONATION (decisions.md, E4)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(39);
+  it("has every code from DESIGN §11 plus the ones added during the build (decisions.md)", () => {
+    expect(Object.keys(MESSAGES)).toHaveLength(40);
   });
 });
