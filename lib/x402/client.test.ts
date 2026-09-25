@@ -7,7 +7,7 @@ import {
   encodePaymentResponseHeader,
 } from "@x402/core/http";
 import type { PaymentPayload, PaymentRequired, PaymentRequirements } from "@x402/core/types";
-import { payCredit, PaymentRefused, type ClientCredit } from "./client";
+import { checkChallenge, payCredit, PaymentRefused, type ClientCredit } from "./client";
 import { signReceipt } from "./receipt";
 import { handleCreditRequest, type CreditRepo, type PayableCredit } from "./server";
 import { msg } from "../messages";
@@ -147,6 +147,21 @@ describe("payCredit pre-sign checks", () => {
     );
     expect(err.code).toBe("CHALLENGE_MISMATCH");
     expect(signer.signTypedData).not.toHaveBeenCalled();
+  });
+});
+
+describe("checkChallenge", () => {
+  it("accepts the challenge the resource issues", () => {
+    expect(checkChallenge(requirements(), credit, USDC)).toBeNull();
+  });
+
+  it("rejects another network or scheme even if a signer were registered for it", () => {
+    expect(checkChallenge(requirements({ network: "eip155:8453" }), credit, USDC)).toBe("CHALLENGE_MISMATCH");
+    expect(checkChallenge(requirements({ scheme: "upto" }), credit, USDC)).toBe("CHALLENGE_MISMATCH");
+  });
+
+  it("rejects a long-lived authorization window", () => {
+    expect(checkChallenge(requirements({ maxTimeoutSeconds: 86_400 }), credit, USDC)).toBe("CHALLENGE_MISMATCH");
   });
 });
 
