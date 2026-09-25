@@ -76,7 +76,7 @@ describe("signInFailureText", () => {
   it("maps each sign-in callback code", () => {
     expect(signInFailureText(null)).toBeNull();
     expect(signInFailureText("CANCELLED")).toBe(MESSAGES.CANCELLED);
-    expect(signInFailureText("WRONG_HUMAN")).toBe(MESSAGES.WRONG_HUMAN);
+    expect(signInFailureText("WRONG_HUMAN")).toBe(OWNER_COPY.WORLD_WRONG_HUMAN);
     expect(signInFailureText("STATE")).toBe(OWNER_COPY.WORLD_STATE);
     expect(signInFailureText("NO_OWNER")).toBe(OWNER_COPY.WORLD_NO_OWNER);
     expect(signInFailureText("ACR")).toBe(MESSAGES.ACR);

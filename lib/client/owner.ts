@@ -114,6 +114,8 @@ export function signInFailureText(code: string | null): string | null {
   if (!code) return null;
   if (code === "STATE") return OWNER_COPY.WORLD_STATE;
   if (code === "NO_OWNER") return OWNER_COPY.WORLD_NO_OWNER;
+  // MESSAGES.WRONG_HUMAN speaks of an approval; at sign-in it is the account.
+  if (code === "WRONG_HUMAN") return OWNER_COPY.WORLD_WRONG_HUMAN;
   return worldFailureText(code) ?? msg("VERIFY_FAILED");
 }
 
