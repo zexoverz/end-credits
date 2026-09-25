@@ -16,3 +16,25 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
 | T6.3 prep | `contracts/script/Deploy.s.sol` (MultiBaas link), `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules` (`forge-multibaas`), `docs/plan/decisions.md`; no Base Sepolia deploy yet | pending review |
 | T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
+| T5.2 | `lib/x402/constants.ts`, `lib/x402/receipt.ts`, `lib/x402/receipt.test.ts`, `lib/x402/server.ts`, `lib/x402/server.test.ts`, `lib/x402/repo.ts`, `lib/x402/deps.ts`, `app/api/x402/credit/[creditId]/route.ts`, `lib/messages.ts` (`NOT_PAYABLE`), `lib/messages.test.ts` | pending review |
+| T5.3 | `lib/x402/client.ts`, `lib/x402/client.test.ts`, `scripts/x402-smoke.ts`; the smoke payment on Base Sepolia was run by the agent | pending review |
+| T4.1 | `scripts/probe-intercepta.ts` (not run yet: no key) | pending review |
+| T4.2 | `lib/intercepta/client.ts`, `http.ts`, `schemas.ts`, `cache.ts`, `repo.ts`, `__fixtures__/memory-repo.ts`, `client.test.ts`, `client.live.test.ts`, `cache.test.ts`, `lib/db/schema.ts`, `drizzle/0001_screens_impersonation.sql` | pending review |
+| T4.3 | `lib/intercepta/mapping.ts`, `mapping.test.ts` | pending review |
+| T4.4 | failure policy in `lib/intercepta/http.ts`, `client.ts`, `lib/decision/matrix.ts`; tests in `client.test.ts`, `matrix.test.ts` | pending review |
+| T4.5 | `lib/decision/types.ts`, `matrix.ts`, `lookalike.ts`, their tests, `lib/messages.ts` (`IMPERSONATION`) | pending review |
+| T4.6 | `lib/decision/spam.ts`, `spam.test.ts` | pending review |
+| T4.7 | `lib/decision/no-code.ts`, `no-code.test.ts` | pending review |
+| T2.1 | `lib/registry/npm.ts`, `lib/registry/npm.test.ts`, `lib/registry/npm.live.test.ts` | pending review |
+| T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
+| T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |
+| T2.4 | `lib/payee/change.ts`, `lib/payee/change.test.ts` | pending review |
+| T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
+| T2.6 | `lib/payee/push.ts`, `lib/payee/push.test.ts`, `lib/payee/change.ts`, `lib/payee/change.test.ts`, `docs/plan/decisions.md` (Activity API CONFIRM) | pending review |
+| T3.1 | `lib/allocation/split.ts`, `lib/allocation/split.test.ts` | pending review |
+| T1.2 | `cli/src/init.ts`, `cli/src/config.ts`, `cli/src/paths.ts`, `cli/src/args.ts`, `cli/src/index.ts`, their tests, `lib/messages.ts` (CLI strings) | pending review |
+| T1.4 | `lib/attribution/specifier.ts`, `lib/attribution/specifier.test.ts` | pending review |
+| T1.3 | `cli/src/start.ts`, `cli/src/record.ts`, `cli/src/bash.ts`, `cli/src/hook.ts`, `lib/attribution/types.ts`, their tests, `cli/src/hooks.process.test.ts` | pending review |
+| T1.5 | `lib/attribution/score.ts`, `lib/attribution/docs.ts`, `lib/attribution/score.test.ts` | pending review |
+| T1.6 | `cli/src/attribute.ts`, `cli/src/settle.ts`, `cli/src/fixture.ts`, `cli/src/index.ts`, their tests | pending review |
+| T1.7 | `lib/sessions/schema.ts`, `lib/sessions/auth.ts`, `lib/sessions/ingest.ts`, `lib/sessions/view.ts`, `app/api/sessions/route.ts`, `app/api/sessions/[id]/route.ts`, `lib/sessions/schema.test.ts`, `app/api/sessions/sessions.test.ts` | pending review |
