@@ -486,3 +486,65 @@ Nothing below has been run against a deployment yet; the UNVERIFIED items are wh
 Address screens are reused for 5 minutes, token screens for 1 hour. The x402 route refuses to pay on
 an address screen older than 10 minutes, so a 1 hour reuse would decide `paid` and then fail at
 payment. Found while wiring E7.
+
+## E11
+
+- **Discovery doc, read live 26 Sep** (`curl https://auth.world.org/.well-known/openid-configuration`):
+  issuer `https://auth.world.org`; authorize `/api/v1/authorize`, token `/api/v1/token`, device
+  `/api/v1/device_authorization`, JWKS `/.well-known/jwks.json` (one RS256 key). Token auth methods
+  `client_secret_basic`, `client_secret_post`, `private_key_jwt` (RS256). ID token alg RS256 only.
+  `response_types` `code`, `response_modes` `query`, grants `authorization_code` and
+  `urn:ietf:params:oauth:grant-type:device_code`, scope `openid` only, PKCE `S256` only, prompt
+  `none` and `login`, acr `https://world.org/oidc/acr/orb-v3` only, subject type `pairwise`,
+  `request_uri` not supported. Claims `iss sub aud exp iat jti nonce auth_time acr amr`.
+- The endpoints are built from `WORLD_ISSUER` with those fixed paths; no discovery request at boot.
+- **Libraries:** `openid-client` 6.8 (authorize URL, PKCE, state, nonce, code grant, device grant)
+  and `jose` 6.2 (`compactVerify` against the issuer's remote JWKS). openid-client does not check the
+  ID token signature in the code flow (TLS token endpoint); our `verifyIdToken` does, and is the
+  check of record for every flow.
+- **Basic auth:** own `ClientAuth` sending `Basic base64(encodeURIComponent(id):encodeURIComponent(secret))`.
+  openid-client's `ClientSecretBasic` also encodes `_ - . ~`, so `app_…` goes out as `app%5F…`; a
+  server that does not form-decode the header would not know that client. Ours is identical for any
+  server when id and secret are unreserved characters.
+- **Callback URL:** the token request's `redirect_uri` is rebuilt from `APP_URL` + path + query,
+  not `req.url`, which carries the internal host behind the Railway proxy.
+- **openid-client claim errors** (nonce, iss, aud/azp, exp) are mapped to the same codes as
+  `verifyIdToken`; any other exchange failure is `TOKEN`. Its clock tolerance is its default 30 s,
+  same as ours.
+- **Approval nonce payload** adds `attempt` (the approval row id) to DESIGN §14.2's fields.
+  `approvals.nonce` is unique, and without it a retry of the same tip (after CANCELLED or
+  STALE_AUTH) would hash to the same nonce. `amount` is micro-USDC as a decimal string.
+  `approvalRef = keccak256(utf8(nonce))`.
+- **Sealed secrets:** the approval's PKCE verifier (10 min) and the device code are sealed with
+  iron-session's `sealData` under `SESSION_SECRET`; no separate AES helper. The sign-in's state,
+  nonce and verifier live in the `ec_world` iron-session cookie (10 min, httpOnly, sameSite lax,
+  path `/api/auth/world`), cleared on the callback whatever happens.
+- **Owner binding:** first World sign-in binds the first owner row (`created_at`, the same one dev
+  login used) only while its `iss` is null, as a conditional update; any other human after that is
+  `WRONG_HUMAN`. Sign-in failures redirect to `/owner?world=<CODE>` (`CANCELLED`, `STATE`, the token
+  codes, `WRONG_HUMAN`, `NO_OWNER`).
+- **Step-up start:** `POST /api/approve/:tipId/start` starts World instead of releasing when
+  `WORLD_REQUIRED=true` or `APPROVE_METHOD=world`, answering `{status: "verify", url}`. It needs
+  the owner bound to a World ID (else 409 `world_not_bound`) and the same hold checks as the
+  session path (404 / 409 / 410). The session path's 403 under `WORLD_REQUIRED` is replaced by this.
+- **Step-up callback:** order is state (400 `UNKNOWN_STATE`, also for a used or failed state),
+  `error` param (`CANCELLED`, any error value), verifier seal (expired → `STALE_AUTH`), exchange and
+  `verifyIdToken` with the row's nonce, `(iss, sub)` equal to the owner (`WRONG_HUMAN`), `auth_time`
+  (seconds) `>= floor(started_at)` in seconds (`STALE_AUTH`, also when missing), then the release
+  under the hold lock with the same checks as the session path. Every failure sets the approval
+  `failed` with its code and redirects to `/approve/<tipId>?result=<CODE>`; success redirects with
+  `result=APPROVED`. The callback does not need the owner cookie: the ID token is the proof.
+- For the page: `CANCELLED`, `STALE_AUTH`, `WRONG_HUMAN`, `NONCE`, `ACR` have their own messages;
+  `AMR` reads best as `ACR`; `SIG`, `ISS`, `AUD`, `EXP`, `SUB`, `TOKEN` show `VERIFY_FAILED`. New
+  messages: `UNKNOWN_STATE`, `VERIFY_FAILED`, and the CLI's `LOGIN_*`.
+- **Device grant:** `/api/agent/device/start` is unauthenticated (the CLI has no key yet) and not
+  rate limited. The poll `id` is a v4 uuid known only to that CLI; the device code never leaves the
+  server. One token request per poll call; the CLI owns the interval. `device_sessions.status`:
+  `pending`, `complete`, `denied`, `expired`, `failed`; a terminal status answers the same on every
+  later poll. The key is issued in one transaction with a conditional `pending → complete`, so two
+  racing polls issue one key. No binding on this path: the `(iss, sub)` must already be an owner.
+- **UNVERIFIED until a live World App run:** that World's token endpoint accepts our Basic header;
+  `auth_time` present in the step-up ID token and after `max_age=0`; the cancel redirect's exact
+  `error` value; whether the device grant's ID token carries `acr` orb-v3 and `amr` `pop` (we
+  require both); `verification_uri_complete` and `interval` in the device response; `aud` shape;
+  the production portal URL.
