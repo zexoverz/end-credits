@@ -21,5 +21,7 @@ export const ledgerPath = (home: string, id: string) =>
   path.join(sessionsDir(home), `${id}.jsonl`);
 export const startPath = (home: string, id: string) =>
   path.join(sessionsDir(home), `${id}.start.json`);
-export const donePath = (home: string, id: string) =>
+export const endPath = (home: string, id: string) =>
+  path.join(sessionsDir(home), `${id}.end.json`);
+export const donePath =(home: string, id: string) =>
   path.join(sessionsDir(home), `${id}.done.json`);

@@ -61,6 +61,7 @@ export const CLI_MESSAGES = {
   UPLOAD_FAILED:
     "End Credits: upload failed ({error}). The ledger is kept; retry with: endcredits settle --session {id}",
   NOTHING_USED: "No installed packages were used in session {id}.",
+  TABLE_HEADER: "package|version|role|score|signals",
 } as const;
 
 export type CliMessageCode = keyof typeof CLI_MESSAGES;
