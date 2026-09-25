@@ -100,7 +100,6 @@ Source: https://code.claude.com/docs/en/hooks and /docs/en/tools-reference, Clau
 - CLI output lives in `CLI_MESSAGES` in `lib/messages.ts`, apart from the DESIGN §11 codes.
 - `next dev` rewrites the repo `AGENTS.md` (Next 16 `agentRules`). Not changed here; revert it or
   set `agentRules: false` in `next.config.ts`.
-||||||| 7ee251d
 ## E2 and E3 (26 Sep)
 
 - **Registry:** `repository` is read from the requested version (default `latest`), falling back to
@@ -159,3 +158,59 @@ changed, `days` from the push. Two consequences:
   the cap" and the two cap cases; replacing `amount < DUST_FLOOR` with `false` fails "never sends a
   nonzero amount under the dust floor" and the two dust cases. Removing the 30-day window in
   `recentlyChanged` fails "last seen over 30 days ago is not a change".
+## E4 (26 Sep)
+
+### Intercepta API, confirmed from the OpenAPI docs
+
+Index `https://docs.web3antivirus.io/llms.txt`; each reference page + `.md` holds its OpenAPI JSON.
+Base `https://api.web3antivirus.io`, header `X-API-KEY`.
+
+- Quick scan: `GET /api/public/v2/extension/account/{address}/quick-scan`
+  (`/reference/quick-scan-address.md`). `/toxic-score` (`/reference/scan-address.md`, "Deep Scan")
+  returns the same `ToxicScoreShortResponseV2`: `{toxicScore: number, traits: [{name, risk,
+  txsCount, description}]}`. No `chainId`. Trait names include `sanction_address`, `known_scammer`,
+  `blacklist`, `fake_phishing_transfer`, `mixer_transfers`, `sanction_address_communication`,
+  `rug_pull` and others; we parse `name` as a free string.
+- Token risks: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453`
+  (`/reference/scan-token.md`). `{apiVersion, riskScore, riskLevel: neutral|low|medium|high,
+  category, trust: whitelist|blocklist|neutral, action: block|warn|info, detectors: [{code,
+  description}], token: {chainId, address, symbol}, saleTax, buyTax}`.
+- Simulation: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`
+  (`/reference/scan-transaction.md`), chains `1, 56, 8453, 42161, 10, solana`. Body
+  `{transaction: {from, to, value, data, gas?, gasPrice?}, mode: "short"}`. Response
+  `{to, from, detectors: [{code, description}], assetsMovement: {send, receive}, transactionType}`.
+  We simulate `USDC.transfer(payee, amount)` on Base USDC from the payer.
+- **Impersonation (the SPEC §7.1 CONFIRM): there is a dedicated endpoint.**
+  `GET /api/public/v1/extension/poisoning-attack/check-address/{address}`
+  (`/reference/detect-address-impersonation.md`) → `{isAddressPoisoned: boolean, originalAddress}`.
+  Its sibling `/poisoning-attack/user/{address}` lists attacks *against* a wallet and is not used.
+
+### Choices
+
+- `screenPayee` runs quick scan, impersonation and token risks in parallel (token risks hit the 1 h
+  cache after the first payee). Simulation runs only when quick scan fails. Any of the three still
+  failing sets `Screen.error`, so the matrix holds. A payee therefore costs 2 requests, not 1.
+- A positive impersonation check refuses at rule 4 with a new message code `IMPERSONATION`
+  (`Refused. Intercepta: this address impersonates {original} (address poisoning).`), so
+  `MESSAGES` has 39 codes. Our own lookalike rule still runs after it, labelled as ours.
+- New `screens.kind` value `impersonation` (migration `0001_screens_impersonation`).
+- Simulation fallback: its detectors become `Screen.traits` (name = detector code, description
+  verbatim), toxic score 0. `CRITICAL` also holds `SCAM_ADDRESS`, `MALICIOUS_ADDRESS`,
+  `TRANSFER_TO_POISONING_ADDRESS`, `POISONING_ATTACK` so a scam recipient found this way is refused.
+- Failure mapping: deadline hit → `TIMEOUT` (the deadline races the fetch, so a fetch that ignores
+  its signal still times out); non-2xx or network error → `HTTP`; bad JSON or a body that fails
+  the schema → `PARSE`. Every call, failed or not, is a `screens` row (status 0 when there was no
+  HTTP answer). Only status-200 rows that pass the schema again are reused from the cache.
+- `DecideInput` gains `pkg` (the message texts need `{package}`); `Screen` gains `impersonation` and
+  `screenIds` (for `credits.screen_ids`). Reason sources: `intercepta`, `policy`, `payee` as in
+  DESIGN §3. `SCREENED_AS` is appended to every decision made on a successful screen.
+- Held on token `warn` uses `HELD_MEDIUM` with the address score, which may read `(0)`. Left as is.
+- Spam: an unknown download count is not treated as low.
+- `noCodeOnBase` reads `getCode` on `ETH_MAINNET_RPC` / `BASE_MAINNET_RPC` (defaults
+  `https://ethereum-rpc.publicnode.com`, `https://mainnet.base.org`). An RPC error throws rather
+  than returning false. An EIP-7702 delegation (`0xef0100…`) counts as an EOA. Live fixtures,
+  checked with `eth_getCode` on 26 Sep: DAI `0x6B175474E89094C44Da98b954EedeAC495271d0F` is on
+  Ethereum only; Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` is on both.
+- T4.1 probe: `~/.config/dominion/intercepta-key` did not exist on 26 Sep, so
+  `scripts/probe-intercepta.ts` is written (10 requests) but not run, and
+  `docs/intercepta-probe.md` does not exist yet.

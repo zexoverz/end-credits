@@ -16,8 +16,8 @@ describe("msg", () => {
     );
   });
 
-  it("has every code from DESIGN §11, plus SPOOF_REPO (T2.5)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(39);
+  it("has every code from DESIGN §11, plus SPOOF_REPO (T2.5) and IMPERSONATION (E4)", () => {
+    expect(Object.keys(MESSAGES)).toHaveLength(40);
   });
 
   it("names the repo and package in SPOOF_REPO", () => {
