@@ -228,6 +228,20 @@ describe.skipIf(!TEST_DB)("world approval step-up (integration)", () => {
     expect(r.after.approvals[0]).toMatchObject({ status: "failed", failureCode: "STALE_AUTH" });
   });
 
+  it("an approval started over 10 minutes ago: STALE_AUTH before any token call", async () => {
+    const seeded = await seedHold(db, s, ownerId);
+    const url = await startApproval(seeded.tipId);
+    const [hold] = await db.select().from(s.holds).where(eq(s.holds.tipId, seeded.tipId));
+    await db
+      .update(s.approvals)
+      .set({ startedAt: new Date(Date.now() - 11 * 60_000) })
+      .where(eq(s.approvals.holdId, hold.id));
+    const { res, chain, calls } = await callback(url, { auth_time: Math.floor(Date.now() / 1000) });
+    expect(new URL(res.headers.get("location")!).searchParams.get("result")).toBe("STALE_AUTH");
+    expect(calls).toHaveLength(0);
+    expect(chain.calls.release).toHaveLength(0);
+  });
+
   it("missing auth_time: STALE_AUTH, nothing released", async () => {
     const r = await denied({ auth_time: undefined });
     expect(r.code).toBe("STALE_AUTH");
