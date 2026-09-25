@@ -727,3 +727,17 @@ payment. Found while wiring E7.
 - Live check, 26 Sep: hold then immediate refund, 3 times on `sepolia.base.org`, all refunded
   (holds `0xd36dcf08…`, `0x68f22392…`, `0xb964ad55…`; refunds `0xcd5853f2…`, `0x13fee051…`,
   `0xf1d0a896…`). Not logged whether a re-simulation fired on these runs.
+
+## Live deployment (26 Sep)
+
+- `EndCreditsEscrow` on Base Sepolia at `0x63047583FbCe241D72d71137C940aa27BBdC60f1`, deployed from
+  `ethglobal-tokyo` through the forge-multibaas plugin (tx `0x3ddf9e35…6ed8`). Verified on Sourcify
+  (`exact_match`), Blockscout and Basescan.
+- MultiBaas deployment on Base Sepolia: escrow linked as `escrow`, USDC linked as `usdc`, six saved
+  queries, webhook `endcredits` to `/api/webhooks/multibaas`. The live API rejects a contract
+  without bytecode, answers PUT /queries without `result`, caps `limit` at 50, and returns bytes32
+  as a byte-array string; all four handled.
+- Live checks: hold then refund round trips through `lib/chain`, indexed by MultiBaas, `Held` and
+  `Refunded` delivered by the webhook, owner notifications created; a CLI-recorded session
+  uploaded to production and shown on the roll before settlement.
+- Postgres has a Railway TCP proxy so migrations and the seed run from the laptop.
