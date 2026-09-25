@@ -176,4 +176,61 @@ contract EndCreditsEscrowTest is Test {
         vm.prank(recorder);
         escrow.release(TIP, APPROVAL);
     }
+
+    // -------------------------------------------------------------- refund
+
+    function test_refund_byRecorderBeforeExpiry() public {
+        _hold();
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Refunded(TIP, payer, AMOUNT, false);
+
+        vm.prank(recorder);
+        escrow.refund(TIP);
+
+        assertEq(usdc.balanceOf(payer), START);
+        assertEq(usdc.balanceOf(payee), 0);
+        assertEq(escrow.totalPending(), 0);
+        assertEq(uint8(_status(TIP)), uint8(EndCreditsEscrow.TipStatus.Refunded));
+    }
+
+    function test_refund_revertsForStrangerBeforeExpiry() public {
+        uint64 expiresAt = _hold();
+        vm.warp(expiresAt - 1);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotExpired.selector, TIP));
+        vm.prank(stranger);
+        escrow.refund(TIP);
+    }
+
+    function test_refund_byAnyoneAfterExpiry() public {
+        uint64 expiresAt = _hold();
+        vm.warp(expiresAt);
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Refunded(TIP, payer, AMOUNT, true);
+
+        vm.prank(stranger);
+        escrow.refund(TIP);
+
+        assertEq(usdc.balanceOf(payer), START);
+        assertEq(usdc.balanceOf(stranger), 0);
+        assertEq(escrow.totalPending(), 0);
+    }
+
+    function test_refund_revertsTwice() public {
+        _hold();
+        vm.startPrank(recorder);
+        escrow.refund(TIP);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
+        escrow.refund(TIP);
+        vm.stopPrank();
+    }
+
+    function test_refund_revertsAfterRelease() public {
+        uint64 expiresAt = _hold();
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL);
+        vm.warp(expiresAt);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
+        vm.prank(stranger);
+        escrow.refund(TIP);
+    }
 }
