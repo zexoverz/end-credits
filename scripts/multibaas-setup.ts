@@ -59,6 +59,7 @@ async function linkUsdc(mb: MultiBaasClient): Promise<void> {
       contractName: "USDC",
       version: "1.0",
       rawAbi: JSON.stringify(erc20Abi),
+      bin: "0x", // MultiBaas rejects a contract without bytecode; USDC is only linked, never deployed
     });
     console.log("usdc: contract ABI uploaded");
   } else console.log("usdc: contract ABI exists, skipped");
