@@ -382,4 +382,21 @@ contract EndCreditsEscrowTest is Test {
         assertEq(usdc.balanceOf(maintainerA), 0);
         assertEq(escrow.reserved(PKG), 0);
     }
+
+    // ------------------------------------------------------- recordSession
+
+    function test_recordSession_emits() public {
+        bytes32 ownerHash = keccak256("owner");
+        bytes32 manifest = keccak256("manifest");
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.SessionSettled(SESSION, ownerHash, 5e6, 3e6, 1e6, 5e5, 5e5, manifest);
+        vm.prank(recorder);
+        escrow.recordSession(SESSION, ownerHash, 5e6, 3e6, 1e6, 5e5, 5e5, manifest);
+    }
+
+    function test_recordSession_revertsForNonRecorder() public {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
+        vm.prank(stranger);
+        escrow.recordSession(SESSION, bytes32(0), 1, 1, 0, 0, 0, bytes32(0));
+    }
 }
