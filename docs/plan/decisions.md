@@ -297,3 +297,41 @@ Base `https://api.web3antivirus.io`, header `X-API-KEY`.
   Base Sepolia test until the escrow is deployed.
 - `origin/e0-foundation` had committed a gitlink for `.claude/worktrees/agent-a44bbe6f…`, which
   broke `git submodule update`; removed on this branch.
+## E5
+
+- **Manual resource route, no `withX402`.** `app/api/x402/credit/[creditId]` calls
+  `handleCreditRequest` (`lib/x402/server.ts`), which builds the v2 challenge itself and calls the
+  facilitator's `verify` then `settle` directly (`HTTPFacilitatorClient`). This lets the 409 run
+  before any quote and gives the handler the settle tx hash to sign and store the receipt.
+  `@x402/next` and `@x402/paywall` are not installed.
+- **Order in the handler:** unknown credit → 404; already settled (`tx_hash` and `receipt` set) →
+  the stored receipt, 200, before the freshness check, so a receipt stays readable after its screen
+  ages out; outcome not `paid`/`capped`, or no `status 200` `address` screen of the payee (matched
+  case-insensitively) within 10 min → 409 `NOT_PAYABLE`; no `PAYMENT-SIGNATURE` → 402.
+- **The server re-checks the payment against the credit** (`accepted` scheme, network, asset,
+  payTo, amount, and the signed authorization's `to` and `value`) before it calls the facilitator,
+  and passes its own requirements, not the client's copy, to `verify` and `settle`. Failures come
+  back as a 402 whose `error` is `CHALLENGE_MISMATCH`, `INVALID_PAYMENT` or the facilitator's reason.
+- **Challenge differs from DESIGN §10 as the x402 v2 CONFIRM says:** `resource` is the top-level
+  `{url, description}`; each accept carries `maxTimeoutSeconds: 120` and
+  `extra: {name:"USDC", version:"2"}`. `resource.url` is built from `APP_URL`, not `req.url`.
+- **Receipt:** `{creditId, package, amount, payee, tx}`, `amount` in micro-USDC as a string, signed
+  with `RECEIPT_SIGNING_KEY` by `signMessage` over the JSON with sorted keys; `sig` and `signer`
+  added. The client checks the signature, `creditId`, `payee` and that `tx` equals the
+  `PAYMENT-RESPONSE` transaction.
+- **Client spend controls are off (`setSpendControls(false)`), not `{maxAmountPerPayment:false}`.**
+  With an object, the library's default-asset allowlist rejects a wrong token before our hook runs,
+  so the refusal would be a library error instead of `TOKEN_PIN`. Our `onBeforePaymentCreation` hook
+  is the gate. Only `eip155:84532` is registered; a challenge on another network fails selection
+  and is mapped to `CHALLENGE_MISMATCH`, and the hook checks the network too.
+- **Extra client checks beyond DESIGN §10:** `extra` must be `{name:"USDC", version:"2"}` with no
+  `assetTransferMethod` other than `eip3009`, and `maxTimeoutSeconds` must be 1 to 120; else
+  `CHALLENGE_MISMATCH`.
+- **New message `NOT_PAYABLE`** ("Not paid: this credit has no fresh paid decision to pay
+  against."): the 409 body and the client refusal when `decisionAllowsPay` is false.
+- **Smoke run (26 Sep):** `scripts/x402-smoke.ts` paid 0.01 USDC from the payer to
+  `0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13` through `https://x402.org/facilitator`, tx
+  `0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`, block 47293505, status 1,
+  `AuthorizationUsed` and a `Transfer` of 10000 in the receipt. `balanceOf` read right after the
+  receipt returned the pre-transfer value from `sepolia.base.org`, so the script now reads the
+  `Transfer` log instead.
