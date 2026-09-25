@@ -33,6 +33,8 @@ export const MESSAGES = {
   WRONG_HUMAN: "This approval belongs to a different human.",
   NONCE: "This verification was not issued for this approval.",
   ACR: "A proof-of-human credential is required.",
+  UNKNOWN_STATE: "This verification is not for a pending approval. Nothing was released.",
+  VERIFY_FAILED: "The verification could not be checked. Nothing was released.",
   APPROVE_SENTENCE: "Release {amount} USDC to {address} for {package}.",
   CLAIM_HEADLINE: "Agents set aside {amount} USDC for {package} from {sessions} sessions.",
   NO_PERMISSION: "You need push or admin access to {repo} to claim for {package}.",
