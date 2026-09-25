@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>End Credits demo storyboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f1ea;--ink:#1c1b19;--muted:#6b675f;--card:#fffdf8;--line:#e2ddd1;--green:#1f8a4c;--amber:#b7791f;--blue:#2b6cb0;--red:#c53030;--violet:#6b46c1;--film:#0c0b0a;--gold:#e9c46a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 16px 80px}
+h1{font:800 34px/1.1 Inter;margin:0 0 6px}.sub{color:var(--muted);margin:0 0 28px}
+.note{background:#fff7e0;border:1px solid #f0dca0;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:28px}
+.frame{display:grid;grid-template-columns:260px 1fr;gap:22px;margin:0 0 34px;align-items:start}
+.meta .t{font:600 13px 'JetBrains Mono',monospace;color:var(--violet)}
+.meta h2{font:800 20px/1.2 Inter;margin:4px 0 8px}.meta p{margin:0 0 8px;color:#3a3833;font-size:14px}
+.say{border-left:3px solid var(--gold);padding:4px 10px;font-style:italic;background:#fffaf0;font-size:14px;margin-top:8px}
+.shot{border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.12);border:1px solid var(--line);background:var(--card)}
+.bar{display:flex;gap:6px;align-items:center;padding:9px 12px;background:#ece8df;border-bottom:1px solid var(--line);font:12px 'JetBrains Mono',monospace;color:var(--muted)}
+.bar i{width:10px;height:10px;border-radius:50%;background:#d8d2c4;display:inline-block}
+.term{background:#15141a;color:#d7d4e0;font:13px/1.6 'JetBrains Mono',monospace;padding:16px 18px}
+.term .p{color:#8be9a8}.term .d{color:#8a86a0}.term .hl{color:var(--gold)}
+.film{background:var(--film);color:#efe9dc;text-align:center;padding:34px 20px 28px;font-family:'Playfair Display',serif}
+.film .made{font-style:italic;font-size:15px;color:#bdb4a2;letter-spacing:.06em}
+.film .ttl{font-size:28px;margin:6px 0 18px;letter-spacing:.02em}
+.row{display:grid;grid-template-columns:1fr 110px 120px;gap:10px;align-items:center;max-width:620px;margin:0 auto;padding:7px 0;border-bottom:1px solid #26231f;font-family:Inter;font-size:14px;text-align:left}
+.row .n{font-family:'JetBrains Mono',monospace}.row .w{color:#9c9384;font-size:12px}
+.b{font:600 11px Inter;padding:3px 8px;border-radius:99px;text-align:center;white-space:nowrap}
+.paid{background:#d9f2e3;color:var(--green)}.capped{background:#dbe8f7;color:var(--blue)}.held{background:#fcecd1;color:var(--amber)}.refused{background:#fbdada;color:var(--red)}.reserved{background:#e7e0f6;color:var(--violet)}
+.reason{grid-column:1/-1;color:#b9ae9a;font-size:12px;margin-top:-2px}
+.panel{padding:18px}
+.kv{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kv div{background:#faf7f0;border:1px solid var(--line);border-radius:10px;padding:10px}
+.kv b{display:block;font-size:22px}.kv span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-weight:600}
+.phone{width:250px;margin:18px auto;border:10px solid #1c1b19;border-radius:34px;padding:18px 14px;background:#fff;text-align:center}
+.phone .ic{width:52px;height:52px;border-radius:50%;background:#1c1b19;color:#fff;display:grid;place-items:center;margin:6px auto 10px;font-weight:800}
+.btn{display:inline-block;padding:9px 14px;border-radius:9px;font-weight:600;font-size:13px;margin:4px}
+.btn.dark{background:#1c1b19;color:#fff}.btn.ghost{border:1px solid var(--line)}
+.steps{display:flex;gap:10px;flex-wrap:wrap}.step{flex:1 1 170px;background:#faf7f0;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px}
+.step b{display:block;margin-bottom:4px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 26px}
+@media (max-width:760px){.frame{grid-template-columns:1fr}.kv{grid-template-columns:repeat(2,1fr)}.row{grid-template-columns:1fr 90px}.row .w{display:none}}
+</style>
+</head>
+<body><div class="wrap">
+<h1>End Credits: demo storyboard</h1>
+<p class="sub">Your AI agent pays every open-source project it used, and never pays the scammers pretending to be them.</p>
+<div class="note">Mockup to explain the flow. Held and refused rows use our own @endcredits-demo packages, never a real package, amounts are illustrative. The real demo runs on a real session and real package metadata.</div>
+<div class="legend"><span class="b paid">paid</span><span class="b capped">capped</span><span class="b held">held</span><span class="b refused">refused</span><span class="b reserved">reserved</span></div>
+
+<!-- 1 -->
+<div class="frame"><div class="meta"><div class="t">0:00 – 0:15</div><h2>1. The problem, in their words</h2>
+<p>One slide, Adam Wathan's own GitHub comment. Nothing else on screen.</p>
+<div class="say">"Tailwind is more popular than ever, docs traffic is down 40%, and 75% of the engineering team was laid off. AI uses open source and pays nothing back."</div></div>
+<div class="shot"><div class="bar"><i></i><i></i><i></i> github.com/tailwindlabs/tailwindcss.com/pull/2388</div>
+<div class="panel" style="font-size:15px"><b>adamwathan</b> commented · Jan 7, 2026<br><br>“…75% of the people on our engineering team lost their jobs here yesterday because of the brutal impact AI has had on our business.”<br><br>“Traffic to our docs is down about 40% from early 2023 despite Tailwind being more popular than ever.”</div></div></div>
+
+<!-- 2 -->
+<div class="frame"><div class="meta"><div class="t">0:15 – 0:20</div><h2>2. A real agent session ends</h2>
+<p>A Claude Code session recorded 10–15 minutes earlier in a real repo. The End Credits hook fires when it stops.</p>
+<div class="say">"This is my agent's session from ten minutes ago. When it finishes…"</div></div>
+<div class="shot"><div class="bar"><i></i><i></i><i></i> terminal · claude</div>
+<div class="term"><span class="p">✓</span> Added date range filter to /reports (4 files changed)<br>
+<span class="d">session: 38 tool calls · read 11 packages · fetched 3 docs pages</span><br><br>
+<span class="hl">▶ end-credits</span> session budget $2.00 · cap $0.25 per project<br>
+<span class="d">attributing usage… resolving payees… screening with Intercepta…</span><br>
+<span class="p">→</span> rolling credits at <u>endcredits.app/s/7f3a</u></div></div></div>
+
+<!-- 3 -->
+<div class="frame"><div class="meta"><div class="t">0:20 – 0:35</div><h2>3. The credits roll</h2>
+<p>Film-style credits scroll up: every package and docs site the session used, weighted by how much it was used.</p>
+<div class="say">"…it rolls credits. Everyone who made this work possible."</div></div>
+<div class="shot"><div class="film"><div class="made">This session was made possible by</div><div class="ttl">END CREDITS</div>
+<div class="row"><span class="n">tailwindcss docs</span><span class="w">docs · 9 reads</span><span></span></div>
+<div class="row"><span class="n">zod</span><span class="w">import · 6 uses</span><span></span></div>
+<div class="row"><span class="n">date-fns</span><span class="w">import · 5 uses</span><span></span></div>
+<div class="row"><span class="n">@endcredits-demo/moved-payout</span><span class="w">read · 4</span><span></span></div>
+<div class="row"><span class="n">prettier</span><span class="w">dev dep · 3</span><span></span></div>
+<div class="row"><span class="n">@endcredits-demo/left-padder-pro</span><span class="w">transitive · 1</span><span></span></div>
+<div class="row"><span class="n">…and 8 more</span><span class="w"></span><span></span></div></div></div></div>
+
+<!-- 4 -->
+<div class="frame"><div class="meta"><div class="t">0:35 – 1:00</div><h2>4. Every name gets paid, after a check</h2>
+<p>Each row resolves its payout address from package metadata, Intercepta screens it <b>before</b> the agent signs, and the badge lands.</p>
+<p>This frame satisfies Intercepta's requirement: one paid, one refused or held, reason visible.</p>
+<div class="say">"Every name is paid. Every address is checked first."</div></div>
+<div class="shot"><div class="film" style="padding-top:22px">
+<div class="row"><span class="n">zod</span><span class="w">$0.25 · x402</span><span class="b paid">paid</span><span class="reason">tea.yaml → 0x9a…41 · clean · tx 0x5c1e… on Basescan</span></div>
+<div class="row"><span class="n">prettier</span><span class="w">$0.25 · x402</span><span class="b capped">capped</span><span class="reason">FUNDING.json (Drips) · share $0.41, capped at $0.25 per project · paid</span></div>
+<div class="row"><span class="n">tailwindcss docs</span><span class="w">$0.25</span><span class="b reserved">reserved</span><span class="reason">only a sponsor link, no wallet yet · kept in escrow until Tailwind claims</span></div>
+<div class="row"><span class="n">@endcredits-demo/moved-payout</span><span class="w">$0.18</span><span class="b held">held</span><span class="reason">payout address changed 2 days ago · moved to escrow, owner asked</span></div>
+<div class="row"><span class="n">@endcredits-demo/left-padder-pro</span><span class="w">$0.00</span><span class="b refused">refused</span><span class="reason">Intercepta: sanction_address · payout points at an OFAC-listed wallet</span></div>
+<div class="row"><span class="n">date-fns</span><span class="w">$0.21</span><span class="b reserved">reserved</span><span class="reason">no wallet in metadata · held in escrow until the maintainer claims</span></div>
+</div></div></div>
+
+<!-- 5 -->
+<div class="frame"><div class="meta"><div class="t">1:00 – 1:15</div><h2>5. A human decides the doubtful one</h2>
+<p>The held tip asks the agent's owner. Approval needs a fresh World ID verification, so it is a real human, not another agent. Approve releases the escrow; deny or timeout refunds.</p>
+<div class="say">"Anything doubtful is never paid automatically. A human decides."</div></div>
+<div class="shot"><div class="panel"><div class="phone"><div class="ic">W</div><b>End Credits</b> wants you to verify<br><small style="color:var(--muted)">Approve held tip: @endcredits-demo/moved-payout · $0.18<br>address changed 2 days ago</small><br><br><span class="btn dark">Verify with World ID</span><br><span class="btn ghost">Deny</span></div>
+<p style="text-align:center;margin:0;font-size:13px;color:var(--muted)">→ escrow <code>release(tipId)</code> · badge turns <span class="b paid">paid</span></p></div></div></div>
+
+<!-- 6 -->
+<div class="frame"><div class="meta"><div class="t">1:15 – 1:25</div><h2>6. The dashboard</h2>
+<p>Everything above is on-chain events, indexed by Curvegrid MultiBaas. This is the Curvegrid Dashboard track.</p>
+<div class="say">"This weekend our agents paid N maintainers and stopped M suspicious addresses."</div></div>
+<div class="shot"><div class="bar"><i></i><i></i><i></i> endcredits.app/dashboard · data: MultiBaas event queries</div>
+<div class="panel"><div class="kv"><div><b>$41.20</b><span>paid to maintainers</span></div><div><b>127</b><span>projects credited</span></div><div><b>9</b><span>held, 6 approved</span></div><div><b>14</b><span>refused addresses</span></div></div>
+<table><tr><th>Project</th><th>Sessions</th><th>Paid</th><th>Reserved</th><th>Last decision</th></tr>
+<tr><td>zod</td><td>23</td><td>$3.10</td><td>–</td><td><span class="b paid">paid</span></td></tr>
+<tr><td>tailwindcss docs</td><td>19</td><td>–</td><td>$4.75</td><td><span class="b reserved">reserved</span></td></tr>
+<tr><td>date-fns</td><td>17</td><td>–</td><td>$2.80</td><td><span class="b reserved">reserved</span></td></tr>
+<tr><td>@endcredits-demo/left-padder-pro</td><td>4</td><td>$0.00</td><td>–</td><td><span class="b refused">refused</span></td></tr></table></div></div></div>
+
+<!-- 7 -->
+<div class="frame"><div class="meta"><div class="t">1:25 – 1:45</div><h2>7. The maintainer claims in 60 seconds</h2>
+<p>Only about 2% of the top 1,000 npm packages have a wallet in their metadata, while 42% already ask for funding. This page closes that gap.</p>
+<div class="say">"Forty percent of packages already ask to be funded. We open the door."</div></div>
+<div class="shot"><div class="bar"><i></i><i></i><i></i> endcredits.app/npm/date-fns</div>
+<div class="panel"><div style="font-size:20px;font-weight:800;margin-bottom:4px">$2.80 is waiting for date-fns</div><div style="color:var(--muted);margin-bottom:14px">set aside by agents in 17 sessions this weekend</div>
+<div class="steps"><div class="step"><b>1 · Sign in with GitHub</b>we check you can push to date-fns/date-fns</div><div class="step"><b>2 · Wallet with a passkey</b>Face ID, no seed phrase</div><div class="step"><b>3 · One-click PR</b>adds <code>FUNDING.json</code> (Drips format)</div><div class="step"><b>4 · Merge = proof</b>escrow releases $2.80 to you</div></div></div></div></div>
+
+<!-- close -->
+<div class="frame"><div class="meta"><div class="t">1:45 – 1:55</div><h2>Close</h2><p>Say it before anyone asks.</p></div>
+<div class="shot"><div class="film" style="padding:30px"><div class="ttl" style="font-size:22px">Not a paywall.</div><div class="made" style="font-size:15px">Packages stay free for everyone. End Credits just makes sure the companies<br>that want to give back give to the right place, and never to a scammer.</div></div></div></div>
+
+</div></body></html>
