@@ -4,8 +4,8 @@ import { createIntercepta } from "./client";
 import { BASE_USDC } from "./mapping";
 import { memoryRepo } from "./__fixtures__/memory-repo";
 
-const PAYEE = "0xAbCdEf0000000000000000000000000000001234";
-const PAYER = "0x9999999999999999999999999999999999999999";
+const PAYEE = "0xAbCdEf0000000000000000000000000000001234" as const;
+const PAYER = "0x9999999999999999999999999999999999999999" as const;
 const BASE = "https://intercepta.test";
 
 const clean = { toxicScore: 0, traits: [] };
