@@ -21,7 +21,7 @@ function credit(over: Partial<PayableCredit> = {}): PayableCredit {
     id: "c1",
     packageName: "zod",
     sessionId: "5f1c2a9e-0000-4000-8000-000000000000",
-    amountMicro: 10_000n,
+    amountMicro: BigInt(10_000),
     payee: PAYEE,
     outcome: "paid",
     txHash: null,
@@ -47,7 +47,7 @@ const fresh = { [PAYEE.toLowerCase()]: new Date(NOW.getTime() - 60_000) };
 
 function fakeFacilitator(opts: { valid?: boolean; settled?: boolean } = {}) {
   return {
-    verify: vi.fn(async () => ({ isValid: opts.valid ?? true, invalidReason: "invalid_signature" })),
+    verify: vi.fn(async (_p: PaymentPayload, _r: PaymentRequirements) => ({ isValid: opts.valid ?? true, invalidReason: "invalid_signature" })),
     settle: vi.fn(async () => ({
       success: opts.settled ?? true,
       transaction: "0xfeed",
