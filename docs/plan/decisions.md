@@ -620,6 +620,25 @@ payment. Found while wiring E7.
   require both); `verification_uri_complete` and `interval` in the device response; `aud` shape;
   the production portal URL.
 
+## E8/E9 frontend: dashboard and landing
+
+- `/dashboard` is a server page around one client view. It fetches `/api/dashboard` on load, every
+  30 s and on **Refresh**, one request at a time. The route's own 60 s cache means most refreshes cost
+  no MultiBaas calls.
+- Any failed fetch replaces the numbers with the error (`HTTP 503 · multibaas_unavailable (network):
+  <detail>`). The last good numbers are not kept on screen, so nothing shown can be older than the
+  error above it.
+- `recent[].at` comes back as Postgres text (`2026-09-25 18:46:24+00`), not ISO; `parseTime` in
+  `lib/client/dashboard.ts` reads both and shows `—` for anything it cannot parse, never "now".
+- Held lists pending first. Packages sort by paid + reserved (as integers from `micro`), then
+  sessions, then name. Recent sorts by block, newest first.
+- A recent event's subject is shown as the package name when it is a package key the table knows
+  (Reserved, Claimed); tip ids and session ids stay shortened hex. The API has no tip → package map.
+- `/` is static. The measurement is SPEC §6.1 (41.6% / 2.1%, top 1,000, 25 Sep 2026), copied into
+  `lib/copy/landing.ts`; change both together. `NOT_A_PAYWALL` is read from `lib/messages.ts`.
+- Checked 26 Sep against the live MultiBaas with an empty local DB: cards showed 5 denied holds
+  (0.05 USDC), 10 recent escrow events with Basescan links; the bad-host run showed the 503 detail
+  and no numbers. Refused and package names need the production DB, so they read 0 / none locally.
 ## Stale RPC reads (26 Sep)
 
 - **What happened:** `https://sepolia.base.org` is load-balanced over nodes that lag each other.
