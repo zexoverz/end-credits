@@ -85,13 +85,15 @@ function memoryRepo() {
       notifications.push({ payer, tipId });
       return 1;
     }),
-    transaction: vi.fn(async <T>(fn: (r: WebhookRepo) => Promise<T>) => fn(repo)),
+    transaction: vi.fn(async (fn: (r: WebhookRepo) => Promise<unknown>): Promise<unknown> => fn(repo as unknown as WebhookRepo)),
   };
   return { repo: repo as unknown as WebhookRepo & typeof repo, notifications, seen };
 }
 
-function deps(repo: WebhookRepo): WebhookDeps & { invalidate: ReturnType<typeof vi.fn> } {
-  return { repo, secret: SECRET, now: () => NOW * 1000, invalidate: vi.fn() };
+function deps(repo: WebhookRepo) {
+  const invalidate = vi.fn<() => void>();
+  const d: WebhookDeps = { repo, secret: SECRET, now: () => NOW * 1000, invalidate };
+  return { ...d, invalidate };
 }
 
 describe("multibaas webhook", () => {
