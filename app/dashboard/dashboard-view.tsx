@@ -42,10 +42,11 @@ export function DashboardView() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const first = setTimeout(() => void load(), 0);
     const refresh = setInterval(() => void load(), REFRESH_MS);
     const tick = setInterval(() => setNow(Date.now()), 5_000);
     return () => {
+      clearTimeout(first);
       clearInterval(refresh);
       clearInterval(tick);
     };
