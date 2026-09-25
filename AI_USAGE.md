@@ -14,3 +14,4 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
 | T1.2 | `cli/src/init.ts`, `cli/src/config.ts`, `cli/src/paths.ts`, `cli/src/args.ts`, `cli/src/index.ts`, their tests, `lib/messages.ts` (CLI strings) | pending review |
 | T1.4 | `lib/attribution/specifier.ts`, `lib/attribution/specifier.test.ts` | pending review |
+| T1.3 | `cli/src/start.ts`, `cli/src/record.ts`, `cli/src/bash.ts`, `cli/src/hook.ts`, `lib/attribution/types.ts`, their tests, `cli/src/hooks.process.test.ts` | pending review |
