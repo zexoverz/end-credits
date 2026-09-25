@@ -62,16 +62,34 @@ export interface TxQueue {
   submit(from: Address, call: ContractCall): Promise<Hash>;
 }
 
-export function createTxQueue(io: TxIo): TxQueue {
-  const tails = new Map<string, Promise<unknown>>();
+export interface TxQueueOptions {
+  /** Simulations after the first when one reverts with a custom error. Default 2. */
+  staleRetries?: number;
+  /** Wait before each re-simulation, ms. Default 1500. */
+  staleDelayMs?: number;
+}
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
+  const tails = new Map<string, Promise<unknown>>();
+  const staleRetries = opts.staleRetries ?? 2;
+  const staleDelayMs = opts.staleDelayMs ?? 1_500;
+
+  // A load-balanced RPC (sepolia.base.org) can answer from a node that has not seen the tx we just
+  // mined, so a revert here may be stale. Re-simulate a few times before believing it.
   async function simulateOrThrow(from: Address, call: ContractCall) {
-    try {
-      await io.simulate(from, call);
-    } catch (err) {
-      const name = revertName(err);
-      if (name) throw new TxRevertedError(call.functionName, name, undefined, { cause: err });
-      throw err;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await io.simulate(from, call);
+      } catch (err) {
+        const name = revertName(err);
+        if (!name) throw err;
+        if (attempt >= staleRetries) {
+          throw new TxRevertedError(call.functionName, name, undefined, { cause: err });
+        }
+        await sleep(staleDelayMs);
+      }
     }
   }
 
