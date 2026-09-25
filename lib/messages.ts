@@ -56,7 +56,13 @@ export type MessageCode = keyof typeof MESSAGES;
 // The `endcredits` CLI's own output (E1). Kept apart from the §11 codes above.
 export const CLI_MESSAGES = {
   USAGE:
-    "Usage: endcredits init [--global] | key <token> [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run]",
+    "Usage: endcredits init [--global] | key <token> [--api <url>] | login [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run]",
+  LOGIN_CODE: "Open {url} in World App and confirm the code {code}.",
+  LOGIN_SAVED: "Signed in with World ID. Agent key saved to {path}.",
+  LOGIN_DENIED: "Sign-in was cancelled in World App. No key was saved.",
+  LOGIN_EXPIRED: "The sign-in code expired. Run endcredits login again.",
+  LOGIN_NO_OWNER: "This World ID is not an End Credits owner. No key was saved.",
+  LOGIN_FAILED: "Sign-in failed ({error}). No key was saved.",
   INIT_ADDED: "End Credits hooks added to {path}.",
   INIT_UNCHANGED: "End Credits hooks are already in {path}.",
   INIT_INVALID: "Could not read {path} as JSON. Left it unchanged.",
