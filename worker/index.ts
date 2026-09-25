@@ -1,2 +1,4 @@
-// Settler and expirer loops run here (E7). For now it only proves the service boots.
+import { checkEnv, WORKER_BOOT } from "../lib/env";
+
+checkEnv(WORKER_BOOT);
 console.log("end-credits worker up");
