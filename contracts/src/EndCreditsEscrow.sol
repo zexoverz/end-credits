@@ -150,6 +150,17 @@ contract EndCreditsEscrow {
         usdc.safeTransfer(payer, amount);
     }
 
+    /// @notice Pull `amount` from the caller into the package's reserve.
+    function reserve(bytes32 packageKey, uint256 amount, bytes32 sessionId) external {
+        if (amount == 0) revert ZeroAmount();
+
+        reserved[packageKey] += amount;
+        totalReserved += amount;
+
+        emit Reserved(packageKey, msg.sender, amount, sessionId);
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+    }
+
     function tipOf(bytes32 tipId) external view returns (Tip memory) {
         return tips[tipId];
     }
