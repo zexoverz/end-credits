@@ -7,11 +7,15 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | Ticket | Files written or changed with AI | Reviewed by the builder |
 |---|---|---|
 | plan | `docs/plan/*` drafted with Claude from the builder's research and decisions | every section |
+| T6.1 | `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules`, `contracts/src/EndCreditsEscrow.sol`, `contracts/test/mocks/MockUSDC.sol`, `contracts/script/Deploy.s.sol`, `docs/plan/decisions.md` | pending review |
+| T6.2 | `contracts/test/EndCreditsEscrow.t.sol`, `contracts/test/EndCreditsEscrow.invariant.t.sol`, `docs/plan/decisions.md` (mutation table) | pending review |
 | T0.1 | `package.json`, `pnpm-workspace.yaml`, `app/*` (create-next-app output), `cli/package.json`, `cli/src/index.ts`, `worker/index.ts`, `vitest.config.ts`, `.gitignore` | pending review |
 | T0.2 | `app/api/health/route.ts`; Railway project, services and domain set up by the agent through the Railway MCP | pending review |
 | T0.3 | `lib/db/schema.ts`, `lib/db/client.ts`, `drizzle.config.ts`, `drizzle/0000_init.sql` | pending review |
 | T0.4 | `lib/env.ts`, `lib/env.test.ts`, `instrumentation.ts` | pending review |
 | T0.5 | `lib/messages.ts`, `lib/messages.test.ts` | pending review |
+| T6.3 prep | `contracts/script/Deploy.s.sol` (MultiBaas link), `contracts/foundry.toml`, `contracts/foundry.lock`, `.gitmodules` (`forge-multibaas`), `docs/plan/decisions.md`; no Base Sepolia deploy yet | pending review |
+| T6.4 | `lib/chain/abi.ts`, `lib/chain/keys.ts`, `lib/chain/txqueue.ts`, `lib/chain/escrow.ts` and their tests, `scripts/gen-abi.ts`, `scripts/seed-approve.ts`, `docs/plan/decisions.md` | pending review |
 | T5.2 | `lib/x402/constants.ts`, `lib/x402/receipt.ts`, `lib/x402/receipt.test.ts`, `lib/x402/server.ts`, `lib/x402/server.test.ts`, `lib/x402/repo.ts`, `lib/x402/deps.ts`, `app/api/x402/credit/[creditId]/route.ts`, `lib/messages.ts` (`NOT_PAYABLE`), `lib/messages.test.ts` | pending review |
 | T5.3 | `lib/x402/client.ts`, `lib/x402/client.test.ts`, `scripts/x402-smoke.ts`; the smoke payment on Base Sepolia was run by the agent | pending review |
 | T4.1 | `scripts/probe-intercepta.ts` (not run yet: no key) | pending review |
