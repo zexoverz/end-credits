@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Our AGENTS.md is the project's own; next dev must not rewrite it.
+  agentRules: false,
 };
 
 export default nextConfig;
