@@ -1,6 +1,6 @@
 // The package header: name, repo, what is reserved, other funding links, payee and cooling.
 import { Mono } from "@/components/ui";
-import { githubRepoUrl, reserveLine, type Notice, type PackageSummary } from "@/lib/client/claim";
+import { githubRepoUrl, reserveLine, safeLinks, type Notice, type PackageSummary } from "@/lib/client/claim";
 import { addressUrl } from "@/lib/client/format";
 import { claimCopy } from "@/lib/copy/claim";
 
@@ -16,6 +16,7 @@ export function NoticeLine({ notice }: { notice: Notice | null }) {
 }
 
 export function Header({ s }: { s: PackageSummary }) {
+  const links = safeLinks(s.alsoAccepts);
   return (
     <header className="mb-6 space-y-3">
       <h1 className="font-mono text-2xl font-semibold">{s.package}</h1>
@@ -30,10 +31,10 @@ export function Header({ s }: { s: PackageSummary }) {
         <p className="text-sm text-muted">{claimCopy("NO_REPO")}</p>
       )}
       <NoticeLine notice={reserveLine(s)} />
-      {s.alsoAccepts.length > 0 && (
+      {links.length > 0 && (
         <p className="text-sm">
           {claimCopy("ALSO_ACCEPTS")}:{" "}
-          {s.alsoAccepts.map((u, i) => (
+          {links.map((u, i) => (
             <span key={u}>
               {i > 0 && ", "}
               <a className="underline" href={u} target="_blank" rel="noreferrer">
