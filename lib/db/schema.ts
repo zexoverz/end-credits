@@ -145,7 +145,7 @@ export const screens = pgTable(
   },
   (t) => [
     index("screens_cache").on(t.kind, t.subject, t.chainId, t.fetchedAt.desc()),
-    check("screens_kind", sql`${t.kind} in ('address','token','simulation')`),
+    check("screens_kind", sql`${t.kind} in ('address','token','simulation','impersonation')`),
   ],
 );
 

@@ -1,0 +1,2 @@
+ALTER TABLE "screens" DROP CONSTRAINT "screens_kind";--> statement-breakpoint
+ALTER TABLE "screens" ADD CONSTRAINT "screens_kind" CHECK ("screens"."kind" in ('address','token','simulation','impersonation'));

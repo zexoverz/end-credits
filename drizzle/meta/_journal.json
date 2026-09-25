@@ -8,6 +8,13 @@
       "when": 1790353933886,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790354364763,
+      "tag": "0001_screens_impersonation",
+      "breakpoints": true
     }
   ]
 }
