@@ -17,6 +17,7 @@ export const MESSAGES = {
   DUST: "Under 0.01 USDC. Not sent.",
   DAILY_LIMIT: "Daily limit reached. Nothing was sent.",
   PAYEE_INVALID: "The funding file names an invalid address.",
+  SPOOF_REPO: "Reserved: {repo} does not publish {package}.",
   SCREENED_AS: "Screened as its mainnet equivalent (Base, chain 8453).",
   APPROVED: "Approved with World ID. Released {amount} USDC to {address}.",
   APPROVED_SESSION: "Approved by the owner. Released {amount} USDC to {address}.",
