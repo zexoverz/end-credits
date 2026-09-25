@@ -2,7 +2,7 @@
 // discarded (decisions.md), so the hook only records the end and hands the upload and the
 // browser tab to a detached child: `endcredits settle --session <id>`.
 import { spawn } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { cliMsg } from "../../lib/messages";
 import { buildUpload } from "./attribute";
 import { readConfig } from "./config";
@@ -51,7 +51,23 @@ async function upload(apiUrl: string, key: string, body: unknown, deps: SettleDe
   return rollUrl(apiUrl, await res.json());
 }
 
+function alreadySettled(home: string, id: string): { id: string; url: string } | null {
+  if (existsSync(ledgerPath(home, id)) || !existsSync(donePath(home, id))) return null;
+  try {
+    const done = JSON.parse(readFileSync(donePath(home, id), "utf8")) as { id: string; url: string };
+    return typeof done.id === "string" && typeof done.url === "string" ? done : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function settleSession(home: string, id: string, deps: SettleDeps): Promise<SettleResult> {
+  const done = alreadySettled(home, id);
+  if (done) {
+    deps.say(cliMsg("ROLLING", { url: done.url }));
+    deps.open(done.url);
+    return { ok: true, ...done };
+  }
   const config = readConfig(home);
   if (!config) {
     deps.say(cliMsg("KEY_MISSING"));

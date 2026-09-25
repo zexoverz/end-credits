@@ -69,6 +69,22 @@ describe("settleSession", () => {
     expect(JSON.parse(readFileSync(path.join(fx.home, "sessions", `${fx.sid}.done.json`), "utf8")).id).toBe("abc");
   });
 
+  it("a retry after success reopens the same roll without uploading", async () => {
+    const { fx } = setup();
+    const first = deps(async () => Response.json({ id: "abc", url: `${API}/credits/abc` }, { status: 201 }));
+    await settleSession(fx.home, fx.sid, first.d);
+    const fetchSpy = vi.fn<SettleDeps["fetch"]>();
+    const again = deps(fetchSpy);
+    expect(await settleSession(fx.home, fx.sid, again.d)).toEqual({
+      ok: true,
+      id: "abc",
+      url: `${API}/credits/abc`,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(again.said).toEqual([`End Credits: rolling credits at ${API}/credits/abc`]);
+    expect(again.opened).toEqual([`${API}/credits/abc`]);
+  });
+
   it("never opens a URL on another origin", async () => {
     const { fx } = setup();
     const { d, opened } = deps(async () =>
