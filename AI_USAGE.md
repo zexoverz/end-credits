@@ -16,3 +16,4 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | T2.2 | `lib/payee/parse.ts`, `lib/payee/parse.test.ts`, `lib/payee/__fixtures__/*` (fetched from GitHub) | pending review |
 | T2.3 | `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/payee/keys.ts`, `lib/payee/keys.test.ts`, `lib/payee/observe.ts`, `lib/payee/github.ts`, `lib/payee/__fixtures__/memory-store.ts` | pending review |
 | T2.4 | `lib/payee/change.ts`, `lib/payee/change.test.ts` | pending review |
+| T2.5 | `lib/payee/spoof.ts`, `lib/payee/resolve.ts`, `lib/payee/resolve.test.ts`, `lib/messages.ts` (`SPOOF_REPO`), `lib/messages.test.ts`, `lib/payee/__fixtures__/*.package.json` | pending review |
