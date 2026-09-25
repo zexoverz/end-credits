@@ -619,3 +619,25 @@ payment. Found while wiring E7.
   `error` value; whether the device grant's ID token carries `acr` orb-v3 and `amr` `pop` (we
   require both); `verification_uri_complete` and `interval` in the device response; `aud` shape;
   the production portal URL.
+
+## Stale RPC reads (26 Sep)
+
+- **What happened:** `https://sepolia.base.org` is load-balanced over nodes that lag each other.
+  `hold(tipId)` mined (receipt status 1), the `refund(tipId)` right after was simulated on a node
+  that had not seen the hold, reverted `NotPending`, and the queue threw before sending. 0.01 USDC
+  sat in escrow until refunded by hand. A `tipOf` read just after the hold receipt also said `none`.
+- **Fix:** `createTxQueue` re-simulates when the pre-send simulation reverts with a custom error:
+  waits `staleDelayMs` (1500) and tries again, up to `staleRetries` (2) more times, then throws
+  `TxRevertedError` with the decoded name. A genuine revert costs about 3 s before it is named.
+  Errors that are not a revert (network, RPC) are thrown at once, as before.
+- **Why no block pin:** the failing pair crosses keys (hold is payer, refund is recorder), so a
+  per-key "at least the receipt's block" pin would not have covered it. Pinning `eth_call` to a
+  block number would also freeze a later simulation at an old block, and a `getBlockNumber()` gate
+  can hit a different node than the call it gates. Retrying the simulation is enough for writes:
+  a wrong "pending" answer can only make us send, and the chain then reverts the tx for real.
+- **Reads are not fixed here.** `tipOf`, `reserved` and friends can still be a block or two behind
+  right after a receipt; callers that act on a read made straight after their own write should
+  trust the receipt, not the read.
+- Live check, 26 Sep: hold then immediate refund, 3 times on `sepolia.base.org`, all refunded
+  (holds `0xd36dcf08…`, `0x68f22392…`, `0xb964ad55…`; refunds `0xcd5853f2…`, `0x13fee051…`,
+  `0xf1d0a896…`). Not logged whether a re-simulation fired on these runs.
