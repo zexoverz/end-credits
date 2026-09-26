@@ -1,8 +1,6 @@
-// The dashboard's sections. Thin on purpose: the redesign restyles these, the view model stays.
 import Link from "next/link";
-import { EXPERIENCE as E } from "@/lib/copy/experience";
-import type { ReactNode } from "react";
-import { Badge, Card, Mono } from "@/components/ui";
+import { Badge, Mono } from "@/components/ui";
+import { StudioArtwork, PackageGlyph } from "@/components/product/artwork";
 import {
   absoluteTime,
   cardsView,
@@ -19,83 +17,30 @@ import {
 } from "@/lib/client/dashboard";
 import { addressUrl, txUrl } from "@/lib/client/format";
 import { DASHBOARD as C, fill } from "@/lib/copy/dashboard";
-
-const ext = {
-  target: "_blank",
-  rel: "noopener noreferrer",
-  className: "underline",
-} as const;
-
-function Big({ children }: { children: ReactNode }) {
-  return <p className="dashboard-stat">{children}</p>;
-}
-
-function Sub({ children }: { children: ReactNode }) {
-  return <p className="mt-1 text-xs text-muted">{children}</p>;
-}
-
-function PackageName({
-  name,
-  fallback,
-}: {
-  name: string | null;
-  fallback: string;
-}) {
-  const href = npmHref(name);
-  return href ? (
-    <Link href={`/app${href}`} className="underline">
-      {name}
-    </Link>
-  ) : (
-    <Mono>{shortHex(fallback)}</Mono>
-  );
-}
-
+import { EXPERIENCE as E } from "@/lib/copy/experience";
+import { STUDIO as S } from "@/lib/copy/studio";
+const ext = { target: "_blank", rel: "noopener noreferrer" } as const;
 export function Cards({ data }: { data: Dashboard }) {
-  const v = cardsView(data);
+  const cards = [
+    [data.cards.paid.amount.usdc, S.paid, "↗"],
+    [data.cards.projects.count, S.projects, "◈"],
+    [data.cards.reserved.amount.usdc, S.reserved, "◷"],
+    [data.sessions.count, S.sessions, "▤"],
+  ];
   return (
-    <div className="dashboard-stats">
-      <Card title={C.CARD_PAID}>
-        <Big>{v.paid.amount}</Big>
-        <Sub>{v.paid.sub}</Sub>
-      </Card>
-      <Card title={C.CARD_PROJECTS}>
-        <Big>{v.projects.count}</Big>
-        <Sub>{v.projects.sub}</Sub>
-      </Card>
-      <Card title={C.CARD_HELD}>
-        <dl className="dashboard-held">
-          {v.held.map((h) => (
-            <div key={h.label}>
-              <dt className="text-muted">{h.label}</dt>
-              <dd>{h.count}</dd>
-              <dd className="text-right">{h.amount}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
-      <Card title={C.CARD_REFUSED}>
-        <Big>{v.refused.count}</Big>
-        <Sub>{v.refused.sub}</Sub>
-      </Card>
-      <Card title={C.CARD_RESERVED}>
-        <Big>{v.reserved.amount}</Big>
-        <Sub>{v.reserved.sub}</Sub>
-        {v.reserved.packages.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm">
-            {v.reserved.packages.map((p) => (
-              <li key={p.key} className="flex justify-between gap-3">
-                <PackageName name={p.name} fallback={p.key} />
-                <span className="tabular-nums">{p.amount}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
+    <section className="studio-metrics" aria-label={S.overview}>
+      {cards.map(([value, label, icon]) => (
+        <div key={label}>
+          <div>
+            <span>{label}</span>
+            <i aria-hidden="true">{icon}</i>
+          </div>
+          <strong>{value}</strong>
+        </div>
+      ))}
+    </section>
   );
 }
-
 export function PackageTable({
   rows,
   now,
@@ -104,57 +49,57 @@ export function PackageTable({
   now: number;
 }) {
   return (
-    <Card title={C.PACKAGES}>
+    <section className="studio-panel">
+      <header className="studio-panel-heading">
+        <div>
+          <h2>{S.packageTitle}</h2>
+          <p>{S.packageSubtitle}</p>
+        </div>
+        <Link href="/app/packages" aria-label={S.browse}>
+          ↗
+        </Link>
+      </header>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">{C.PACKAGES_EMPTY}</p>
+        <div className="studio-cast-empty">
+          <StudioArtwork kind="cast" />
+          <h3>{S.packageEmpty}</h3>
+          <p>{S.packageEmptyBody}</p>
+          <Link href="/app/packages">{S.browse} ↗</Link>
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-muted">
-              <tr>
-                <th className="py-1 pr-3">{C.COL_PACKAGE}</th>
-                <th className="py-1 pr-3 text-right">{C.COL_SESSIONS}</th>
-                <th className="py-1 pr-3 text-right">{C.COL_PAID}</th>
-                <th className="py-1 pr-3 text-right">{C.COL_RESERVED}</th>
-                <th className="py-1">{C.COL_LAST}</th>
-              </tr>
-            </thead>
-            <tbody className="tabular-nums">
-              {sortPackages(rows).map((r) => (
-                <tr key={r.packageKey} className="border-t border-line">
-                  <td className="py-1.5 pr-3">
-                    <PackageName name={r.name} fallback={r.packageKey} />
-                  </td>
-                  <td className="py-1.5 pr-3 text-right">{r.sessions}</td>
-                  <td className="py-1.5 pr-3 text-right">{money(r.paid)}</td>
-                  <td className="py-1.5 pr-3 text-right">
-                    {money(r.reserved)}
-                  </td>
-                  <td className="py-1.5">
-                    {r.lastDecision ? (
-                      <span
-                        className="flex items-center gap-2"
-                        title={absoluteTime(r.lastDecision.at)}
-                      >
-                        <Badge outcome={r.lastDecision.outcome} />
-                        <span className="text-xs text-muted">
-                          {relativeTime(r.lastDecision.at, now)}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-muted">{C.NO_VALUE}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="studio-package-rows">
+          {sortPackages(rows).map((row) => (
+            <div key={row.packageKey}>
+              <PackageGlyph name={row.name ?? row.packageKey} />
+              <div>
+                <Link
+                  href={row.name ? `/app${npmHref(row.name)}` : "/app/packages"}
+                >
+                  {row.name ?? shortHex(row.packageKey)}
+                </Link>
+                <small>
+                  {row.sessions} {C.COL_SESSIONS.toLowerCase()}
+                </small>
+              </div>
+              <div>
+                <strong>{money(row.paid)}</strong>
+                <small>
+                  {C.COL_RESERVED}: {money(row.reserved)}
+                </small>
+              </div>
+              {row.lastDecision && (
+                <span title={absoluteTime(row.lastDecision.at)}>
+                  <Badge outcome={row.lastDecision.outcome} />
+                  <small>{relativeTime(row.lastDecision.at, now)}</small>
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       )}
-    </Card>
+    </section>
   );
 }
-
 export function RecentEvents({
   rows,
   packages,
@@ -165,76 +110,135 @@ export function RecentEvents({
   now: number;
 }) {
   return (
-    <Card title={C.RECENT}>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">{C.RECENT_EMPTY}</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-muted">
-              <tr>
-                <th className="py-1 pr-3">{C.COL_EVENT}</th>
-                <th className="py-1 pr-3">{C.COL_SUBJECT}</th>
-                <th className="py-1 pr-3 text-right">{C.COL_AMOUNT}</th>
-                <th className="py-1 pr-3 text-right">{C.COL_BLOCK}</th>
-                <th className="py-1 pr-3">{C.COL_TX}</th>
-                <th className="py-1">{C.COL_TIME}</th>
-              </tr>
-            </thead>
-            <tbody className="tabular-nums">
-              {sortRecent(rows).map((r) => {
-                const s = subjectLabel(r.subject, packages);
-                return (
-                  <tr
-                    key={`${r.tx}:${r.event}:${r.subject}`}
-                    className="border-t border-line"
-                  >
-                    <td className="py-1.5 pr-3 font-medium">{r.event}</td>
-                    <td className="py-1.5 pr-3" title={r.subject}>
-                      {s.href ? (
-                        <Link href={`/app${s.href}`} className="underline">
-                          {s.label}
-                        </Link>
-                      ) : (
-                        <Mono>{s.label}</Mono>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-3 text-right">
-                      {money(r.amount)}
-                    </td>
-                    <td className="py-1.5 pr-3 text-right">{r.block}</td>
-                    <td className="py-1.5 pr-3">
-                      <a href={txUrl(r.tx)} {...ext}>
-                        <Mono>{shortHex(r.tx)}</Mono>
-                      </a>
-                    </td>
-                    <td
-                      className="py-1.5 text-xs text-muted"
-                      title={absoluteTime(r.at)}
-                    >
-                      {relativeTime(r.at, now)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+    <section className="studio-panel">
+      <header className="studio-panel-heading">
+        <div>
+          <h2>{S.activity}</h2>
+          <p>{S.activitySub}</p>
         </div>
+        <span className="studio-live-dot" />
+      </header>
+      {rows.length === 0 ? (
+        <div className="studio-small-empty">
+          <h3>{S.noActivity}</h3>
+          <p>{S.noActivityBody}</p>
+        </div>
+      ) : (
+        <ol className="studio-activity">
+          {sortRecent(rows).map((row) => {
+            const sub = subjectLabel(row.subject, packages);
+            return (
+              <li key={`${row.tx}:${row.event}:${row.subject}`}>
+                <span className="activity-symbol" aria-hidden="true">
+                  {row.event === "Released"
+                    ? "↗"
+                    : row.event === "Held"
+                      ? "Ⅱ"
+                      : "◈"}
+                </span>
+                <div>
+                  <strong>
+                    {S.events[row.event as keyof typeof S.events] ?? row.event}
+                  </strong>
+                  <p>
+                    {sub.href ? (
+                      <Link href={`/app${sub.href}`}>{sub.label}</Link>
+                    ) : (
+                      <Mono>{sub.label}</Mono>
+                    )}
+                    <span>·</span>
+                    <time title={absoluteTime(row.at)}>
+                      {relativeTime(row.at, now)}
+                    </time>
+                  </p>
+                </div>
+                <div>
+                  <strong>{money(row.amount)}</strong>
+                  <a
+                    href={txUrl(row.tx)}
+                    {...ext}
+                    aria-label={`${S.transaction} ${shortHex(row.tx)}`}
+                  >
+                    {S.transaction} ↗
+                  </a>
+                </div>
+                <details>
+                  <summary>{fill(S.block, { number: row.block })}</summary>
+                  <Mono>{row.tx}</Mono>
+                </details>
+              </li>
+            );
+          })}
+        </ol>
       )}
-    </Card>
+    </section>
   );
 }
-
+export function EscrowPanel({ data }: { data: Dashboard }) {
+  const lines = cardsView(data).held;
+  const total = lines.reduce((n, l) => n + l.count, 0);
+  const pending = data.cards.held.pending.count;
+  return (
+    <aside className="studio-side-column">
+      <section className={`studio-attention ${pending ? "has-holds" : ""}`}>
+        <div className="attention-icon" aria-hidden="true">
+          {pending ? "Ⅱ" : "✓"}
+        </div>
+        <p className="studio-kicker">{S.attention}</p>
+        <h2>{pending ? fill(S.held, { count: pending }) : S.clearTitle}</h2>
+        <p>{pending ? S.heldBody : S.clearBody}</p>
+        {pending > 0 && (
+          <Link href="/app/owner?section=approvals">{S.review} ↗</Link>
+        )}
+      </section>
+      <section className="studio-vault">
+        <StudioArtwork kind="vault" />
+        <h2>{S.escrow}</h2>
+        <p>{S.escrowBody}</p>
+        {total > 0 && (
+          <div className="escrow-distribution" aria-hidden="true">
+            {lines.map((l, i) => (
+              <span
+                key={l.label}
+                className={`escrow-segment segment-${i}`}
+                style={{ flexGrow: l.count }}
+              />
+            ))}
+          </div>
+        )}
+        <dl>
+          {lines.map((l, i) => (
+            <div key={l.label}>
+              <dt>
+                <i className={`segment-${i}`} />
+                {[S.pending, S.approved, S.denied, S.expired][i]}
+              </dt>
+              <dd>
+                {l.count}
+                <small>{l.amount}</small>
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <Link href="/app/history?outcome=refused">
+          {fill(S.refused, { count: data.cards.refused.count })} ↗
+        </Link>
+      </section>
+    </aside>
+  );
+}
 export function Footer({ data }: { data: Dashboard }) {
   return (
-    <footer className="dashboard-source">
-      <p>{C.FOOTER_SOURCE}</p>
-      <p>{E.transferScope}</p>
-      <p>{fill(C.SESSIONS_SETTLED, { count: data.sessions.count })}</p>
+    <footer className="studio-data-footer">
+      <p>
+        <i />
+        {S.dataNote}
+      </p>
       <details>
-        <summary>
-          {C.FOOTER_GENERATED}: {absoluteTime(data.generatedAt)}
-        </summary>
+        <summary>{S.chainDetails}</summary>
+        <p>
+          {C.FOOTER_SOURCE}. {E.transferScope}
+        </p>
         <p>
           {C.FOOTER_ESCROW}:{" "}
           <a href={addressUrl(data.escrow)} {...ext}>
@@ -246,6 +250,9 @@ export function Footer({ data }: { data: Dashboard }) {
           <a href={addressUrl(data.payer)} {...ext}>
             <Mono>{data.payer}</Mono>
           </a>
+        </p>
+        <p>
+          {C.FOOTER_GENERATED}: {absoluteTime(data.generatedAt)}
         </p>
       </details>
     </footer>

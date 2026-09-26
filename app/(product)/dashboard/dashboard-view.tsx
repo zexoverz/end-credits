@@ -3,8 +3,10 @@
 // with the error: nothing on this page is ever a placeholder or a stale guess.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { EXPERIENCE as E } from "@/lib/copy/experience";
-import { Button, ErrorBox } from "@/components/ui";
+import { STUDIO as S } from "@/lib/copy/studio";
+import { StudioArtwork } from "@/components/product/artwork";
+import { SetupGuide } from "@/components/product/setup-guide";
+import { ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
 import {
   relativeTime,
@@ -13,7 +15,13 @@ import {
   type DashboardError,
 } from "@/lib/client/dashboard";
 import { DASHBOARD as C, fill } from "@/lib/copy/dashboard";
-import { Cards, Footer, PackageTable, RecentEvents } from "./sections";
+import {
+  Cards,
+  Footer,
+  PackageTable,
+  RecentEvents,
+  EscrowPanel,
+} from "./sections";
 
 export const REFRESH_MS = 30_000;
 
@@ -69,35 +77,64 @@ export function DashboardView() {
     };
   }, [load]);
 
+  const established =
+    state.phase === "data" &&
+    (state.data.sessions.count > 0 || state.data.packages.length > 0);
   return (
     <div className="space-y-6">
-      <div className="dashboard-toolbar">
-        <p className="text-sm text-muted">
-          {C.INTRO} {C.AUTO_REFRESH}
-        </p>
-        <div className="flex items-center gap-3 text-xs text-muted">
+      <div className="studio-overview-intro">
+        <p>{S.subtitle}</p>
+        <div className="studio-sync">
           {state.phase === "data" && (
             <span>
+              <i />
               {fill(C.UPDATED, {
                 time: relativeTime(new Date(state.at).toISOString(), now),
               })}
             </span>
           )}
-          <Button onClick={() => void load()} disabled={busy}>
-            {busy ? C.REFRESHING : C.REFRESH}
-          </Button>
+          <button
+            onClick={() => void load()}
+            disabled={busy}
+            aria-label={busy ? C.REFRESHING : C.REFRESH}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M20 7v5h-5M4 17v-5h5M19 12a7 7 0 0 0-12-5L4 10m16 4-3 3A7 7 0 0 1 5 12" />
+            </svg>
+          </button>
         </div>
       </div>
-
-      <div className="dashboard-setup">
-        <span aria-hidden="true">✳</span>
+      <section
+        className={`studio-welcome ${established ? "is-established" : ""}`}
+      >
         <div>
-          <h2>{E.setupBanner}</h2>
-          <p>{E.setupBannerBody}</p>
+          <p className="studio-kicker">{S.greeting}</p>
+          <h2>{established ? S.activeTitle : S.welcome}</h2>
+          <p>{established ? S.activeBody : S.welcomeBody}</p>
+          <div className="studio-actions">
+            {established ? (
+              <Link className="studio-primary" href="/app/sessions">
+                {S.activeAction} ↗
+              </Link>
+            ) : (
+              <SetupGuide />
+            )}
+            <Link href={established ? "/app/history" : "/app/sessions"}>
+              {established ? S.inspect : S.openSession}
+              <span>↗</span>
+            </Link>
+          </div>
         </div>
-        <Link href="/app/owner">{E.setupBannerAction}</Link>
-      </div>
-
+        <div className="studio-welcome-art">
+          <StudioArtwork />
+        </div>
+      </section>
       {state.phase === "loading" && (
         <p className="text-sm text-muted">{C.LOADING}</p>
       )}
@@ -105,12 +142,17 @@ export function DashboardView() {
       {state.phase === "data" && (
         <>
           <Cards data={state.data} />
-          <PackageTable rows={state.data.packages} now={now} />
-          <RecentEvents
-            rows={state.data.recent}
-            packages={state.data.packages}
-            now={now}
-          />
+          <div className="studio-dashboard-columns">
+            <div className="studio-main-column">
+              <PackageTable rows={state.data.packages} now={now} />
+              <RecentEvents
+                rows={state.data.recent}
+                packages={state.data.packages}
+                now={now}
+              />
+            </div>
+            <EscrowPanel data={state.data} />
+          </div>
           <Footer data={state.data} />
         </>
       )}

@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { EXPERIENCE as C } from "@/lib/copy/experience";
+import { STUDIO as S } from "@/lib/copy/studio";
+import { SetupGuide } from "./setup-guide";
 import { BrandMark } from "@/components/landing/artwork";
 
 function NavIcon({ index }: { index: number }) {
@@ -57,13 +59,17 @@ export function ProductShell({ children }: { children: React.ReactNode }) {
           <BrandMark />
           {C.name}
         </Link>
-        <p className="sidebar-label">{C.shellLabel}</p>
+        <p className="sidebar-label">{S.workspace}</p>
         <nav aria-label={C.nav}>
-          {C.shellNav.map(([href, label], index) => {
+          {S.nav.map(([href, label], index) => {
             const selected =
               href === "/app"
                 ? canonical === href
                 : canonical.startsWith(href) ||
+                  (href === "/app/sessions" &&
+                    canonical.startsWith("/app/credits")) ||
+                  (href === "/app/owner" &&
+                    canonical.startsWith("/app/approve")) ||
                   (href === "/app/packages" &&
                     canonical.startsWith("/app/npm"));
             return (
@@ -72,7 +78,19 @@ export function ProductShell({ children }: { children: React.ReactNode }) {
                 href={href}
                 aria-current={selected ? "page" : undefined}
               >
-                <NavIcon index={index} />
+                <NavIcon
+                  index={
+                    index === 1
+                      ? 1
+                      : index === 2
+                        ? 2
+                        : index === 3
+                          ? 1
+                          : index === 4
+                            ? 3
+                            : 0
+                  }
+                />
                 <span>{label}</span>
                 {selected && <span className="nav-indicator" />}
               </Link>
@@ -80,26 +98,30 @@ export function ProductShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-setup">
-            <span className="sidebar-spark" aria-hidden="true">
-              ✳
-            </span>
-            <h2>{C.shellHelp}</h2>
-            <p>{C.shellHelpBody}</p>
-            <Link href="/landing#setup">{C.shellHelpAction}</Link>
+          <div className="sidebar-version">
+            <i />
+            {S.workspaceNote}
           </div>
           <Link className="sidebar-about" href="/landing">
-            {C.shellBack}
+            {S.about}
+            <span>↗</span>
           </Link>
         </div>
       </aside>
       <div className="product-workspace">
         <header className="workspace-header">
-          <span>{C.shellTestnet}</span>
-          <span className="network-pill">
-            <i />
-            {C.shellNetwork}
-          </span>
+          <div className="workspace-breadcrumb">
+            <span>{C.name}</span>
+            <span>/</span>
+            <strong>
+              {S.nav.find(([href]) =>
+                href === "/app"
+                  ? canonical === href
+                  : canonical.startsWith(href),
+              )?.[1] ?? S.nav[1][1]}
+            </strong>
+          </div>
+          <SetupGuide compact />
         </header>
         <main id="workspace-content">{children}</main>
       </div>
