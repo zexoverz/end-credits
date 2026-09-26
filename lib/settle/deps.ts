@@ -2,7 +2,7 @@
 // faked here), the escrow through the tx queue, and the x402 client paying our own credit route.
 import { zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { budgetAddress, pull, remaining } from "../chain/budget";
+import { budgetAddress, pull, remaining, returnToOwner } from "../chain/budget";
 import { claimOf, hold, recordSession, reserve } from "../chain/escrow";
 import { chain } from "../chain/keys";
 import { db } from "../db/client";
@@ -66,6 +66,7 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
           budget: {
             remaining: (owner: Address) => remaining(owner, undefined, ctx, budget),
             pull: (owner: Address, amount: bigint) => pull(owner, amount, ctx, budget),
+            returnToOwner: (owner: Address, amount: bigint) => returnToOwner(owner, amount, ctx),
           },
         }
       : {}),
