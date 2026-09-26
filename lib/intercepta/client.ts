@@ -77,7 +77,7 @@ export function createIntercepta(cfg: InterceptaConfig) {
       last = await attempt(key, mappedFrom, req, noHistory !== undefined);
     }
     const { res, fresh, screenId } = last;
-    if (fresh) return { ok: true, data: noHistory, screenId };
+    if (fresh && noHistory !== undefined) return { ok: true, data: noHistory, screenId };
     if (!res.ok) return { ok: false, error: res.error, screenId };
     const parsed = schema.safeParse(res.body);
     if (!parsed.success) return { ok: false, error: "PARSE", screenId };
