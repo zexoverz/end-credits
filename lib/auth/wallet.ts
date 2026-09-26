@@ -1,6 +1,8 @@
 // Owner sign-in with the owner's wallet (SIWE, EIP-4361). The nonce lives in the `ec_owner` cookie for
 // 10 minutes and is spent in `siwe_nonces` on first use, so a replayed cookie cannot reuse it. The
-// signer must be the owner's bound wallet; the first sign-in binds it (rule in decisions.md).
+// signer must be the owner's bound wallet; the first sign-in binds it, and a wallet no owner has
+// becomes a new owner (rules in decisions.md).
+import { randomUUID } from "node:crypto";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { getAddress, isHex, zeroAddress, type Address, type Hex } from "viem";
 import { generateSiweNonce, parseSiweMessage } from "viem/siwe";
@@ -20,6 +22,8 @@ export interface WalletAuthDeps {
   verify(p: { address: Address; message: string; signature: Hex }): Promise<boolean>;
   /** The escrow approver in force for `payer` (zero address when none). */
   approverOf(payer: Address): Promise<Address>;
+  /** The payer address a new owner with this id gets (derived from the master key). */
+  newPayer(ownerId: string): Address;
   now?(): Date;
 }
 
@@ -112,32 +116,59 @@ type Bound = { ownerId: string } | { error: WalletError } | { error: "no_owner" 
 /**
  * The owner this wallet signs in as. A bound wallet signs in as its owner. An unbound one binds to the
  * first owner only if that owner has no wallet yet and the address is its on-chain approver (or none
- * is set).
+ * is set). Any other wallet becomes a new owner with its own payer key (multi-owner, decisions.md).
  */
 async function ownerFor(address: Address, deps: WalletAuthDeps): Promise<Bound> {
-  const lower = address.toLowerCase();
+  const bound = await boundOwner(address);
+  if (bound) return { ownerId: bound };
+  const [first] = await db().select().from(owners).orderBy(asc(owners.createdAt), asc(owners.id)).limit(1);
+  if (!first) return { error: "no_owner" };
+  if (!first.walletAddress) {
+    let approver: Address;
+    try {
+      approver = await deps.approverOf(first.payerAddress as Address);
+    } catch {
+      return { error: "chain_error" };
+    }
+    if (approver === zeroAddress || approver.toLowerCase() === address.toLowerCase()) {
+      // Binds only while the row has no wallet; a lost race falls through to a new owner.
+      const [updated] = await db()
+        .update(owners)
+        .set({ walletAddress: address })
+        .where(and(eq(owners.id, first.id), isNull(owners.walletAddress)))
+        .returning({ id: owners.id });
+      if (updated) return { ownerId: updated.id };
+    }
+  }
+  return newOwner(address, deps);
+}
+
+async function boundOwner(address: Address): Promise<string | null> {
   const [bound] = await db()
     .select({ id: owners.id })
     .from(owners)
-    .where(sql`lower(${owners.walletAddress}) = ${lower}`)
+    .where(sql`lower(${owners.walletAddress}) = ${address.toLowerCase()}`)
     .limit(1);
-  if (bound) return { ownerId: bound.id };
-  const [first] = await db().select().from(owners).orderBy(asc(owners.createdAt), asc(owners.id)).limit(1);
-  if (!first) return { error: "no_owner" };
-  let approver: Address;
-  try {
-    approver = await deps.approverOf(first.payerAddress as Address);
-  } catch {
-    return { error: "chain_error" };
-  }
-  if (approver !== zeroAddress && approver.toLowerCase() !== lower) return { error: "wrong_wallet" };
-  // Binds only while the row has no wallet: an owner with one refuses every other wallet.
-  const [updated] = await db()
-    .update(owners)
-    .set({ walletAddress: address })
-    .where(and(eq(owners.id, first.id), isNull(owners.walletAddress)))
+  return bound?.id ?? null;
+}
+
+/** A new owner for `address`: default limits, its own derived payer, the wallet bound. */
+async function newOwner(address: Address, deps: WalletAuthDeps): Promise<Bound> {
+  const id = randomUUID();
+  const inserted = await db()
+    .insert(owners)
+    .values({
+      id,
+      displayName: `${address.slice(0, 6)}…${address.slice(-4)}`,
+      payerAddress: deps.newPayer(id),
+      walletAddress: address,
+    })
+    .onConflictDoNothing({ target: owners.walletAddress })
     .returning({ id: owners.id });
-  return updated ? { ownerId: updated.id } : { error: "wrong_wallet" };
+  if (inserted[0]) return { ownerId: inserted[0].id };
+  // The same wallet signed in twice at once: the other request created it.
+  const bound = await boundOwner(address);
+  return bound ? { ownerId: bound } : { error: "wrong_wallet" };
 }
 
 const STATUS_OTHER = { no_owner: 404, chain_error: 502 } as const;

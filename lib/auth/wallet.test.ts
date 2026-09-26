@@ -1,10 +1,11 @@
 // Integration: real Postgres and real SIWE signatures from local keys. Skipped without TEST_DATABASE_URL.
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { verifyMessage, zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { APP, connect, devOwner, req, TEST_DB } from "../__fixtures__/owner-db";
+import { payerAddressFor } from "../chain/payers";
 import type { WalletAuthDeps } from "./wallet";
 
 type Conn = Awaited<ReturnType<typeof connect>>;
@@ -24,6 +25,7 @@ describe.skipIf(!TEST_DB)("wallet sign-in (integration)", () => {
   const deps: WalletAuthDeps = {
     verify: (p) => verifyMessage(p),
     approverOf: async () => approver,
+    newPayer: (id) => payerAddressFor(id, { PAYER_PRIVATE_KEY: `0x${"c3".repeat(32)}` }),
   };
 
   beforeAll(async () => {
@@ -34,6 +36,7 @@ describe.skipIf(!TEST_DB)("wallet sign-in (integration)", () => {
   });
   beforeEach(async () => {
     approver = zeroAddress;
+    await db.delete(s.owners).where(ne(s.owners.id, ownerId));
     await db.update(s.owners).set({ walletAddress: null });
   });
   afterEach(() => {
@@ -135,16 +138,34 @@ describe.skipIf(!TEST_DB)("wallet sign-in (integration)", () => {
     await expectError(await signIn(OWNER_KEY, { expirationTime: new Date(Date.now() - 1000) }), "expired");
   });
 
-  it("another wallet after binding is wrong_wallet", async () => {
+  const ownerOf = async (address: Address) =>
+    (await db.select().from(s.owners).where(eq(s.owners.walletAddress, address)))[0];
+
+  it("another wallet after binding becomes a new owner with its own payer", async () => {
     expect((await signIn(OWNER_KEY)).status).toBe(200);
     const res = await signIn(OTHER_KEY);
-    await expectError(res, "wrong_wallet", 403);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ownerId).not.toBe(ownerId);
+    const other = await ownerOf(OTHER_KEY.address);
+    expect(other.id).toBe(body.ownerId);
+    expect(other.payerAddress).toBe(deps.newPayer(other.id));
+    expect(await auth.requireOwner(req("/", { cookie: cookieOf(res) }))).toEqual({ ownerId: other.id });
     expect(await walletOf()).toBe(OWNER_KEY.address);
   });
 
-  it("first sign-in by a wallet that is not the on-chain approver is wrong_wallet", async () => {
+  it("the new owner signs in again as itself", async () => {
+    const first = await (await signIn(OTHER_KEY)).json();
+    approver = OWNER_KEY.address;
+    const again = await (await signIn(OTHER_KEY)).json();
+    expect(again.ownerId).toBe(first.ownerId);
+  });
+
+  it("a wallet that is not the first owner's on-chain approver gets its own owner, not the first", async () => {
     approver = OTHER_KEY.address;
-    await expectError(await signIn(OWNER_KEY), "wrong_wallet", 403);
+    const res = await signIn(OWNER_KEY);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ownerId).not.toBe(ownerId);
     expect(await walletOf()).toBeNull();
     expect((await signIn(OTHER_KEY)).status).toBe(200);
     expect(await walletOf()).toBe(OTHER_KEY.address);
