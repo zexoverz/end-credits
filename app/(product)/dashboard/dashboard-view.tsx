@@ -2,9 +2,16 @@
 // Fetches /api/dashboard on load, every 30 s and on Refresh. A failed fetch replaces the numbers
 // with the error: nothing on this page is ever a placeholder or a stale guess.
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { EXPERIENCE as E } from "@/lib/copy/experience";
 import { Button, ErrorBox } from "@/components/ui";
-import { api } from "@/lib/client/api";
-import { relativeTime, toDashboardError, type Dashboard, type DashboardError } from "@/lib/client/dashboard";
+import { api } from "@/components/product/request";
+import {
+  relativeTime,
+  toDashboardError,
+  type Dashboard,
+  type DashboardError,
+} from "@/lib/client/dashboard";
 import { DASHBOARD as C, fill } from "@/lib/copy/dashboard";
 import { Cards, Footer, PackageTable, RecentEvents } from "./sections";
 
@@ -30,10 +37,20 @@ export function DashboardView() {
       setState(
         r.ok
           ? { phase: "data", data: r.data, at: Date.now() }
-          : { phase: "error", error: toDashboardError(r.status, r.body, r.error) },
+          : {
+              phase: "error",
+              error: toDashboardError(r.status, r.body, r.error),
+            },
       );
     } catch (e) {
-      setState({ phase: "error", error: toDashboardError(0, null, e instanceof Error ? e.message : String(e)) });
+      setState({
+        phase: "error",
+        error: toDashboardError(
+          0,
+          null,
+          e instanceof Error ? e.message : String(e),
+        ),
+      });
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -54,13 +71,17 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="dashboard-toolbar">
         <p className="text-sm text-muted">
           {C.INTRO} {C.AUTO_REFRESH}
         </p>
         <div className="flex items-center gap-3 text-xs text-muted">
           {state.phase === "data" && (
-            <span>{fill(C.UPDATED, { time: relativeTime(new Date(state.at).toISOString(), now) })}</span>
+            <span>
+              {fill(C.UPDATED, {
+                time: relativeTime(new Date(state.at).toISOString(), now),
+              })}
+            </span>
           )}
           <Button onClick={() => void load()} disabled={busy}>
             {busy ? C.REFRESHING : C.REFRESH}
@@ -68,13 +89,28 @@ export function DashboardView() {
         </div>
       </div>
 
-      {state.phase === "loading" && <p className="text-sm text-muted">{C.LOADING}</p>}
+      <div className="dashboard-setup">
+        <span aria-hidden="true">✳</span>
+        <div>
+          <h2>{E.setupBanner}</h2>
+          <p>{E.setupBannerBody}</p>
+        </div>
+        <Link href="/app/owner">{E.setupBannerAction}</Link>
+      </div>
+
+      {state.phase === "loading" && (
+        <p className="text-sm text-muted">{C.LOADING}</p>
+      )}
       {state.phase === "error" && <ErrorPanel error={state.error} />}
       {state.phase === "data" && (
         <>
           <Cards data={state.data} />
           <PackageTable rows={state.data.packages} now={now} />
-          <RecentEvents rows={state.data.recent} packages={state.data.packages} now={now} />
+          <RecentEvents
+            rows={state.data.recent}
+            packages={state.data.packages}
+            now={now}
+          />
           <Footer data={state.data} />
         </>
       )}
@@ -87,7 +123,8 @@ function ErrorPanel({ error }: { error: DashboardError }) {
     <ErrorBox>
       <p className="font-medium">{C.ERROR_TITLE}</p>
       <p className="mt-1 font-mono text-xs break-all">
-        {error.status > 0 && `${fill(C.ERROR_STATUS, { status: error.status })} · `}
+        {error.status > 0 &&
+          `${fill(C.ERROR_STATUS, { status: error.status })} · `}
         {error.error}
         {error.kind && ` (${error.kind})`}
         {error.detail && `: ${error.detail}`}
