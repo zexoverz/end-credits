@@ -8,6 +8,12 @@ session actually used, screens every payee with **Intercepta** before anything i
 ones in USDC over **x402**, and holds or reserves the rest in an escrow. Every step is on chain and
 shown on a dashboard built on **Curvegrid MultiBaas**.
 
+<p>
+  <img src="docs/assets/intercepta.svg" alt="Intercepta" height="28">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/assets/curvegrid.svg" alt="Curvegrid MultiBaas" height="28">
+</p>
+
 ETHGlobal Tokyo 2026 · solo build by Faisal ([`zexoverz`](https://github.com/zexoverz)) · Base Sepolia
 
 | | |
@@ -96,6 +102,8 @@ Claimed on Base Sepolia:
 
 ## Intercepta: the moment of decision
 
+<img src="docs/assets/intercepta.svg" alt="Intercepta" height="24">
+
 - Every payee gets a quick scan, the address-poisoning check and token risks, in parallel, before
   any signature ([`lib/intercepta/client.ts`](lib/intercepta/client.ts)).
 - The verdict picks the outcome: critical traits or `toxicScore > 50` refuse, 20 to 50 hold, clean
@@ -110,6 +118,8 @@ Claimed on Base Sepolia:
 Full write-up, live results and API feedback: [docs/intercepta.md](docs/intercepta.md).
 
 ## Curvegrid MultiBaas: following the money
+
+<img src="docs/assets/curvegrid.svg" alt="Curvegrid MultiBaas" height="24">
 
 - Both contracts deployed and linked with the MultiBaas Forge plugin; Base Sepolia USDC linked too,
   so x402 payments are indexed next to escrow events.
