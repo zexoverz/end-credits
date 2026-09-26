@@ -273,6 +273,33 @@ of signing: "Refused: the payment request names a different address than the one
 [`0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`](https://sepolia.basescan.org/tx/0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1)
 (block 47293505, [`scripts/x402-smoke.ts`](scripts/x402-smoke.ts)).
 
+## Held money: the owner signs the release, on chain
+
+A `held` credit sits in `EndCreditsEscrow` v2 until the owner decides. Our server cannot release it
+alone: `release` needs an EIP-712 signature from the owner's approver wallet, checked by the
+contract.
+
+| Rule | Where |
+|---|---|
+| Each payer names an approver wallet with `setApprover`. The first set is immediate; any later change waits `changeDelay` (3 days) and is public as `ApproverSet` meanwhile | [`contracts/src/EndCreditsEscrow.sol#L117-L133`](contracts/src/EndCreditsEscrow.sol#L117-L133) |
+| `release(tipId, approvalRef, deadline, signature)` is sent by the recorder, but reverts `BadApproval` unless the payer's current approver signed it (ECDSA or ERC-1271) | [`#L163-L184`](contracts/src/EndCreditsEscrow.sol#L163-L184) |
+| The signed struct binds the stored payee and amount, the tip, a deadline and the escrow's domain, so a signature cannot move other money | [`#L272-L277`](contracts/src/EndCreditsEscrow.sol#L272-L277) |
+| The payer can refund its own pending tip at any time (a deny without our server); anyone can after expiry | [`#L189`](contracts/src/EndCreditsEscrow.sol#L189) |
+
+The flow on `/approve/<tipId>`: `POST /api/approve/:tipId/prepare` returns typed data rebuilt from
+our rows ([`lib/approve/typed-data.ts`](lib/approve/typed-data.ts)); the owner signs it with MetaMask
+or a Base Account passkey wallet ([`components/approver/sign-release.tsx`](components/approver/sign-release.tsx),
+[`components/approver/connect-wallet.tsx`](components/approver/connect-wallet.tsx)); the server checks
+the signature against the stored approver ([`lib/approve/signed.ts`](lib/approve/signed.ts)); then the
+recorder submits `release` with it ([`lib/approve/actions.ts#L91-L104`](lib/approve/actions.ts#L91-L104)).
+The owner names the approver on `/owner` ([`components/approver/set-approver.tsx`](components/approver/set-approver.tsx)).
+
+Live on 26 Sep: the `@endcredits-demo/moved-payout` hold in the session above was released with the
+owner's MetaMask signature. With a throwaway payer, a release signed by the wrong key reverted
+`BadApproval` and the approver-signed release
+[`0xd8c70875…`](https://sepolia.basescan.org/tx/0xd8c7087528872b003879e215d7b515e46b20d6728ec26a28f28d9684c648d95d)
+paid. Design and the mutation table: [`docs/plan/decisions.md`](docs/plan/decisions.md) (Escrow v2).
+
 ## Curvegrid MultiBaas
 
 **Summary.** MultiBaas deploys and indexes `EndCreditsEscrow`, and its event queries and webhook are
