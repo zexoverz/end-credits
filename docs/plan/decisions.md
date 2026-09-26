@@ -770,3 +770,34 @@ repo so the anti-spoof check finds the same name in the root `package.json` and 
 - **Demo repo:** https://github.com/zexoverz/endcredits-demo-reports, Next.js with a static
   `/reports` page and `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`. The fixtures
   are added after publish; `DEMO.md` there has the command and the session prompt.
+
+## MCP server
+
+The agent takes part in the flow through `endcredits mcp`, a stdio MCP server in the same bundle. It
+reads and requests; it never decides. Who gets paid stays with the screened settler, and every tool
+description says so.
+
+- **CONFIRM: MCP SDK.** `@modelcontextprotocol/sdk` 1.30.1 (npm latest, 26 Sep), pinned `~1.30.1`
+  as a CLI devDependency and bundled by esbuild. `McpServer` from `server/mcp.js`,
+  `registerTool(name, {title, description, inputSchema: <zod raw shape>}, cb)`,
+  `StdioServerTransport` from `server/stdio.js`. Peer `zod` `^3.25 || ^4`; we pass zod 4 shapes.
+- **CONFIRM: Claude Code registration** (code.claude.com/docs/en/mcp, Claude Code 2.1.283). Project
+  scope is `.mcp.json` at the project root, `{"mcpServers": {"<name>": {"type": "stdio", "command",
+  "args", "env"}}}`; Claude Code asks for approval on the next interactive start. User scope:
+  `claude mcp add --scope user <name> -- <command> [args]` (the default scope is local).
+  `endcredits init` merges `end-credits` into `./.mcp.json` and never replaces an existing entry;
+  `init --global` prints `claude mcp add --scope user end-credits -- endcredits mcp`.
+- **Tools.** `end_credits_status {sessionId?}`: local attribution plus an estimated `split` of the
+  owner's budget from `GET /api/agent/settings`; unreachable → defaults 2 / 0.25, labelled as such.
+  `end_credits_roll {sessionId?}`: the `settle --session` upload path (10 s timeout, no browser),
+  reusing `<id>.done.json` when already uploaded, then `POST /api/agent/sessions/:id/settle`; 409
+  reads as "already rolling" (auto mode sets `settle_requested_at` at upload). `end_credits_explain
+  {sessionId}`: `GET /api/sessions/:id`, stored reason texts, Basescan links, approve links for held
+  credits; while not settled it names the rows still screening. The default session is the most
+  recently touched ledger: the MCP process is not given the Claude Code session id.
+- **Agent-key routes.** Bearer agent key via `lib/sessions/auth.ts`; revoked keys 401. Settle only
+  for the key that uploaded the session (403 otherwise, 404 unknown), same 202/409 update as the
+  owner route. Settings returns the owner's `settingsView`.
+- `GET /api/sessions/:id` credits now carry `tipId` (null except on held credits).
+- stdout is the protocol; logs go to stderr; the agent key is never in a result. The bundle grows
+  from ~30 KB to 1.4 MB; a `record` hook run costs ~5 ms more (73 vs 68 ms, node boot included).
