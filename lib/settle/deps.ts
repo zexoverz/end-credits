@@ -47,6 +47,7 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
       }),
     pushedAt: (repo, file, since) => firstSeenPush(repo, file, { since, githubToken }),
     screenPayee: (payee, opts) => intercepta.screenPayee(payee, opts),
+    simulatePayment: (payee, amount) => intercepta.simulatePayment({ payer: account.address, payee, amount }),
     // P1: only for a mainnet round (DESIGN §8 rule 7).
     ...(env.CHECK_NO_CODE === "true" ? { noCodeOnBase: (payee: Address) => noCodeOnBase(payee) } : {}),
     escrow: {
