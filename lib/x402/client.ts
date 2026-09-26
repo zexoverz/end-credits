@@ -3,20 +3,29 @@
 import { getAddress, isAddress } from "viem";
 import { x402Client } from "@x402/core/client";
 import { decodePaymentResponseHeader } from "@x402/core/http";
-import type { PaymentRequirements } from "@x402/core/types";
+import type { PaymentRequirements, SettleResponse } from "@x402/core/types";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
-import { msg } from "../messages";
+import { ENDPOINT_REASONS, msg } from "../messages";
 import { MAX_TIMEOUT_SECONDS, NETWORK, SCHEME, USDC_EXTRA } from "./constants";
+import { endpointFetch, EndpointRefused } from "./endpoint";
 import { verifyReceipt, type Receipt } from "./receipt";
 
 export type ClientCredit = { id: string; payee: string; amountMicro: bigint };
 
-export type RefusalCode = "NOT_PAYABLE" | "PAYTO_MISMATCH" | "TOKEN_PIN" | "CHALLENGE_MISMATCH";
+export type RefusalCode =
+  | "NOT_PAYABLE"
+  | "PAYTO_MISMATCH"
+  | "TOKEN_PIN"
+  | "CHALLENGE_MISMATCH"
+  | "ENDPOINT_REFUSED";
 
 export class PaymentRefused extends Error {
-  constructor(readonly code: RefusalCode) {
-    super(msg(code));
+  constructor(
+    readonly code: RefusalCode,
+    readonly vars: Record<string, string> = {},
+  ) {
+    super(msg(code, vars));
     this.name = "PaymentRefused";
   }
 }
@@ -55,6 +64,61 @@ export function checkChallenge(r: PaymentRequirements, credit: ClientCredit, usd
 }
 
 export async function payCredit(credit: ClientCredit, opts: PayOptions): Promise<{ tx: string; receipt: Receipt }> {
+  const res = await gatedPay(credit, opts, opts.url);
+  if (res.status === 409) throw new PaymentRefused("NOT_PAYABLE");
+  if (!res.ok) throw new Error(`x402 payment for credit ${credit.id} failed with HTTP ${res.status}`);
+  return readReceipt(res, credit);
+}
+
+export type MaintainerPayOptions = Omit<PayOptions, "url"> & { endpoint: string };
+
+export type MaintainerReceipt = { endpoint: string; settlement: SettleResponse };
+
+/** The maintainer's own endpoint for this credit: `amount` in micro-USDC and our credit id as `ref`. */
+export function maintainerUrl(endpoint: string, credit: ClientCredit): string {
+  const url = new URL(endpoint);
+  url.searchParams.set("amount", credit.amountMicro.toString());
+  url.searchParams.set("ref", credit.id);
+  return url.toString();
+}
+
+/**
+ * Pays a credit through the maintainer's own x402 endpoint (FUNDING.json `x402.endpoint`). The same
+ * pre-sign gate as our route: the challenge's `payTo` must be the payee screened from FUNDING.json.
+ * The endpoint is fetched through the SSRF guard unless a fetch is injected (tests).
+ */
+export async function payMaintainer(
+  credit: ClientCredit,
+  opts: MaintainerPayOptions,
+): Promise<{ tx: string; receipt: MaintainerReceipt }> {
+  const url = maintainerUrl(opts.endpoint, credit);
+  let res: Response;
+  try {
+    res = await gatedPay(credit, { ...opts, fetch: opts.fetch ?? endpointFetch() }, url);
+  } catch (err) {
+    if (err instanceof EndpointRefused) {
+      throw new PaymentRefused("ENDPOINT_REFUSED", { host: err.host, reason: ENDPOINT_REASONS[err.reason] });
+    }
+    throw err;
+  }
+  if (!res.ok) throw new Error(`x402 payment for credit ${credit.id} failed with HTTP ${res.status}`);
+  const header = res.headers.get("PAYMENT-RESPONSE");
+  const settlement = header ? decodeSettlement(header) : null;
+  if (!settlement || !settlement.success || settlement.network !== NETWORK || !/^0x[0-9a-fA-F]{64}$/.test(settlement.transaction)) {
+    throw new Error(`x402 settlement for credit ${credit.id} is missing or not a Base Sepolia transaction`);
+  }
+  return { tx: settlement.transaction, receipt: { endpoint: opts.endpoint, settlement } };
+}
+
+function decodeSettlement(header: string): SettleResponse | null {
+  try {
+    return decodePaymentResponseHeader(header);
+  } catch {
+    return null;
+  }
+}
+
+async function gatedPay(credit: ClientCredit, opts: Omit<PayOptions, "url">, url: string): Promise<Response> {
   let refused: RefusalCode | null = null;
   const client = new x402Client()
     .register(NETWORK, new ExactEvmScheme(opts.account))
@@ -68,9 +132,8 @@ export async function payCredit(credit: ClientCredit, opts: PayOptions): Promise
     });
 
   const pay = wrapFetchWithPayment(opts.fetch ?? globalThis.fetch, client);
-  let res: Response;
   try {
-    res = await pay(opts.url);
+    return await pay(url);
   } catch (err) {
     if (refused) throw new PaymentRefused(refused);
     // Only eip155:84532 is registered, so a challenge on any other network fails selection.
@@ -79,9 +142,6 @@ export async function payCredit(credit: ClientCredit, opts: PayOptions): Promise
     }
     throw err;
   }
-  if (res.status === 409) throw new PaymentRefused("NOT_PAYABLE");
-  if (!res.ok) throw new Error(`x402 payment for credit ${credit.id} failed with HTTP ${res.status}`);
-  return readReceipt(res, credit);
 }
 
 async function readReceipt(res: Response, credit: ClientCredit): Promise<{ tx: string; receipt: Receipt }> {
