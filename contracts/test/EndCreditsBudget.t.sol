@@ -159,4 +159,205 @@ contract EndCreditsBudgetTest is Test {
         vm.prank(agent);
         budget.pull(poor, 11);
     }
+
+    // ---------------------------------------------------------------- setAllowance and revoke
+
+    function test_setAllowance_storesAndEmits() public {
+        vm.expectEmit(true, true, true, true, address(budget));
+        emit EndCreditsBudget.AllowanceSet(owner, agent, CAP, DAY);
+        _allow(CAP, DAY);
+
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.perPeriod, CAP);
+        assertEq(a.period, DAY);
+        assertEq(a.periodStart, T0);
+        assertEq(a.spentInPeriod, 0);
+        assertEq(budget.remaining(owner, agent), CAP);
+    }
+
+    function test_setAllowance_loweringCapKeepsSpent() public {
+        _allow(CAP, DAY);
+        _pull(3_000_000);
+        skip(1 hours);
+
+        _allow(2_000_000, DAY);
+
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.spentInPeriod, 3_000_000);
+        assertEq(a.periodStart, T0);
+        assertEq(budget.remaining(owner, agent), 0);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsBudget.OverPeriodCap.selector, uint256(0)));
+        _pull(1);
+    }
+
+    function test_setAllowance_raisingCapKeepsWindow() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+        skip(1 hours);
+
+        _allow(CAP + 1_000_000, DAY);
+
+        assertEq(budget.allowanceOf(owner, agent).periodStart, T0);
+        assertEq(budget.remaining(owner, agent), 1_000_000);
+        _pull(1_000_000);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsBudget.OverPeriodCap.selector, uint256(0)));
+        _pull(1);
+    }
+
+    function test_setAllowance_periodChangeResets() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+        skip(1 hours);
+
+        _allow(CAP, 7 days);
+
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.period, 7 days);
+        assertEq(a.periodStart, T0 + 1 hours);
+        assertEq(a.spentInPeriod, 0);
+        assertEq(budget.remaining(owner, agent), CAP);
+    }
+
+    function test_setAllowance_afterRevokeStartsFresh() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+        vm.prank(owner);
+        budget.revoke(agent);
+        skip(1 hours);
+
+        _allow(CAP, DAY);
+
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.periodStart, T0 + 1 hours);
+        assertEq(a.spentInPeriod, 0);
+    }
+
+    function test_revoke_deletesAndEmits() public {
+        _allow(CAP, DAY);
+        _pull(1_000_000);
+
+        vm.expectEmit(true, true, true, true, address(budget));
+        emit EndCreditsBudget.AllowanceRevoked(owner, agent);
+        vm.prank(owner);
+        budget.revoke(agent);
+
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.perPeriod, 0);
+        assertEq(a.period, 0);
+        assertEq(a.periodStart, 0);
+        assertEq(a.spentInPeriod, 0);
+        assertEq(budget.remaining(owner, agent), 0);
+    }
+
+    function test_revoke_onlyTouchesCallersAllowance() public {
+        _allow(CAP, DAY);
+        vm.prank(otherOwner);
+        budget.revoke(agent);
+        assertEq(budget.allowanceOf(owner, agent).perPeriod, CAP);
+        _pull(1);
+    }
+
+    // ---------------------------------------------------------------- pull
+
+    function test_pull_movesFundsWithinCap() public {
+        _allow(CAP, DAY);
+
+        vm.expectEmit(true, true, true, true, address(budget));
+        emit EndCreditsBudget.Pulled(owner, agent, 2_000_000, 2_000_000, uint64(T0));
+        _pull(2_000_000);
+
+        assertEq(usdc.balanceOf(agent), 2_000_000);
+        assertEq(usdc.balanceOf(owner), START - 2_000_000);
+        assertEq(usdc.balanceOf(address(budget)), 0);
+        assertEq(budget.allowanceOf(owner, agent).spentInPeriod, 2_000_000);
+        assertEq(budget.remaining(owner, agent), 3_000_000);
+    }
+
+    function test_pull_exactCapThenNothingLeft() public {
+        _allow(CAP, DAY);
+        _pull(2_000_000);
+        _pull(3_000_000);
+        assertEq(budget.remaining(owner, agent), 0);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsBudget.OverPeriodCap.selector, uint256(0)));
+        _pull(1);
+    }
+
+    function test_pull_windowEdge() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+
+        vm.warp(T0 + DAY - 1);
+        assertEq(budget.remaining(owner, agent), 0);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsBudget.OverPeriodCap.selector, uint256(0)));
+        _pull(1);
+
+        vm.warp(T0 + DAY);
+        assertEq(budget.remaining(owner, agent), CAP);
+        _pull(1);
+        assertEq(budget.allowanceOf(owner, agent).periodStart, T0 + DAY);
+    }
+
+    function test_pull_rollsAfterOnePeriod() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+        vm.warp(T0 + DAY + 5 hours);
+
+        vm.expectEmit(true, true, true, true, address(budget));
+        emit EndCreditsBudget.Pulled(owner, agent, 1_000_000, 1_000_000, uint64(T0 + DAY));
+        _pull(1_000_000);
+
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.periodStart, T0 + DAY);
+        assertEq(a.spentInPeriod, 1_000_000);
+        assertEq(usdc.balanceOf(agent), CAP + 1_000_000);
+    }
+
+    function test_pull_rollsAfterSeveralPeriodsWithoutDrift() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+        vm.warp(T0 + 4 * DAY + 23 hours);
+
+        _pull(CAP);
+
+        // Start stays on the day grid of the first window, not at the pull time.
+        assertEq(budget.allowanceOf(owner, agent).periodStart, T0 + 4 * DAY);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsBudget.OverPeriodCap.selector, uint256(0)));
+        _pull(1);
+
+        // One hour later the next day's window opens, on the same grid.
+        vm.warp(T0 + 5 * DAY);
+        _pull(CAP);
+        assertEq(budget.allowanceOf(owner, agent).periodStart, T0 + 5 * DAY);
+    }
+
+    function test_remaining_accountsForRolledWindow() public {
+        _allow(CAP, DAY);
+        _pull(CAP);
+        vm.warp(T0 + 3 * DAY + 1);
+        assertEq(budget.remaining(owner, agent), CAP);
+        // The view does not write: storage still holds the old window.
+        EndCreditsBudget.Allowance memory a = budget.allowanceOf(owner, agent);
+        assertEq(a.periodStart, T0);
+        assertEq(a.spentInPeriod, CAP);
+    }
+
+    function test_remaining_zeroWithoutAllowance() public view {
+        assertEq(budget.remaining(owner, agent), 0);
+    }
+
+    function test_pull_allowancesAreSeparatePerSpender() public {
+        _allow(CAP, DAY);
+        vm.prank(owner);
+        budget.setAllowance(otherAgent, 1_000_000, DAY);
+
+        _pull(CAP);
+        vm.prank(otherAgent);
+        budget.pull(owner, 1_000_000);
+
+        assertEq(usdc.balanceOf(agent), CAP);
+        assertEq(usdc.balanceOf(otherAgent), 1_000_000);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsBudget.OverPeriodCap.selector, uint256(0)));
+        vm.prank(otherAgent);
+        budget.pull(owner, 1);
+    }
 }
