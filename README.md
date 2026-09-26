@@ -421,7 +421,10 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
    screen before signing, but cannot prove who wrote the file beyond "it is on the default branch".
 4. `tea.yaml` addresses come from a scheme that was farmed; they are screened like every other.
 5. The payer key is server-held for the demo and everything moves on Base Sepolia. What is screened
-   is the payees' real mainnet addresses.
+   is the payees' real mainnet addresses. Because the server holds the payer key, it could call
+   `setApprover` as the payer; the 3-day delay makes that change public before it counts, and holds
+   with the default 24 h TTL expire and refund before then. The payer refund is a server-free deny
+   only once the payer is the owner's own wallet.
 6. The claim needs a merged PR; orgs that restrict OAuth apps use the prefilled "new file" link, whose
    `filename` and `value` parameters are known from use, not from GitHub's docs. We ask for
    `public_repo`, which GitHub's docs contradict each other on for writing contents.
@@ -439,6 +442,9 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
     on-chain approver signature either way.
 12. USDC sent straight to the escrow address (not through `hold` or `reserve`) is stuck. Nothing reads
     the balance, so this is left as is.
+13. A new payee with no mainnet history holds (`HELD_NO_HISTORY`). As a claim wallet the same answer
+    passes the screen, since new passkey wallets are fresh; the claim is still gated by repo write
+    access and the funding file.
 
 ## Measurement
 
