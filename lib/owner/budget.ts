@@ -52,8 +52,11 @@ function withTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
-/** Chain state for `budgetOwner`; never throws (an RPC error text can carry the provider key). */
-export async function budgetView(budgetOwner: string | null, chain: BudgetChain): Promise<BudgetView> {
+/**
+ * Chain state for `budgetOwner` and `payer`, the owner's own payer key (the spender it allows);
+ * never throws (an RPC error text can carry the provider key).
+ */
+export async function budgetView(budgetOwner: string | null, chain: BudgetChain, payer?: string): Promise<BudgetView> {
   const empty: BudgetView = {
     budgetAddress: null,
     usdc: null,
@@ -69,7 +72,7 @@ export async function budgetView(budgetOwner: string | null, chain: BudgetChain)
   let usdc: Address;
   try {
     address = chain.address();
-    spender = chain.spender();
+    spender = payer ? getAddress(payer) : chain.spender();
     usdc = chain.usdc();
   } catch {
     return { ...empty, error: "rpc_unavailable" };
@@ -105,7 +108,7 @@ export async function budgetView(budgetOwner: string | null, chain: BudgetChain)
 
 export async function getBudget(ownerId: string, chain: BudgetChain): Promise<BudgetView | null> {
   const row = await ownerRow(ownerId);
-  return row ? budgetView(row.budgetOwner, chain) : null;
+  return row ? budgetView(row.budgetOwner, chain, row.payerAddress) : null;
 }
 
 /** Stores the owner's funding wallet, checksummed. */
@@ -115,6 +118,6 @@ export async function setBudgetOwner(ownerId: string, address: string, chain: Bu
     .update(owners)
     .set({ budgetOwner })
     .where(eq(owners.id, ownerId))
-    .returning({ budgetOwner: owners.budgetOwner });
-  return row ? budgetView(row.budgetOwner, chain) : null;
+    .returning({ budgetOwner: owners.budgetOwner, payerAddress: owners.payerAddress });
+  return row ? budgetView(row.budgetOwner, chain, row.payerAddress) : null;
 }

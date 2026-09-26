@@ -3,7 +3,9 @@
 import { returnToOwner } from "../lib/chain/budget";
 import { refund } from "../lib/chain/escrow";
 import type { ChainContext } from "../lib/chain/keys";
+import { chainForOwner } from "../lib/chain/payers";
 import { expireHolds, retryReturns } from "../lib/settle/expire";
+import type { ReturnPayer } from "../lib/settle/return";
 import type { Database } from "../lib/settle/store";
 import type { Address, Hex } from "viem";
 import { startLoop, type Loop } from "./loop";
@@ -22,7 +24,7 @@ export function startExpirer(
       const deps = {
         database,
         refund: (tipId: Hex) => refund(tipId, ctx),
-        returnToOwner: (owner: Address, amount: bigint) => returnToOwner(owner, amount, ctx),
+        returnToOwner: (owner: Address, amount: bigint, payer: ReturnPayer) => returnToOwner(owner, amount, chainForOwner(payer)),
         log,
       };
       await retryReturns(deps);

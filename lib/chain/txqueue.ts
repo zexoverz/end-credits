@@ -25,6 +25,8 @@ export interface RawCall {
   to: Address;
   data: Hex;
   functionName: string;
+  /** Wei sent with the call (a gas top-up). */
+  value?: bigint;
 }
 
 export type TxCall = ContractCall | RawCall;
@@ -166,9 +168,16 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
   };
 }
 
-/** viem-backed io over one public client and the wallet clients allowed to sign. */
-export function viemIo(publicClient: PublicClient, signers: readonly SignerClient[]): TxIo {
-  const byAddress = new Map(signers.map((s) => [s.account.address.toLowerCase(), s]));
+/**
+ * viem-backed io over one public client and the wallet clients allowed to sign. A Map is read live,
+ * so keys registered later (one payer key per owner) share this io and its per-key nonce tracking.
+ */
+export function viemIo(
+  publicClient: PublicClient,
+  signers: readonly SignerClient[] | Map<string, SignerClient>,
+): TxIo {
+  const byAddress =
+    signers instanceof Map ? signers : new Map(signers.map((s) => [s.account.address.toLowerCase(), s]));
   const signer = (from: Address) => {
     const s = byAddress.get(from.toLowerCase());
     if (!s) throw new Error(`No signer for ${from}`);
@@ -179,7 +188,7 @@ export function viemIo(publicClient: PublicClient, signers: readonly SignerClien
     pendingNonce: (from) => publicClient.getTransactionCount({ address: from, blockTag: "pending" }),
     async simulate(from, call, blockNumber) {
       if (isRaw(call)) {
-        await publicClient.call({ account: from, to: call.to, data: call.data, blockNumber });
+        await publicClient.call({ account: from, to: call.to, data: call.data, value: call.value, blockNumber });
         return;
       }
       await publicClient.simulateContract({ ...call, account: signer(from).account, blockNumber });
@@ -187,7 +196,7 @@ export function viemIo(publicClient: PublicClient, signers: readonly SignerClien
     write: (from, call, nonce) => {
       const s = signer(from);
       if (isRaw(call)) {
-        return s.sendTransaction({ account: s.account, chain: s.chain, to: call.to, data: call.data, nonce });
+        return s.sendTransaction({ account: s.account, chain: s.chain, to: call.to, data: call.data, value: call.value, nonce });
       }
       return s.writeContract({ ...call, account: s.account, chain: s.chain, nonce });
     },

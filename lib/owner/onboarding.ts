@@ -35,8 +35,8 @@ export interface Onboarding {
 export interface OnboardingDeps {
   /** The escrow approver in force for `payer` (zero address when none). */
   approverOf(payer: Address): Promise<Address>;
-  /** The budget wallet's allowance for our hot key (EndCreditsBudget); null when none is set. */
-  readSpendAllowance?(wallet: Address | null): Promise<SpendAllowance | null>;
+  /** The budget wallet's allowance for the owner's payer key (EndCreditsBudget); null when none is set. */
+  readSpendAllowance?(wallet: Address | null, payer: Address): Promise<SpendAllowance | null>;
 }
 
 /** Micro-USDC, and the period in seconds. */
@@ -49,11 +49,10 @@ export interface SpendAllowance {
   approved: bigint;
 }
 
-/** EndCreditsBudget on Base Sepolia: `wallet`'s allowance for our payer (hot) key. */
-export const readSpendAllowance: NonNullable<OnboardingDeps["readSpendAllowance"]> = async (wallet) => {
+/** EndCreditsBudget on Base Sepolia: `wallet`'s allowance for the owner's payer key. */
+export const readSpendAllowance: NonNullable<OnboardingDeps["readSpendAllowance"]> = async (wallet, spender) => {
   if (!wallet) return null;
   const ctx = chain();
-  const spender = ctx.payer.account.address;
   const [a, left, approved] = await Promise.all([
     allowanceOf(wallet, spender, ctx),
     remaining(wallet, spender, ctx),
@@ -81,11 +80,11 @@ async function approverStep(payer: Address, deps: OnboardingDeps): Promise<Step>
 }
 
 // Done when the hot key can pull now and the USDC approval covers a full period.
-async function allowanceStep(wallet: Address | null, deps: OnboardingDeps): Promise<Step> {
+async function allowanceStep(wallet: Address | null, payer: Address, deps: OnboardingDeps): Promise<Step> {
   const step = { id: "spend_allowance" as const, href: `${OWNER_PAGE}#allowance` };
   if (!process.env.BUDGET_ADDRESS) return { ...step, done: false, detail: "coming soon" };
   const read = deps.readSpendAllowance ?? readSpendAllowance;
-  const allowance = await read(wallet).catch(() => null);
+  const allowance = await read(wallet, payer).catch(() => null);
   if (allowance === null) return { ...step, done: false, detail: null };
   const covered = allowance.approved >= allowance.perPeriod;
   const detail =
@@ -121,7 +120,7 @@ export async function ownerOnboarding(ownerId: string, deps: OnboardingDeps): Pr
     { id: "wallet_bound", done: wallet !== null, detail: wallet, href: null },
     { id: "budget_set", done: true, detail: budget, href: `${OWNER_PAGE}#budget` },
     await approverStep(row.payerAddress as Address, deps),
-    await allowanceStep(funder, deps),
+    await allowanceStep(funder, row.payerAddress as Address, deps),
     { id: "agent_key", done: Boolean(key), detail: null, href: `${OWNER_PAGE}#keys` },
     {
       id: "first_session",

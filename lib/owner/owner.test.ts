@@ -300,7 +300,9 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
   });
   describe("budget wallet", () => {
     const BUDGET = "0x1429498c0e6f2f474a5bd3230e79a838e3590b36";
-    const SPENDER = "0x00000000000000000000000000000000000000aa";
+    // The chain's default spender (the master key) is not the owner's: views use the owner's payer.
+    const SPENDER = "0x00000000000000000000000000000000000000bb";
+    const OWNER_PAYER = "0x00000000000000000000000000000000000000AA";
     const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
     const FUNDER = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
     const FUNDER_SUM = "0xABcdEFABcdEFabcdEfAbCdefabcdeFABcDEFabCD";
@@ -346,7 +348,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
         budgetAddress: BUDGET,
         usdc: USDC,
         budgetOwner: null,
-        spender: SPENDER,
+        spender: OWNER_PAYER,
         usdcBalance: null,
         usdcAllowanceToBudget: null,
         allowance: null,
@@ -366,7 +368,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
         budgetAddress: BUDGET,
         usdc: USDC,
         budgetOwner: FUNDER_SUM,
-        spender: SPENDER,
+        spender: OWNER_PAYER,
         usdcBalance: "12.5",
         usdcAllowanceToBudget: "20",
         allowance: {

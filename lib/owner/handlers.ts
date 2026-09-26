@@ -73,17 +73,22 @@ function result(r: { error: string; status: number } | object): Response {
 
 const approverInput = z.object({ address: z.string().refine((a) => isAddress(a, { strict: false })) });
 
+/** A chain fixed for tests, or built for the signed-in owner (its own payer key). */
+export type PerOwner<T> = T | ((ownerId: string) => Promise<T>);
+const forOwner = <T>(c: PerOwner<T>, ownerId: string): Promise<T> =>
+  typeof c === "function" ? (c as (id: string) => Promise<T>)(ownerId) : Promise.resolve(c);
+
 /** GET /api/owner/approver → { approver, onchain, pending }. */
-export function handleGetApprover(req: Request, chain: ApproverChain): Promise<Response> {
-  return withOwner(req, async ({ ownerId }) => result(await getApprover(ownerId, chain)));
+export function handleGetApprover(req: Request, chain: PerOwner<ApproverChain>): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => result(await getApprover(ownerId, await forOwner(chain, ownerId))));
 }
 
 /** POST /api/owner/approver { address } → { approver, onchain, pending, tx }. */
-export function handleSetApprover(req: Request, chain: ApproverChain): Promise<Response> {
+export function handleSetApprover(req: Request, chain: PerOwner<ApproverChain>): Promise<Response> {
   return withOwner(req, async ({ ownerId }) => {
     const parsed = approverInput.safeParse(await body(req));
     if (!parsed.success) return invalid(z.flattenError(parsed.error).fieldErrors);
-    return result(await setOwnerApprover(ownerId, parsed.data.address as Address, chain));
+    return result(await setOwnerApprover(ownerId, parsed.data.address as Address, await forOwner(chain, ownerId)));
   });
 }
 

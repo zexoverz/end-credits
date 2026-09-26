@@ -118,7 +118,7 @@ export async function ownerSummary(
     payerBalance(owner.payerAddress, deps),
     pendingHolds(ownerId, now),
     unreadNotifications(ownerId),
-    deps.budget ? budgetView(owner.budgetOwner, deps.budget) : null,
+    deps.budget ? budgetView(owner.budgetOwner, deps.budget, owner.payerAddress) : null,
   ]);
   return {
     owner: { id: owner.id, displayName: owner.displayName },

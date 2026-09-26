@@ -6,7 +6,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { budgetAddress, pull, remaining, returnToOwner } from "../chain/budget";
 import { claimOf, hold, recordSession, reserve } from "../chain/escrow";
 import { chain } from "../chain/keys";
+import { chainForOwner, payerKeyFor } from "../chain/payers";
+import { eq } from "drizzle-orm";
 import { db } from "../db/client";
+import { owners, sessions } from "../db/schema";
 import { noCodeOnBase } from "../decision/no-code";
 import { readEnv } from "../env";
 import { interceptaFromEnv } from "../intercepta/client";
@@ -21,11 +24,17 @@ import { decisionAllowsPay } from "./store";
 
 type Env = Record<string, string | undefined>;
 
-export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) => void): SettleDeps {
+export type PayerOwner = { id: string; payerAddress: string };
+
+/**
+ * Settlement signing as `owner`'s payer key (multi-owner, decisions.md); without an owner, as the
+ * master key. The chain context is shared per payer, so its nonces stay in one queue.
+ */
+export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) => void, owner?: PayerOwner): SettleDeps {
   const database = db();
-  const ctx = chain();
+  const ctx = owner ? chainForOwner(owner, env) : chain();
   // chain() already checked the key's format; x402 needs a LocalAccount to sign typed data.
-  const account = privateKeyToAccount(readEnv("PAYER_PRIVATE_KEY", env) as Hex);
+  const account = privateKeyToAccount(owner ? payerKeyFor(owner, env) : (readEnv("PAYER_PRIVATE_KEY", env) as Hex));
   const usdc = readEnv("USDC_ADDRESS", env) as Address;
   const appUrl = readEnv("APP_URL", env).replace(/\/+$/, "");
   const githubToken = env.GITHUB_TOKEN_READ || undefined;
@@ -66,9 +75,9 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
     ...(budget
       ? {
           budget: {
-            remaining: (owner: Address) => remaining(owner, undefined, ctx, budget),
-            pull: (owner: Address, amount: bigint) => pull(owner, amount, ctx, budget),
-            returnToOwner: (owner: Address, amount: bigint) => returnToOwner(owner, amount, ctx),
+            remaining: (funder: Address) => remaining(funder, undefined, ctx, budget),
+            pull: (funder: Address, amount: bigint) => pull(funder, amount, ctx, budget),
+            returnToOwner: (funder: Address, amount: bigint) => returnToOwner(funder, amount, ctx),
           },
         }
       : {}),
@@ -80,5 +89,25 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
         : payCredit(credit, { ...gate, url: `${appUrl}/api/x402/credit/${credit.id}` });
     },
     log,
+  };
+}
+
+/** Settle deps per session: each session signs as its owner's payer. Cached per payer address. */
+export function settleDepsPerOwner(env: Env = process.env, log?: (line: string) => void) {
+  const cache = new Map<string, SettleDeps>();
+  return async (sessionId: string): Promise<SettleDeps> => {
+    const [row] = await db()
+      .select({ id: owners.id, payerAddress: owners.payerAddress })
+      .from(sessions)
+      .innerJoin(owners, eq(owners.id, sessions.ownerId))
+      .where(eq(sessions.id, sessionId));
+    if (!row) throw new Error("session has no owner");
+    const key = row.payerAddress.toLowerCase();
+    let deps = cache.get(key);
+    if (!deps) {
+      deps = settleDepsFromEnv(env, log, row);
+      cache.set(key, deps);
+    }
+    return deps;
   };
 }
