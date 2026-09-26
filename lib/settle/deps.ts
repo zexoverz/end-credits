@@ -1,5 +1,6 @@
 // Production wiring for settlement: Postgres, the npm registry, GitHub, Intercepta (live, never
-// faked here), the escrow through the tx queue, and the x402 client paying our own credit route.
+// faked here), the escrow through the tx queue, and the x402 client paying the maintainer's own
+// endpoint or, without one, our own credit route.
 import { zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { budgetAddress, pull, remaining, returnToOwner } from "../chain/budget";
@@ -14,7 +15,7 @@ import { dbObservations } from "../payee/observe";
 import { firstSeenPush } from "../payee/push";
 import { resolvePayee } from "../payee/resolve";
 import { loadPackage } from "../registry/npm";
-import { payCredit } from "../x402/client";
+import { payCredit, payMaintainer } from "../x402/client";
 import type { SettleDeps } from "./settle";
 import { decisionAllowsPay } from "./store";
 
@@ -70,13 +71,13 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
           },
         }
       : {}),
-    payCredit: (credit) =>
-      payCredit(credit, {
-        account,
-        usdc,
-        url: `${appUrl}/api/x402/credit/${credit.id}`,
-        decisionAllowsPay: (id) => decisionAllowsPay(database, id),
-      }),
+    // Agent to agent: the maintainer's own x402 endpoint when FUNDING.json lists one, else ours.
+    payCredit: ({ endpoint, ...credit }) => {
+      const gate = { account, usdc, decisionAllowsPay: (id: string) => decisionAllowsPay(database, id) };
+      return endpoint
+        ? payMaintainer(credit, { ...gate, endpoint })
+        : payCredit(credit, { ...gate, url: `${appUrl}/api/x402/credit/${credit.id}` });
+    },
     log,
   };
 }

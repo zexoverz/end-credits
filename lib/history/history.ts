@@ -33,6 +33,8 @@ export interface HistoryItem {
   screens: ScreenView[];
   txHash: string | null;
   txUrl: string | null;
+  /** `maintainer_x402` | `endcredits_x402` on a paid credit, else null. */
+  paidVia: string | null;
   decidedAt: string;
   settledAt: string | null;
   hold: { status: string; expiresAt: string; releaseTx: string | null; refundTx: string | null } | null;
@@ -77,6 +79,7 @@ export async function creditHistory(limit: number = HISTORY_LIMIT): Promise<Hist
       reasons: credits.reasons,
       screenIds: credits.screenIds,
       txHash: credits.txHash,
+      paidVia: credits.paidVia,
       decidedAt: credits.decidedAt,
       settledAt: credits.settledAt,
       holdStatus: holds.status,
@@ -104,6 +107,7 @@ export async function creditHistory(limit: number = HISTORY_LIMIT): Promise<Hist
     screens: r.screenIds.flatMap((id) => byId.get(id) ?? []),
     txHash: r.txHash,
     txUrl: basescanTx(r.txHash),
+    paidVia: r.paidVia,
     decidedAt: r.decidedAt!.toISOString(),
     settledAt: r.settledAt?.toISOString() ?? null,
     hold:

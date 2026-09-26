@@ -317,6 +317,30 @@ rewrote payment destinations to lookalike attacker addresses
 the address in the 402 challenge must equal the address Intercepta screened, checked at the moment
 of signing: "Refused: the payment request names a different address than the one screened."
 
+**Agent to agent: the maintainer's own endpoint.** A package can name its own x402 service in
+`FUNDING.json`, next to the payee:
+
+```json
+{
+  "drips": { "ethereum": { "ownedBy": "0x9ebdC8ACc879a8284Ae5B3CecfbD280ec307aFA3" } },
+  "x402": { "endpoint": "https://endcredits-tipjar.up.railway.app/honest/tip" }
+}
+```
+
+Then the settler pays `<endpoint>?amount=<micro>&ref=<creditId>`, a server we do not run, instead
+of our own route. `ownedBy` stays the trust anchor: Intercepta screens it, and the same pre-sign
+checks apply to the maintainer's 402, so its `payTo` must be that address. The worker fetches the URL
+as hostile input ([`lib/x402/endpoint.ts`](lib/x402/endpoint.ts)): https only, every resolved address
+public (checked at connect time), no redirects, 8 s, 64 KB. The credit records
+`paid_via = maintainer_x402` and says "Paid through {host}, the maintainer's own x402 endpoint."
+[`services/tipjar/`](services/tipjar/handler.ts) is a small maintainer-side jar (`pnpm tipjar`) with
+two routes: `/honest/tip` asks to be paid to its `FUNDING.json` address, `/clipper/tip` asks for a
+different one. Live on 26 Sep ([`scripts/a2a-live.ts`](scripts/a2a-live.ts)): the honest jar was
+paid 0.01 USDC in
+[`0x2d226aff…9514`](https://sepolia.basescan.org/tx/0x2d226affdb3dd15dfaee6fe7e3cca9b8f09204a8bae011976c2fbc6072989514),
+and the clipper jar was refused with `PAYTO_MISMATCH` before the signer ran. Fixtures:
+`@endcredits-demo/tip-jar` and `@endcredits-demo/swapped-jar`.
+
 **Smoke payment.** 0.01 USDC from the payer through the public facilitator,
 [`0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`](https://sepolia.basescan.org/tx/0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1)
 (block 47293505, [`scripts/x402-smoke.ts`](scripts/x402-smoke.ts)).

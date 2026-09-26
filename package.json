@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "worker": "tsx worker/index.ts",
+    "tipjar": "tsx services/tipjar/server.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

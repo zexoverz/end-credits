@@ -324,3 +324,36 @@ The session row has a new `budget_pull_tx` (the pull's tx hash, null when there 
   never as payable. Live example: `@endcredits-demo/left-padder-pro`.
 - `claimed: {wallet, setClaimTx, claimTxs} | null`: the newest finished claim for the repo, public
   (no sign-in needed). Link the txs to Basescan. Live example: `@endcredits-demo/unclaimed-rehearsal-1`.
+
+## Agent to agent: paid through the maintainer's own x402 endpoint (26 Sep)
+
+A package can list its own x402 service in `FUNDING.json` (`"x402": {"endpoint": "https://…"}`).
+The settler then pays that service instead of our route. No new routes.
+
+**`paidVia`** is new on each credit of `GET /api/sessions/[id]` and each item of `GET /api/history`:
+
+| value | meaning |
+|---|---|
+| `"maintainer_x402"` | paid through the maintainer's own endpoint (another agent's server) |
+| `"endcredits_x402"` | paid through our own x402 route |
+| `null` | not paid (held, refused, reserved, dust, or not executed) |
+
+On the roll, a `maintainer_x402` credit can say "paid through the maintainer's own x402 endpoint";
+the reason below carries the host.
+
+New reason codes (`reasons`, source `policy`):
+
+| code | outcome | example `text` |
+| --- | --- | --- |
+| `PAID_VIA_MAINTAINER` | `paid` / `capped` | Paid through endcredits-tipjar.up.railway.app, the maintainer's own x402 endpoint. |
+| `ENDPOINT_REFUSED` | `refused` | Refused: the maintainer's x402 endpoint 169.254.169.254 resolves to a private or reserved address. |
+
+`{reason}` in `ENDPOINT_REFUSED` is one of: "is not https", "resolves to a private or reserved
+address", "does not resolve", "answered with a redirect", "did not answer within 8 s", "answered with
+more than 64 KB", "could not be reached".
+
+When a maintainer endpoint's 402 names a different address than the screened payee (the clipper),
+the credit is now `refused` with `PAYTO_MISMATCH` ("Refused: the payment request names a different
+address than the one screened.") and its `PAID` line is removed. Same for `TOKEN_PIN` and
+`CHALLENGE_MISMATCH` from a maintainer endpoint. Nothing was signed. Show it like the other refusals.
+Fixtures: `@endcredits-demo/tip-jar` (honest) and `@endcredits-demo/swapped-jar` (clipper).

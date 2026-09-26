@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseFundingJson, parseNpmFunding, parseTeaYaml } from "./parse";
+import { parseFundingJson, parseNpmFunding, parseTeaYaml, parseX402Endpoint, X402_ENDPOINT_MAX } from "./parse";
 
 const fixture = (name: string) => readFileSync(path.join(__dirname, "__fixtures__", name), "utf8");
 
@@ -115,5 +115,41 @@ describe("parseNpmFunding", () => {
       address: null,
       reason: "PAYEE_INVALID",
     });
+  });
+});
+
+describe("parseX402Endpoint (our FUNDING.json extension)", () => {
+  const funding = (x402: unknown) =>
+    JSON.stringify({ drips: { ethereum: { ownedBy: "0xD5371B61b35E13F2ae354BE95081aD63FB383452" } }, x402 });
+
+  it("reads a top-level x402.endpoint", () => {
+    expect(parseX402Endpoint(funding({ endpoint: "https://tips.example.com/tip" }))).toBe(
+      "https://tips.example.com/tip",
+    );
+  });
+
+  it("refuses anything but https", () => {
+    expect(parseX402Endpoint(funding({ endpoint: "http://tips.example.com/tip" }))).toBeNull();
+    expect(parseX402Endpoint(funding({ endpoint: "file:///etc/passwd" }))).toBeNull();
+  });
+
+  it("refuses credentials, fragments and junk", () => {
+    expect(parseX402Endpoint(funding({ endpoint: "https://u:p@tips.example.com/" }))).toBeNull();
+    expect(parseX402Endpoint(funding({ endpoint: "https://tips.example.com/#x" }))).toBeNull();
+    expect(parseX402Endpoint(funding({ endpoint: "not a url" }))).toBeNull();
+    expect(parseX402Endpoint(funding({ endpoint: 42 }))).toBeNull();
+    expect(parseX402Endpoint(funding("https://tips.example.com/"))).toBeNull();
+  });
+
+  it("caps the length at 2048 chars", () => {
+    const base = "https://tips.example.com/";
+    const at = base + "a".repeat(X402_ENDPOINT_MAX - base.length);
+    expect(parseX402Endpoint(funding({ endpoint: at }))).toBe(at);
+    expect(parseX402Endpoint(funding({ endpoint: at + "a" }))).toBeNull();
+  });
+
+  it("is null without the key or on broken JSON", () => {
+    expect(parseX402Endpoint(funding(undefined))).toBeNull();
+    expect(parseX402Endpoint("{")).toBeNull();
   });
 });

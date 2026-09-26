@@ -7,10 +7,10 @@ import {
   encodePaymentResponseHeader,
 } from "@x402/core/http";
 import type { PaymentPayload, PaymentRequired, PaymentRequirements } from "@x402/core/types";
-import { checkChallenge, payCredit, PaymentRefused, type ClientCredit } from "./client";
+import { checkChallenge, payCredit, payMaintainer, PaymentRefused, type ClientCredit } from "./client";
 import { signReceipt } from "./receipt";
 import { handleCreditRequest, type CreditRepo, type PayableCredit } from "./server";
-import { msg } from "../messages";
+import { ENDPOINT_REASONS, msg } from "../messages";
 
 const USDC = getAddress("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
 const PAYEE = getAddress("0x00000000000000000000000000000000000000aa");
@@ -233,5 +233,96 @@ describe("payCredit happy path", () => {
     );
     expect(err.code).toBe("NOT_PAYABLE");
     expect(signer.signTypedData).not.toHaveBeenCalled();
+  });
+});
+
+describe("payMaintainer (the maintainer's own x402 endpoint)", () => {
+  const ENDPOINT = "https://tipjar.example.com/honest/tip";
+  const TX = `0x${"ab".repeat(32)}`;
+
+  // A maintainer-side resource (tests only): 402 with its own accepts, then a settlement header.
+  function maintainer(accept: PaymentRequirements, settle: Record<string, unknown> = { success: true, transaction: TX, network: "eip155:84532" }) {
+    const urls: string[] = [];
+    const payments: PaymentPayload[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      urls.push(req.url);
+      const header = req.headers.get("PAYMENT-SIGNATURE");
+      if (!header) {
+        const challenge: PaymentRequired = { x402Version: 2, resource: { url: req.url, description: "tip" }, accepts: [accept] };
+        return new Response("{}", { status: 402, headers: { "PAYMENT-REQUIRED": encodePaymentRequiredHeader(challenge) } });
+      }
+      payments.push(decodePaymentSignatureHeader(header));
+      return Response.json({ ok: true }, { headers: { "PAYMENT-RESPONSE": encodePaymentResponseHeader(settle as never) } });
+    });
+    return { fetchImpl, urls, payments };
+  }
+
+  it("pays the endpoint with amount and ref, and returns the settle tx from PAYMENT-RESPONSE", async () => {
+    const signer = spySigner();
+    const { fetchImpl, urls, payments } = maintainer(requirements());
+    const result = await payMaintainer(credit, { account: signer, endpoint: ENDPOINT, usdc: USDC, decisionAllowsPay: allow, fetch: fetchImpl });
+    expect(urls[0]).toBe(`${ENDPOINT}?amount=10000&ref=c1`);
+    expect(signer.signTypedData).toHaveBeenCalledTimes(1);
+    expect((payments[0].payload.authorization as { to: Hex }).to).toBe(PAYEE);
+    expect(result.tx).toBe(TX);
+    expect(result.receipt).toMatchObject({ endpoint: ENDPOINT, settlement: { transaction: TX } });
+  });
+
+  it("refuses a payTo other than the FUNDING.json payee with PAYTO_MISMATCH and never signs", async () => {
+    const signer = spySigner();
+    const clipper = getAddress("0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13");
+    const { fetchImpl, payments } = maintainer(requirements({ payTo: clipper }));
+    const err = await refusal(
+      payMaintainer(credit, { account: signer, endpoint: ENDPOINT, usdc: USDC, decisionAllowsPay: allow, fetch: fetchImpl }),
+    );
+    expect(err.code).toBe("PAYTO_MISMATCH");
+    expect(signer.signTypedData).not.toHaveBeenCalled();
+    expect(payments).toHaveLength(0);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies the whole challenge check: token, amount and domain", async () => {
+    for (const [over, code] of [
+      [{ asset: getAddress("0x00000000000000000000000000000000000000dd") }, "TOKEN_PIN"],
+      [{ amount: "10001" }, "CHALLENGE_MISMATCH"],
+      [{ extra: { name: "USD Coin", version: "2" } }, "CHALLENGE_MISMATCH"],
+    ] as const) {
+      const signer = spySigner();
+      const { fetchImpl } = maintainer(requirements(over));
+      const err = await refusal(
+        payMaintainer(credit, { account: signer, endpoint: ENDPOINT, usdc: USDC, decisionAllowsPay: allow, fetch: fetchImpl }),
+      );
+      expect(err.code).toBe(code);
+      expect(signer.signTypedData).not.toHaveBeenCalled();
+    }
+  });
+
+  it("never signs without a stored paid decision", async () => {
+    const signer = spySigner();
+    const { fetchImpl } = maintainer(requirements());
+    const err = await refusal(
+      payMaintainer(credit, { account: signer, endpoint: ENDPOINT, usdc: USDC, decisionAllowsPay: async () => false, fetch: fetchImpl }),
+    );
+    expect(err.code).toBe("NOT_PAYABLE");
+    expect(signer.signTypedData).not.toHaveBeenCalled();
+  });
+
+  it("maps a guard refusal to ENDPOINT_REFUSED with the host and reason", async () => {
+    const signer = spySigner();
+    const err = await refusal(
+      payMaintainer(credit, { account: signer, endpoint: "https://169.254.169.254/tip", usdc: USDC, decisionAllowsPay: allow }),
+    );
+    expect(err.code).toBe("ENDPOINT_REFUSED");
+    expect(err.message).toBe(msg("ENDPOINT_REFUSED", { host: "169.254.169.254", reason: ENDPOINT_REASONS.PRIVATE_ADDRESS }));
+    expect(signer.signTypedData).not.toHaveBeenCalled();
+  });
+
+  it("a failed or missing settlement is an error, not a payment", async () => {
+    const signer = spySigner();
+    const { fetchImpl } = maintainer(requirements(), { success: false, transaction: "", network: "eip155:84532", errorReason: "insufficient_funds" });
+    await expect(
+      payMaintainer(credit, { account: signer, endpoint: ENDPOINT, usdc: USDC, decisionAllowsPay: allow, fetch: fetchImpl }),
+    ).rejects.toThrow(/missing or not a Base Sepolia transaction/);
   });
 });

@@ -19,6 +19,8 @@ export interface CreditView {
   reasons: unknown;
   signal: MainSignal | null;
   txHash: string | null;
+  /** How a paid credit went out: `maintainer_x402` (the maintainer's own endpoint) or `endcredits_x402`. */
+  paidVia: string | null;
   payee: string | null;
   /** Set on held credits: the `/approve/<tipId>` link. */
   tipId: string | null;
@@ -94,6 +96,7 @@ export function previewCredits(rows: UsageRow[]): CreditView[] {
     reasons: [],
     signal: main.get(p.name) ?? null,
     txHash: null,
+    paidVia: null,
     payee: null,
     tipId: null,
   }));
@@ -111,6 +114,7 @@ export async function sessionView(id: string): Promise<SessionView | null> {
       capped: credits.capped,
       reasons: credits.reasons,
       txHash: credits.txHash,
+      paidVia: credits.paidVia,
       payee: credits.payee,
       tipId: credits.tipId,
     })
@@ -139,6 +143,7 @@ export async function sessionView(id: string): Promise<SessionView | null> {
       reasons: r.reasons,
       signal: signals.get(r.name) ?? null,
       txHash: r.txHash,
+      paidVia: r.paidVia,
       payee: shortAddress(r.payee),
       tipId: r.tipId,
     })),

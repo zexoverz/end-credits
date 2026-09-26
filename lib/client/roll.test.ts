@@ -24,6 +24,7 @@ const credit = (over: Partial<CreditView>): CreditView => ({
   reasons: [],
   signal: null,
   txHash: null,
+  paidVia: null,
   payee: null,
   tipId: null,
   ...over,

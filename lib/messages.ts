@@ -24,6 +24,8 @@ export const MESSAGES = {
   PAYTO_MISMATCH: "Refused: the payment request names a different address than the one screened.",
   CHALLENGE_MISMATCH: "Refused: the payment request does not match this credit.",
   NOT_PAYABLE: "Not paid: this credit has no fresh paid decision to pay against.",
+  PAID_VIA_MAINTAINER: "Paid through {host}, the maintainer's own x402 endpoint.",
+  ENDPOINT_REFUSED: "Refused: the maintainer's x402 endpoint {host} {reason}.",
   RESERVED: "Reserved {amount} USDC for {package}. No wallet yet; the maintainer can claim it.",
   DUST: "Under 0.01 USDC. Not sent.",
   DAILY_LIMIT: "Daily limit reached. Nothing was sent.",
@@ -72,6 +74,19 @@ export const MESSAGES = {
 } as const;
 
 export type MessageCode = keyof typeof MESSAGES;
+
+/** The {reason} of ENDPOINT_REFUSED: why a maintainer's x402 endpoint was not fetched or read. */
+export const ENDPOINT_REASONS = {
+  NOT_HTTPS: "is not https",
+  PRIVATE_ADDRESS: "resolves to a private or reserved address",
+  UNRESOLVED: "does not resolve",
+  REDIRECT: "answered with a redirect",
+  TIMEOUT: "did not answer within 8 s",
+  TOO_LARGE: "answered with more than 64 KB",
+  UNREACHABLE: "could not be reached",
+} as const;
+
+export type EndpointReason = keyof typeof ENDPOINT_REASONS;
 
 // The `endcredits` CLI's own output (E1). Kept apart from the §11 codes above.
 export const CLI_MESSAGES = {
