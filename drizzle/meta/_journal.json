@@ -22,6 +22,13 @@
       "when": 1790355938802,
       "tag": "0002_claim_amount",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790395668391,
+      "tag": "0003_escrow_v2_approver",
+      "breakpoints": true
     }
   ]
 }
