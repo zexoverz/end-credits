@@ -18,10 +18,22 @@ export const LANDING = {
   STEP_3_TITLE: "Credits roll",
   STEP_3_BODY: "Each package gets one outcome:",
   OUTCOMES: [
-    { outcome: "paid", line: "Clean payee: paid in USDC over x402, straight to the maintainer." },
-    { outcome: "held", line: "A doubt: kept in escrow until you approve with World ID, refunded on deny or expiry." },
-    { outcome: "refused", line: "High risk, a lookalike or a spam pattern: nothing is sent." },
-    { outcome: "reserved", line: "No wallet listed: kept in escrow under the package until the maintainer claims it." },
+    {
+      outcome: "paid",
+      line: "Clean payee: paid in USDC over x402, straight to the maintainer.",
+    },
+    {
+      outcome: "held",
+      line: "A doubt: kept in escrow until you approve with World ID, refunded on deny or expiry.",
+    },
+    {
+      outcome: "refused",
+      line: "High risk, a lookalike or a spam pattern: nothing is sent.",
+    },
+    {
+      outcome: "reserved",
+      line: "No wallet listed: kept in escrow under the package until the maintainer claims it.",
+    },
   ],
 
   MEASURE_TITLE: "Why reserve",
@@ -29,13 +41,19 @@ export const LANDING = {
   MEASURE_ANY_VALUE: "41.6%",
   MEASURE_ANY: "have any funding metadata.",
   MEASURE_WALLET_VALUE: "2.1%",
-  MEASURE_WALLET: "list a wallet an agent can pay (21 packages, 10 repositories).",
-  MEASURE_READING: "Four in ten ask for money; one in fifty can receive it. The rest is reserved until the maintainer claims.",
+  MEASURE_WALLET:
+    "list a wallet an agent can pay (21 packages, 10 repositories).",
+  MEASURE_READING:
+    "Four in ten ask for money; one in fifty can receive it. The rest is reserved until the maintainer claims.",
 
   TRY_TITLE: "Try it",
   TRY_INTRO: "From a clone of the repository:",
-  TRY_KEY_NOTE: "Create the agent key on the Owner page.",
-  TRY_COMMANDS: ["pnpm --filter endcredits build", "endcredits init", "endcredits key <token>"],
+  TRY_KEY_NOTE: "Create the connection key on the account page.",
+  TRY_COMMANDS: [
+    "pnpm --filter endcredits build",
+    "endcredits init",
+    "endcredits key <token>",
+  ],
 
   LINKS_TITLE: "Look around",
   LINK_DASHBOARD: "Dashboard: every amount from MultiBaas",

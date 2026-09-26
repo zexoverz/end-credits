@@ -164,7 +164,7 @@ describe("end_credits_explain", () => {
     expect(byPkg.f.outcome).toBe(MCP_COPY.OUTCOMES.dust);
     expect(byPkg.a.approve).toBeUndefined();
     expect(res.text.split("\n")[0]).toBe(
-      `Settled. Paid 0.75 USDC to 2 projects. Held 0.1 USDC. Reserved 0.2 USDC for 1 project without a wallet. Refused 1. 1 held until the owner approves at ${API}/approve/0xt1p.`,
+      `Settled. Paid 0.75 USDC to 2 projects. Held 0.1 USDC. Reserved 0.2 USDC for 1 project without a wallet. Refused 1. 1 held until you approve at ${API}/approve/0xt1p.`,
     );
   });
 

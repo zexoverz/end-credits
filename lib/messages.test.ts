@@ -2,12 +2,26 @@ import { describe, expect, it } from "vitest";
 import { MESSAGES, cliMsg, msg, sessionsLabel } from "./messages";
 
 describe("msg", () => {
+  it("uses account, Agent wallet and Connection key terms without changing codes or placeholders", () => {
+    expect(msg("HELD_MEDIUM", { score: "50" })).toContain(
+      "Waiting for your approval",
+    );
+    expect(msg("SIMULATED", { amount: "2", payee: "0xabc" })).toContain(
+      "Agent wallet",
+    );
+    expect(cliMsg("KEY_SAVED", { path: "/tmp/key" })).toBe(
+      "Connection key saved to /tmp/key.",
+    );
+  });
+
   it("fills every placeholder", () => {
     expect(msg("PAID", { amount: "0.25" })).toBe("Paid 0.25 USDC.");
   });
 
   it("throws on a missing variable instead of printing the placeholder", () => {
-    expect(() => msg("PAID", {})).toThrow("Missing message var: amount in PAID");
+    expect(() => msg("PAID", {})).toThrow(
+      "Missing message var: amount in PAID",
+    );
   });
 
   it("returns fixed strings without vars", () => {
@@ -21,9 +35,12 @@ describe("msg", () => {
   });
 
   it("names the repo and package in SPOOF_REPO", () => {
-    expect(msg("SPOOF_REPO", { repo: "prettier/prettier", package: "prettier-plus" })).toBe(
-      "Reserved: prettier/prettier does not publish prettier-plus.",
-    );
+    expect(
+      msg("SPOOF_REPO", {
+        repo: "prettier/prettier",
+        package: "prettier-plus",
+      }),
+    ).toBe("Reserved: prettier/prettier does not publish prettier-plus.");
   });
 });
 
@@ -32,7 +49,9 @@ describe("cliMsg", () => {
     expect(cliMsg("ROLLING", { url: "https://x/credits/1" })).toBe(
       "End Credits: rolling credits at https://x/credits/1",
     );
-    expect(() => cliMsg("ROLLING", {})).toThrow("Missing message var: url in ROLLING");
+    expect(() => cliMsg("ROLLING", {})).toThrow(
+      "Missing message var: url in ROLLING",
+    );
   });
 });
 

@@ -8,8 +8,8 @@ export const SETUP_STEPS = [
   },
   {
     id: "wallet_bound",
-    title: "Bind your wallet",
-    body: "Your first eligible wallet sign-in binds your owner account. If an approver is already set, use that wallet. After binding, use the same wallet to sign in.",
+    title: "Your wallet",
+    body: "Any wallet can sign in. Its first sign-in creates your account automatically. This wallet is your sign-in, approver and funding wallet by default.",
     action: "Check your identity",
     href: "/app/owner#identity",
   },
@@ -22,23 +22,23 @@ export const SETUP_STEPS = [
   },
   {
     id: "approver_set",
-    title: "Set your approver",
-    body: "Choose the wallet that signs releases of held contributions. An address change may have an on-chain activation delay.",
-    action: "Set approver",
+    title: "Check your approver",
+    body: "Your sign-in wallet becomes your approver automatically, usually within about 5 seconds. Later changes may have an on-chain activation delay.",
+    action: "Review approver",
     href: "/app/owner#approver",
   },
   {
     id: "spend_allowance",
-    title: "Set a spend allowance",
-    body: "Choose your budget wallet, approve USDC to the budget contract, then set the agent’s allowance per period. This is separate from saving your contribution settings.",
-    action: "Open budget wallet",
+    title: "Set a spending limit",
+    body: "Choose a spending limit. From your wallet, approve USDC to the budget contract, then confirm the Agent wallet’s limit per hour, day or week. Both steps must be confirmed on chain.",
+    action: "Set spending limit",
     href: "/app/owner#allowance",
   },
   {
     id: "agent_key",
     title: "Connect your agent",
-    body: "Create an agent key. Run endcredits key <token> on your machine, then endcredits init inside your project.",
-    action: "Create an agent key",
+    body: "Create a connection key. Run endcredits key <token> on your machine, then endcredits init inside your project.",
+    action: "Create a connection key",
     href: "/app/owner#keys",
   },
   {
@@ -50,15 +50,15 @@ export const SETUP_STEPS = [
   },
 ] as const;
 export const ONBOARDING = {
-  eyebrow: "OWNER / SETUP & CONTROLS",
+  eyebrow: "YOUR ACCOUNT / SETUP & CONTROLS",
   title: "Set the rules.\nLet your agent build.",
   subtitle: "One guided setup. Your wallet, your limits, your permission.",
-  passport: "YOUR OWNER PASS",
+  passport: "YOUR ACCOUNT",
   passportBody:
     "A wallet opens your workspace. A few deliberate choices make it yours.",
   signInTitle: "Sign in with your wallet",
   signInBody:
-    "Use the owner wallet, or the existing escrow approver on your first sign-in.",
+    "Sign in with any wallet. If it is new to End Credits, your account is created automatically. Your existing wallet holds your funds; you do not need to create another wallet.",
   messageOnly: "Message signature only. No transfer or spend permission.",
   statement: "Sign in to End Credits",
   metamask: "Continue with MetaMask",
@@ -103,14 +103,14 @@ export const ONBOARDING = {
   sections: "Jump to a control",
   budget: "Budget",
   approver: "Approver",
-  allowance: "Spend allowance",
+  allowance: "Spending limit",
   keys: "Agent connection",
   holds: "Held tips",
   budgetLabel: "01 / CONTRIBUTION RULES",
   budgetTitle: "A little support. Clear limits.",
   budgetBody:
     "Your saved defaults are ready. Adjust them to the amount you want each session to contribute.",
-  identity: "Owner identity",
+  identity: "Your account",
   bound: "Bound sign-in wallet",
   unbound:
     "Your wallet is not bound yet. Sign in with your wallet below to complete this checkpoint.",
@@ -118,14 +118,14 @@ export const ONBOARDING = {
   approverTitle: "You have the final say.",
   approverBody:
     "Held contributions wait for the designated wallet’s signature. Review the address that is actually active on chain.",
-  allowanceLabel: "03 / BUDGET WALLET",
+  allowanceLabel: "03 / SPENDING LIMIT",
   allowanceTitle: "Give spending a boundary.",
   allowanceBody:
-    "Contribution settings describe your budget. A spend allowance separately authorizes the budget wallet to use funds.",
+    "Contribution rules are server-side caps. Your spending limit is a separate hard cap enforced by the contract, funded from your wallet.",
   allowanceSoon:
-    "Budget wallet setup is coming soon. No allowance can be granted from this section yet.",
+    "Budget wallet setup is coming soon. No spending limit can be set from this section yet.",
   allowancePending:
-    "The spend-allowance control is not available in this build yet. Refresh the checklist to see the server’s latest status.",
+    "The spending-limit control is not available in this build yet. Refresh the checklist to see the server’s latest status.",
   continueKeys: "Continue to agent setup ↓",
   keysLabel: "04 / LOCAL CONNECTION",
   keysTitle: "Two commands. Then build.",
@@ -146,11 +146,11 @@ export const ONBOARDING = {
   holdsTitle: "Review before you release.",
   holdsBody:
     "Open a held tip to inspect its evidence and sign or deny the release.",
-  payer: "Current funding wallet",
+  payer: "Agent wallet",
   balance: "USDC balance",
   balanceUnknown: "Balance unavailable",
   walletRoles:
-    "This is the server’s funding wallet. Your sign-in wallet, approver and spend allowance have separate roles.",
+    "This Agent wallet is unique to your account. It draws session funds from your wallet within your spending limit and returns any leftover when the session ends.",
   unit: "USDC",
   recordSession: "First session",
   network: "Base Sepolia · testnet",
@@ -163,13 +163,13 @@ export const ONBOARDING = {
     bad_domain:
       "This message is for a different site or network. Open the official End Credits app and sign in again.",
     bad_signature:
-      "The signature does not match the chosen wallet. Select the owner wallet and try again.",
+      "The signature does not match the chosen wallet. Select the sign-in wallet and try again.",
     expired:
       "The message expired before sign-in finished. Try again and sign the new message within 10 minutes.",
     wrong_wallet:
-      "This is not the owner wallet. Switch to the bound wallet, or the existing escrow approver for a first sign-in.",
+      "The sign-in wallet does not match this account. Start sign-in again with the wallet you want to use.",
     no_owner:
-      "This server has no owner account yet. The operator needs to initialize it before you can sign in.",
+      "Your account could not be created or loaded. Please try signing in again.",
     chain_error:
       "The server could not read the approver on chain. Nothing was bound. Please retry.",
     rejected: "You declined the wallet request. You can try again when ready.",

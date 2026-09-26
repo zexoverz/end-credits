@@ -52,10 +52,10 @@ export const STORY = {
     },
     {
       name: "Resolve",
-      scope: "OWNER + MAINTAINER",
+      scope: "YOUR ACCOUNT + MAINTAINER",
       title: "Automation, with people in control.",
-      body: "Owners review held credits and sign releases with their approver wallet, with World ID step-up where required. Maintainers can claim reserves by proving repository ownership.",
-      proof: "Deny or expire a hold → refund to payer",
+      body: "You review held credits and sign releases with your approver wallet, with World ID step-up where required. Maintainers can claim reserves by proving repository ownership.",
+      proof: "Deny or expire a hold → refund to your wallet",
       detail:
         "The maintainer flow uses GitHub sign-in, a payout wallet, and a merged claim PR. The on-chain activation delay is shown before funds become claimable.",
     },
@@ -108,7 +108,7 @@ export const STORY = {
     },
     {
       name: "Needs review",
-      path: "Escrow → owner",
+      path: "Escrow → your wallet",
       note: "Held",
       tone: "paper",
     },
@@ -122,7 +122,7 @@ export const STORY = {
   routeLabel: "A STORED DECISION ROUTES EACH CREDIT",
   routeFoot: "Refused / skipped → no transfer",
   resolve: {
-    owner: "OWNER",
+    owner: "YOUR ACCOUNT",
     ownerTitle: "Review a hold",
     ownerSteps: [
       "Inspect the reason",

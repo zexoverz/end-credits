@@ -55,7 +55,7 @@ export const TECHNICAL = {
         "allocation = min(weighted share, cap)",
       ],
       tag: "BUDGET-BOUND CONTRIBUTIONS",
-      checkpoint: "Unused budget stays with the owner",
+      checkpoint: "Unused session funds return to your wallet",
     },
     {
       title: "Screen",

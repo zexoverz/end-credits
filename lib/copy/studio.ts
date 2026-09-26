@@ -25,8 +25,8 @@ export const STUDIO = {
     },
     {
       title: "Connect Claude Code",
-      body: "Create an agent key, build the CLI, and install the hook inside your project.",
-      action: "Create an agent key",
+      body: "Create a connection key, build the CLI, and install the hook inside your project.",
+      action: "Create a connection key",
       href: "/app/owner?section=keys",
     },
     {

@@ -3,74 +3,101 @@ export const MESSAGES = {
   PAID: "Paid {amount} USDC.",
   CAPPED: "Capped at {amount} USDC, the per-package limit for this session.",
   HELD_CHANGED:
-    "Held: the funding address for {package} changed {when}. Waiting for the owner.",
-  HELD_MEDIUM: "Held: Intercepta rates this address medium risk ({score}). Waiting for the owner.",
-  HELD_NO_CODE: "Held: {address} is a contract on Ethereum with no code on Base.",
+    "Held: the funding address for {package} changed {when}. Waiting for your approval.",
+  HELD_MEDIUM:
+    "Held: Intercepta rates this address medium risk ({score}). Waiting for your approval.",
+  HELD_NO_CODE:
+    "Held: {address} is a contract on Ethereum with no code on Base.",
   HELD_NO_HISTORY:
-    "Held: {address} has no history on mainnet, so Intercepta has nothing to judge. Waiting for the owner.",
-  SCREEN_UNAVAILABLE: "Held: screening unavailable ({error}). Nothing is paid without a screen.",
+    "Held: {address} has no history on mainnet, so Intercepta has nothing to judge. Waiting for your approval.",
+  SCREEN_UNAVAILABLE:
+    "Held: screening unavailable ({error}). Nothing is paid without a screen.",
   REFUSED_TRAIT: "Refused. Intercepta: {description}",
-  REFUSED_SIMULATION: "Refused. Intercepta flagged the simulated payment: {description}",
-  HELD_SIMULATION: "Held: the simulated payment moves {moved} instead of {amount} USDC to {payee}.",
+  REFUSED_SIMULATION:
+    "Refused. Intercepta flagged the simulated payment: {description}",
+  HELD_SIMULATION:
+    "Held: the simulated payment moves {moved} instead of {amount} USDC to {payee}.",
   SIMULATED:
-    "Simulated on Base: −{amount} USDC from the payer to {payee}. x402 settles it by transferWithAuthorization, which moves the same USDC.",
-  PAYER_REFUSED: "Refused: Intercepta flags the paying wallet. {description}",
-  PAYER_SCREEN_UNAVAILABLE: "Not settled: the paying wallet could not be screened ({error}). Nothing was settled.",
+    "Simulated on Base: −{amount} USDC from the Agent wallet to {payee}. x402 settles it by transferWithAuthorization, which moves the same USDC.",
+  PAYER_REFUSED: "Refused: Intercepta flags the Agent wallet. {description}",
+  PAYER_SCREEN_UNAVAILABLE:
+    "Not settled: the Agent wallet could not be screened ({error}). Nothing was settled.",
   IMPERSONATION:
     "Refused. Intercepta: this address impersonates {original} (address poisoning).",
   TOKEN_PIN: "Refused: the payment token is not Base Sepolia USDC.",
-  LOOKALIKE: "Refused: {address} looks like {known} ({knownPackage}) but is a different address.",
+  LOOKALIKE:
+    "Refused: {address} looks like {known} ({knownPackage}) but is a different address.",
   SPAM: "Refused: this address is the payee of {count} packages in this session, each new or under 1,000 weekly downloads.",
-  PAYTO_MISMATCH: "Refused: the payment request names a different address than the one screened.",
-  CHALLENGE_MISMATCH: "Refused: the payment request does not match this credit.",
-  NOT_PAYABLE: "Not paid: this credit has no fresh paid decision to pay against.",
-  PAID_VIA_MAINTAINER: "Paid through {host}, the maintainer's own x402 endpoint.",
+  PAYTO_MISMATCH:
+    "Refused: the payment request names a different address than the one screened.",
+  CHALLENGE_MISMATCH:
+    "Refused: the payment request does not match this credit.",
+  NOT_PAYABLE:
+    "Not paid: this credit has no fresh paid decision to pay against.",
+  PAID_VIA_MAINTAINER:
+    "Paid through {host}, the maintainer's own x402 endpoint.",
   ENDPOINT_REFUSED: "Refused: the maintainer's x402 endpoint {host} {reason}.",
-  RESERVED: "Reserved {amount} USDC for {package}. No wallet yet; the maintainer can claim it.",
+  RESERVED:
+    "Reserved {amount} USDC for {package}. No wallet yet; the maintainer can claim it.",
   DUST: "Under 0.01 USDC. Not sent.",
   DAILY_LIMIT: "Daily limit reached. Nothing was sent.",
-  RESOLVE_FAILED: "Not sent: the payee lookup failed ({error}). Nothing was paid.",
-  EXECUTION_FAILED: "Decided, but the transfer did not go through ({error}). Nothing was sent.",
-  BUDGET_PULL_FAILED: "Not sent: the owner's budget wallet refused the pull ({error}).",
-  BUDGET_CAP: "The owner's on-chain budget has nothing left this period. Nothing was sent.",
-  NO_APPROVER: "Held, but the owner has no approver wallet yet. Set one on /owner.",
+  RESOLVE_FAILED:
+    "Not sent: the payee lookup failed ({error}). Nothing was paid.",
+  EXECUTION_FAILED:
+    "Decided, but the transfer did not go through ({error}). Nothing was sent.",
+  BUDGET_PULL_FAILED:
+    "Not sent: your funding wallet refused the pull ({error}).",
+  BUDGET_CAP:
+    "Your on-chain spending limit has nothing left this period. Nothing was sent.",
+  NO_APPROVER:
+    "Held, but the account has no approver wallet yet. Set one on /owner.",
   PAYEE_INVALID: "The funding file names an invalid address.",
   SPOOF_REPO: "Reserved: {repo} does not publish {package}.",
-  REPO_DECLARED: "Not on the npm registry; repository taken from the installed package.json.",
+  REPO_DECLARED:
+    "Not on the npm registry; repository taken from the installed package.json.",
   SCREENED_AS: "Screened as its mainnet equivalent (Base, chain 8453).",
   APPROVED: "Approved with World ID. Released {amount} USDC to {address}.",
-  APPROVED_SESSION: "Approved by the owner. Released {amount} USDC to {address}.",
-  DENIED: "Denied. {amount} USDC returned to the owner.",
-  EXPIRED: "Not approved in time. {amount} USDC returned to the owner.",
-  RETURNED: "Returned {amount} USDC to the owner's wallet.",
-  RETURN_PENDING: "Refunded, but the transfer back to the owner's wallet has not gone through yet. Retrying.",
+  APPROVED_SESSION:
+    "Approved by your account. Released {amount} USDC to {address}.",
+  DENIED: "Denied. {amount} USDC returned to your wallet.",
+  EXPIRED: "Not approved in time. {amount} USDC returned to your wallet.",
+  RETURNED: "Returned {amount} USDC to the your wallet.",
+  RETURN_PENDING:
+    "Refunded, but the transfer back to the your wallet has not gone through yet. Retrying.",
   CANCELLED: "Verification cancelled. Nothing was released.",
   STALE_AUTH: "A fresh verification is required. Nothing was released.",
   WRONG_HUMAN: "This approval belongs to a different human.",
   NONCE: "This verification was not issued for this approval.",
   ACR: "A proof-of-human credential is required.",
-  UNKNOWN_STATE: "This verification is not for a pending approval. Nothing was released.",
+  UNKNOWN_STATE:
+    "This verification is not for a pending approval. Nothing was released.",
   VERIFY_FAILED: "The verification could not be checked. Nothing was released.",
   APPROVE_SENTENCE: "Release {amount} USDC to {address} for {package}.",
-  CLAIM_HEADLINE: "Agents set aside {amount} USDC for {package} from {sessions}.",
-  NO_PERMISSION: "You need push or admin access to {repo} to claim for {package}.",
+  CLAIM_HEADLINE:
+    "Agents set aside {amount} USDC for {package} from {sessions}.",
+  NO_PERMISSION:
+    "You need push or admin access to {repo} to claim for {package}.",
   PR_OPENED:
     "Pull request #{number} opened. Merge it to claim; merging is the proof that you control this repository.",
   PR_WAITING: "Waiting for #{number} to be merged.",
   PR_LINK:
     "Your GitHub sign-in cannot write to {repo}. Open the prefilled FUNDING.json on GitHub, commit it to {branch}, then check again.",
-  FUNDING_MISMATCH: "FUNDING.json on {branch} names {found}, not your wallet {expected}.",
+  FUNDING_MISMATCH:
+    "FUNDING.json on {branch} names {found}, not your wallet {expected}.",
   CLAIM_REFUSED: "This address cannot receive funds. Intercepta: {description}",
   CLAIMED: "Claimed {amount} USDC to {address}.",
   ALREADY_PAYABLE: "{package} already lists a wallet. Agents pay it directly.",
-  PAYEE_REFUSED: "Agents refuse to pay {package}: Intercepta flags the address it lists. {description}",
+  PAYEE_REFUSED:
+    "Agents refuse to pay {package}: Intercepta flags the address it lists. {description}",
   COOLING: "The funding address changed. Claims reopen at {time}.",
   NOT_A_PAYWALL:
     "End Credits is opt-in for whoever runs the agent. Packages stay free for everyone.",
   ROLL_TITLE: "This session was made possible by",
   ACTION_APPROVE: "Approve or deny {amount} USDC held for {package}.",
-  ACTION_EXPIRING: "{amount} USDC for {package} expires at {time}. Not approved by then, it returns to you.",
-  ACTION_RESERVE: "{amount} USDC reserved for {package} from {sessions}, waiting for the maintainer to claim.",
+  ACTION_EXPIRING:
+    "{amount} USDC for {package} expires at {time}. Not approved by then, it returns to you.",
+  ACTION_RESERVE:
+    "{amount} USDC reserved for {package} from {sessions}, waiting for the maintainer to claim.",
 } as const;
 
 export type MessageCode = keyof typeof MESSAGES;
@@ -93,20 +120,24 @@ export const CLI_MESSAGES = {
   USAGE:
     "Usage: endcredits init [--global] | key <token> [--api <url>] | login [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run] | mcp",
   LOGIN_CODE: "Open {url} in World App and confirm the code {code}.",
-  LOGIN_SAVED: "Signed in with World ID. Agent key saved to {path}.",
+  LOGIN_SAVED: "Signed in with World ID. Connection key saved to {path}.",
   LOGIN_DENIED: "Sign-in was cancelled in World App. No key was saved.",
   LOGIN_EXPIRED: "The sign-in code expired. Run endcredits login again.",
-  LOGIN_NO_OWNER: "This World ID is not an End Credits owner. No key was saved.",
+  LOGIN_NO_OWNER:
+    "This World ID is not an End Credits account. No key was saved.",
   LOGIN_FAILED: "Sign-in failed ({error}). No key was saved.",
   INIT_ADDED: "End Credits hooks added to {path}.",
   INIT_UNCHANGED: "End Credits hooks are already in {path}.",
   INIT_INVALID: "Could not read {path} as JSON. Left it unchanged.",
-  MCP_ADDED: "End Credits MCP server added to {path}. Approve it the next time you start claude here.",
-  MCP_UNCHANGED: "An end-credits MCP server is already in {path}. Left it unchanged.",
-  MCP_GLOBAL: "To give every project the End Credits MCP server, run: {command}",
-  KEY_SAVED: "Agent key saved to {path}.",
-  KEY_INVALID: "Could not save the agent key: {error}",
-  KEY_MISSING: "No agent key yet. Run: endcredits key <token>",
+  MCP_ADDED:
+    "End Credits MCP server added to {path}. Approve it the next time you start claude here.",
+  MCP_UNCHANGED:
+    "An end-credits MCP server is already in {path}. Left it unchanged.",
+  MCP_GLOBAL:
+    "To give every project the End Credits MCP server, run: {command}",
+  KEY_SAVED: "Connection key saved to {path}.",
+  KEY_INVALID: "Could not save the connection key: {error}",
+  KEY_MISSING: "No connection key yet. Run: endcredits key <token>",
   SESSION_REQUIRED: "Pass --session <id>.",
   NO_LEDGER: "No ledger for session {id}.",
   ROLLING: "End Credits: rolling credits at {url}",
@@ -122,7 +153,8 @@ type Vars = Record<string, string | number>;
 
 function format(template: string, code: string, vars: Vars): string {
   return template.replace(/\{(\w+)\}/g, (_, name: string) => {
-    if (!(name in vars)) throw new Error(`Missing message var: ${name} in ${code}`);
+    if (!(name in vars))
+      throw new Error(`Missing message var: ${name} in ${code}`);
     return String(vars[name]);
   });
 }
@@ -136,4 +168,5 @@ export function cliMsg(code: CliMessageCode, vars: Vars = {}): string {
 }
 
 /** "1 session" / "2 sessions", for the {sessions} placeholders. */
-export const sessionsLabel = (n: number): string => `${n} ${n === 1 ? "session" : "sessions"}`;
+export const sessionsLabel = (n: number): string =>
+  `${n} ${n === 1 ? "session" : "sessions"}`;
