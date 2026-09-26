@@ -387,9 +387,11 @@ whole backend of its money dashboard and of the owner's "money is held" notifica
 | Use | Where |
 |---|---|
 | Deploy through the MultiBaas Forge plugin (`curvegrid/forge-multibaas`), linked as label `endcredits_escrow`, alias `escrow` | [`contracts/script/Deploy.s.sol`](contracts/script/Deploy.s.sol) |
+| Deploy `EndCreditsBudget` the same way, linked as label `endcredits_budget`, alias `budget` | [`contracts/script/DeployBudget.s.sol`](contracts/script/DeployBudget.s.sol) |
 | Link Base Sepolia USDC (a contract we did not deploy) as `usdc` with the ERC-20 ABI, so the payer's x402 `Transfer`s are indexed next to the escrow events | [`scripts/multibaas-setup.ts`](scripts/multibaas-setup.ts) |
 | Six saved event queries: `paid_totals`, `held_status`, `reserved_by_package`, `reserved_sessions`, `sessions`, `recent` | [`lib/multibaas/queries.ts`](lib/multibaas/queries.ts) |
 | `/api/dashboard` builds every amount and count from those queries (60 s cache) | [`lib/multibaas/dashboard.ts`](lib/multibaas/dashboard.ts), [`app/api/dashboard/route.ts`](app/api/dashboard/route.ts) |
+| Actions and a 48 h timeline, built from the same query rows | [`lib/multibaas/actions.ts`](lib/multibaas/actions.ts) |
 | Webhook `endcredits` on `event.emitted`: HMAC over the exact body bytes, 300 s skew, de-dup by `txHash:logIndex`; a `Held` event notifies the owner of that payer | [`lib/multibaas/webhook.ts`](lib/multibaas/webhook.ts), [`app/api/webhooks/multibaas/route.ts`](app/api/webhooks/multibaas/route.ts) |
 | REST client: bearer auth, envelope unwrap, 8 s deadline, typed errors | [`lib/multibaas/client.ts`](lib/multibaas/client.ts), [`lib/multibaas/rows.ts`](lib/multibaas/rows.ts) |
 
@@ -416,6 +418,12 @@ table, the session count, and recent escrow and USDC events with Basescan links.
 ([`lib/multibaas/dashboard.ts`](lib/multibaas/dashboard.ts)); only package names come from our
 database. Refused credits are a count from our decision log, since refused money never moves. The
 webhook turns each `Held` event into an owner notification.
+
+It also says what to do next. Above the cards is a list of actions: held tips waiting for the owner's
+signature (a `Held` with no `Released` or `Refunded` yet, soonest expiry first, flagged when under
+2 h), then reserves waiting for a maintainer to claim, largest first. Each links to the page where it
+is done. Below the cards, a 48 h chart per UTC hour of paid, held, released, refunded, reserved and
+claimed USDC, from the same MultiBaas events.
 
 ### Team
 
@@ -444,9 +452,14 @@ Faisal, solo. GitHub [`zexoverz`](https://github.com/zexoverz).
 
 ### Experience with MultiBaas
 
-- **Win:** the Forge plugin deployed and linked the escrow in one `forge script` run, and saved
+- **Win:** the Forge plugin deployed and linked the escrow (and later the budget contract) in one
+  `forge script` run each, and saved
   queries plus one webhook gave us the dashboard backend without writing an indexer. Linking USDC,
   a contract we did not deploy, put the x402 payments on the same dashboard as the escrow events.
+- **Address filters are case-sensitive.** `paid_totals` returned 0 transfers although the x402
+  payments were indexed: MultiBaas stores event address inputs lowercase and compares filter values
+  as strings, so the checksummed payer matched nothing. Filtering on the lowercase address fixed it
+  ([`lib/multibaas/queries.ts#L101`](lib/multibaas/queries.ts#L101)).
 - **Linking needs bytecode.** The API rejects a contract without it, even when only linking an
   existing address; we upload the ERC-20 ABI with `bin: "0x"`.
 - **`PUT /queries/{label}` answers without `result`,** unlike reads, so an envelope check that
