@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, ErrorBox, Mono } from "@/components/ui";
 import { api } from "@/components/product/request";
 import { keyCommand, type KeyView } from "@/lib/client/owner";
+import { ONBOARDING as O } from "@/lib/copy/onboarding";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
 
 const when = (iso: string) => new Date(iso).toLocaleString();
@@ -48,6 +49,11 @@ function NewKey({ token, onDone }: { token: string; onDone: () => void }) {
         <Mono>{command}</Mono>
         <CopyButton text={command} />
       </div>
+      <p>{O.keyInit}</p>
+      <div className="flex items-center gap-2">
+        <Mono>{O.initCommand}</Mono>
+        <CopyButton text={O.initCommand} />
+      </div>
       <div>
         <Button
           type="button"
@@ -61,7 +67,7 @@ function NewKey({ token, onDone }: { token: string; onDone: () => void }) {
   );
 }
 
-export function AgentKeys() {
+export function AgentKeys({ onChanged }: { onChanged?: () => void } = {}) {
   const notify = useFeedback();
   const [keys, setKeys] = useState<KeyView[] | null>(null);
   const [label, setLabel] = useState("");
@@ -100,6 +106,7 @@ export function AgentKeys() {
     notify(U.keyCreated, C.KEY_CREATED);
     setLabel("");
     await refresh();
+    onChanged?.();
   }
 
   async function revoke(id: string) {
@@ -112,6 +119,7 @@ export function AgentKeys() {
     if (!r.ok) return fail(r.error);
     notify(U.keyRevoked, U.keyRevokeBody);
     await refresh();
+    onChanged?.();
   }
 
   return (

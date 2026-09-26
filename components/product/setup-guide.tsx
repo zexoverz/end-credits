@@ -2,7 +2,8 @@
 import { useId, useRef } from "react";
 import Link from "next/link";
 import { STUDIO as S } from "@/lib/copy/studio";
-import { StudioArtwork } from "./artwork";
+import { ONBOARDING as O, SETUP_STEPS } from "@/lib/copy/onboarding";
+import { SetupArt } from "./setup-art";
 export function SetupGuide({ compact = false }: { compact?: boolean }) {
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -32,12 +33,12 @@ export function SetupGuide({ compact = false }: { compact?: boolean }) {
             ×
           </button>
           <div className="setup-dialog-art">
-            <StudioArtwork kind="agent" />
+            <SetupArt kind="agent" />
           </div>
-          <h2 id={titleId}>{S.helpTitle}</h2>
-          <p>{S.helpBody}</p>
+          <h2 id={titleId}>{O.guideTitle}</h2>
+          <p>{O.guideBody}</p>
           <ol>
-            {S.setupSteps.map((step, i) => (
+            {SETUP_STEPS.map((step, i) => (
               <li key={step.title}>
                 <span>{i + 1}</span>
                 <div>

@@ -6,6 +6,7 @@ import "./desk.css";
 import "./control-room.css";
 import "./claim-flow.css";
 import "./credits-desk.css";
+import "./owner-setup.css";
 export default function ProductLayout({
   children,
 }: {
