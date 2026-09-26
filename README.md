@@ -3,13 +3,20 @@
 **Your AI agent pays every open-source project it used, and never pays the scammers pretending to be
 them.**
 
-ETHGlobal Tokyo 2026. Solo build by Faisal ([`zexoverz`](https://github.com/zexoverz)).
+End Credits splits the owner's budget across the open-source packages a Claude Code session used,
+screens every payee with Intercepta before signing, pays clean ones over x402, and holds or reserves
+the rest in an escrow that only the owner's wallet can release from.
+
+ETHGlobal Tokyo 2026. Solo build by Faisal ([`zexoverz`](https://github.com/zexoverz)). Partners:
+**Intercepta** ([the moment of decision](#intercepta-the-moment-of-decision)) and **Curvegrid
+MultiBaas** ([how it is used](#curvegrid-multibaas)).
 
 | | |
 |---|---|
 | App | https://end-credits.up.railway.app |
 | Dashboard (MultiBaas) | https://end-credits.up.railway.app/dashboard |
 | Decision history | https://end-credits.up.railway.app/history |
+| First live settlement (roll) | https://end-credits.up.railway.app/credits/9233161f-1de0-4161-abc8-387379cc2b8b |
 | `EndCreditsEscrow` on Basescan | https://sepolia.basescan.org/address/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46#code |
 | `EndCreditsEscrow` on Sourcify (`exact_match`) | https://repo.sourcify.dev/84532/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46 |
 
@@ -41,7 +48,7 @@ flowchart LR
   D --> E[Intercepta screen<br/>mainnet reputation]
   E --> F{Decision matrix}
   F -->|paid / capped| G[x402 USDC<br/>to maintainer]
-  F -->|held| H[EndCreditsEscrow.hold<br/>World ID release]
+  F -->|held| H[EndCreditsEscrow.hold<br/>owner-signed release]
   F -->|reserved| I[EndCreditsEscrow.reserve<br/>maintainer claims]
   F -->|refused| J[nothing sent]
   G & H & I & J --> K[Credits roll<br/>+ recordSession]
@@ -63,9 +70,9 @@ flowchart LR
    times and GitHub push times, never commit dates ([`lib/payee/change.ts`](lib/payee/change.ts),
    [`lib/payee/push.ts`](lib/payee/push.ts)).
 5. **Screen.** Every payee is screened by Intercepta before anything is signed (see
-   [Intercepta](#intercepta)).
-6. **Decide and execute.** The matrix below picks one outcome; the decision is stored before any
-   signature ([`lib/settle/settle.ts#L228-L250`](lib/settle/settle.ts#L228-L250)).
+   [Intercepta](#intercepta-the-moment-of-decision)).
+6. **Decide and execute.** The [matrix](#decision-matrix-as-built) picks one outcome; the decision is stored before any
+   signature ([`lib/settle/settle.ts#L248-L272`](lib/settle/settle.ts#L248-L272)).
 7. **Roll.** `/credits/<id>` lists every package with its badge, reason and Basescan link; the
    recorder emits one `SessionSettled` event per session with a manifest hash.
 
@@ -77,12 +84,49 @@ TODO(live): roll screenshot from the recorded demo session.
 |---|---|---|
 | `paid` | clean payee, paid in full | x402 transfer to the maintainer; Basescan link |
 | `capped` | clean payee, share cut to the per-package cap | x402 transfer of the capped amount; the excess went to other packages |
-| `held` | a doubt: funding address changed recently, medium risk, or screening unavailable | in escrow; released on a World-approved owner decision; refunded on deny or expiry |
+| `held` | a doubt: funding address changed recently, medium risk, or screening unavailable | in escrow; released only with the owner's approver wallet signature (EIP-712, checked on chain); refunded on deny or expiry |
 | `refused` | high risk: sanctioned, known scammer, phishing, impersonation, lookalike address, or a spam payout pattern | not sent; stays with the owner |
 | `reserved` | the package lists no wallet | in escrow under the package key until the maintainer claims |
 
 Shares under 0.01 USDC are `dust` and never sent. A payee lookup that fails (registry, GitHub or RPC
 down twice) is `refused` with `RESOLVE_FAILED`, so the money stays with the owner.
+
+## Intercepta: the moment of decision
+
+Every payee is screened live by Intercepta before a payment is signed or a hold is sent, and the
+answer picks what happens to the money. We pay on Base Sepolia, but the payees are the real
+addresses maintainers published, so their **mainnet** reputation is what gets screened.
+
+The order, per credit, in [`lib/settle/settle.ts`](lib/settle/settle.ts):
+
+1. Screen the payee ([`#L248-L249`](lib/settle/settle.ts#L248-L249)). A screen that throws becomes
+   `error: "HTTP"` ([`#L330-L337`](lib/settle/settle.ts#L330-L337)), which holds.
+2. `decide` runs the matrix on the screen ([`#L250-L261`](lib/settle/settle.ts#L250-L261)).
+3. The decision and its reasons are stored, with the ids of the screens that produced it
+   ([`#L262-L269`](lib/settle/settle.ts#L262-L269)).
+4. Only then is anything signed or sent ([`#L271-L327`](lib/settle/settle.ts#L271-L327)): x402 for
+   `paid` / `capped`, `hold` or `reserve` on the escrow, nothing for `refused`.
+5. At signing time the x402 client checks the 402 challenge against the screened payee and the
+   stored decision ([`lib/x402/client.ts#L39-L68`](lib/x402/client.ts#L39-L68)), and the resource
+   refuses to quote a credit whose payee has no successful screen from the last 10 minutes
+   ([`lib/x402/server.ts#L72-L78`](lib/x402/server.ts#L72-L78)).
+
+Timeout or error from Intercepta means hold, never pay.
+
+### Where the API is called
+
+| File | What |
+|---|---|
+| [`lib/intercepta/client.ts#L53-L92`](lib/intercepta/client.ts#L53-L92) | the one HTTP path: `X-API-KEY`, 8 s deadline, every call stored in `screens` with status, body and latency |
+| [`lib/intercepta/client.ts#L96-L105`](lib/intercepta/client.ts#L96-L105) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` |
+| [`lib/intercepta/client.ts#L107-L113`](lib/intercepta/client.ts#L107-L113) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
+| [`lib/intercepta/client.ts#L115-L122`](lib/intercepta/client.ts#L115-L122) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
+| [`lib/intercepta/client.ts#L124-L137`](lib/intercepta/client.ts#L124-L137) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, only when the quick scan fails |
+| [`lib/intercepta/client.ts#L141-L181`](lib/intercepta/client.ts#L141-L181) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure left sets `Screen.error` |
+| [`lib/decision/matrix.ts#L50-L101`](lib/decision/matrix.ts#L50-L101) | how the screen decides: token block, screen error, traits, score, impersonation, medium, no history |
+| [`lib/claim/wallet-screen.ts`](lib/claim/wallet-screen.ts), called from [`lib/claim/env.ts#L48`](lib/claim/env.ts#L48) | a maintainer's claim wallet is quick-scanned before `setClaim` |
+| [`lib/intercepta/cache.ts`](lib/intercepta/cache.ts) | reuse: address screens 5 min, token screens 1 h, only rows that parsed |
+| [`scripts/probe-intercepta.ts`](scripts/probe-intercepta.ts) | the probe behind [`docs/intercepta-probe.md`](docs/intercepta-probe.md) (10 real responses, verbatim) |
 
 ### Decision matrix, as built
 
@@ -101,36 +145,12 @@ down twice) is `refused` with `RESOLVE_FAILED`, so the money stays with the owne
 | 4 | our spam rule: same payee for 5+ packages in the session, each new or under 1,000 weekly downloads | `refused` | `SPAM` |
 | 5 | funding address changed in the last 30 days | `held` | `HELD_CHANGED` |
 | 6 | `20 <= toxicScore <= 50`, or token `action == warn` | `held` | `HELD_MEDIUM` |
+| 6b | Intercepta has no mainnet history for the address (see below) | `held` | `HELD_NO_HISTORY` |
 | 7 | contract on Ethereum with no code on Base (only with `CHECK_NO_CODE=true`) | `held` | `HELD_NO_CODE` |
 | 8 | otherwise | `capped` if the split capped it, else `paid` | `CAPPED` / `PAID` |
 
 Every decision made on a successful screen also carries `SCREENED_AS`: "Screened as its mainnet
 equivalent (Base, chain 8453)." All user-facing text is in [`lib/messages.ts`](lib/messages.ts).
-
-## Intercepta
-
-Every payee is screened live before a payment is signed or a hold is sent, and the result picks the
-outcome. We pay on Base Sepolia, but the payees are the real addresses maintainers published, so
-their **mainnet** reputation is what gets screened.
-
-### Where the API is called
-
-| File | What |
-|---|---|
-| [`lib/intercepta/client.ts#L59-L73`](lib/intercepta/client.ts#L59-L73) | the one HTTP call: `X-API-KEY`, 8 s deadline, every call stored in `screens` with its latency |
-| [`lib/intercepta/client.ts#L85-L91`](lib/intercepta/client.ts#L85-L91) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` |
-| [`lib/intercepta/client.ts#L93-L98`](lib/intercepta/client.ts#L93-L98) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
-| [`lib/intercepta/client.ts#L101-L108`](lib/intercepta/client.ts#L101-L108) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
-| [`lib/intercepta/client.ts#L110-L123`](lib/intercepta/client.ts#L110-L123) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, fallback when quick scan fails |
-| [`lib/intercepta/client.ts#L127-L162`](lib/intercepta/client.ts#L127-L162) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure sets `Screen.error` |
-| [`lib/settle/settle.ts#L227-L239`](lib/settle/settle.ts#L227-L239) | the settler screens the payee, then calls `decide` with the result |
-| [`lib/settle/settle.ts#L309-L315`](lib/settle/settle.ts#L309-L315) | a screen that throws becomes `error: "HTTP"`, so it holds |
-| [`lib/decision/matrix.ts#L50-L95`](lib/decision/matrix.ts#L50-L95) | how the screen decides: token block, screen error, traits, score, impersonation |
-| [`lib/claim/env.ts#L38-L39`](lib/claim/env.ts#L38-L39) | a maintainer's claim wallet is quick-scanned before `setClaim` |
-| [`lib/intercepta/cache.ts`](lib/intercepta/cache.ts) | reuse: address screens 5 min, token screens 1 h, only status-200 rows that parse |
-
-Timeout or error from Intercepta means hold, never pay. The x402 route also refuses to quote a credit
-whose payee has no successful address screen from the last 10 minutes.
 
 ### Testnet to mainnet mapping
 
@@ -146,19 +166,56 @@ Every screened result on the roll and in `/history` carries `SCREENED_AS`, so no
 payment as a mainnet one. Separately, a local pin refuses any payment token that is not Base Sepolia
 USDC (`TOKEN_PIN`).
 
-### Paid, held and refused in the demo
+### No history is not an outage
 
-The held and refused rows come from our own `@endcredits-demo/*` fixtures (see
-[Demo fixtures](#demo-fixtures)).
+For an address it has never seen on mainnet, quick scan answers HTTP 404 with
+`"An Externally Owned Account with this address doesn't exist."`
+([probe #3](docs/intercepta-probe.md)). Treated as an error, a fresh payee would have held as
+`SCREEN_UNAVAILABLE` or fallen back to a simulation that finds nothing wrong with a plain transfer.
+[`lib/intercepta/no-history.ts`](lib/intercepta/no-history.ts) matches only that 404 and that
+message; the client turns it into `noHistory: true`, stores the raw 404, and the matrix holds it as
+`HELD_NO_HISTORY`. Any other 404 is still an error. A fresh address is never paid unscreened.
 
-| Package | Payee | Outcome | Reason shown |
-|---|---|---|---|
-| TODO(live): a real package with a wallet | TODO(live) | `paid` / `capped` | TODO(live): tx link |
-| `@endcredits-demo/left-padder-pro` | `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (OFAC SDN) | `refused` | TODO(live): Intercepta's trait text, verbatim |
-| `@endcredits-demo/moved-payout` | `0xeF4509C258107F5A37fb7e76af4F99a7DD3c6aa2` | `held` | `HELD_CHANGED` |
-| `@endcredits-demo/unclaimed-utils` | none | `reserved` | `RESERVED` |
+### Live results: first settlement, 26 Sep 2026
 
-TODO(live): session id and roll link for the recorded run.
+Session `9233161f-1de0-4161-abc8-387379cc2b8b`, roll:
+https://end-credits.up.railway.app/credits/9233161f-1de0-4161-abc8-387379cc2b8b. Budget 2.00 USDC,
+cap 0.25 USDC per package, Base Sepolia. The held and refused rows are our own `@endcredits-demo/*`
+fixtures (see [Demo fixtures](#demo-fixtures)); the paid rows are real packages paid to the addresses
+their maintainers published.
+
+| Package | Payee | Intercepta said | Outcome | Tx |
+|---|---|---|---|---|
+| `@tanstack/react-query` | `0xD5371B61b35E13F2ae354BE95081aD63FB383452` (Drips `FUNDING.json`) | `toxicScore` 0, no traits | `capped`, 0.25 USDC over x402 | [`0x9bdb46ae…`](https://sepolia.basescan.org/tx/0x9bdb46ae4da6a54f6adc446d9e69d2280116f6fecfd048ea477f112f6bfe5b1a) |
+| `zod` | `0xF233A42130Bcdd8b22FFB5D9593199f31C3Eeb87` (`tea.yaml`) | `toxicScore` 0, no traits | `capped`, 0.25 USDC over x402 | [`0x76fd328d…`](https://sepolia.basescan.org/tx/0x76fd328da02b645ad916d1b45a99cc77aa47e82b7560a8d5bea2f974a91fbe2c) |
+| `@endcredits-demo/left-padder-pro` | `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (OFAC SDN, Lazarus Group) | `toxicScore` 100: `sanction_address`, `known_scammer`, `blacklist` | `refused`, nothing sent | none |
+| `@endcredits-demo/moved-payout` | `0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551` | clean; the funding address changed during the hackathon | `held` (`HELD_CHANGED`), then released after the owner's MetaMask EIP-712 signature | hold [`0x6fa71613…`](https://sepolia.basescan.org/tx/0x6fa71613ea335e6ec578523522db58ad498e5e98360858f14e4abe7177e986ba), release [`0x4d799e1c…`](https://sepolia.basescan.org/tx/0x4d799e1c9ae1964528ce186aa46e531ce25b7106398b82f00e5ed2f975b5bed0) |
+| `date-fns` | none published | not screened (no payee) | `reserved` | [`0x188de0d5…`](https://sepolia.basescan.org/tx/0x188de0d5b6aa202f2d6e5ced162b14e53a4482966223c125f4eb859605018a55) |
+| `tailwindcss` | none published | not screened (no payee) | `reserved` | [`0xdc7153e8…`](https://sepolia.basescan.org/tx/0xdc7153e80bf140fe8157c00ac48f166293d2dd23f6972f621fa23c7da1139ae0) |
+| `@endcredits-demo/unclaimed-utils` | none published | not screened (no payee) | `reserved` | [`0x94abde52…`](https://sepolia.basescan.org/tx/0x94abde524e0f3bc6b444530fa3b19e576ecfb22cf8a0dbdf39150eeae4dbdafe) |
+
+`recordSession`: [`0x85ddbcf9…`](https://sepolia.basescan.org/tx/0x85ddbcf94abd55c47244296223905698b3d47bd725ccc14b3410755721f11393).
+
+The reasons stored for the two non-paid fixture rows, as the roll shows them (from
+`GET /api/sessions/9233161f-1de0-4161-abc8-387379cc2b8b`). Intercepta's trait descriptions go in
+verbatim:
+
+```text
+@endcredits-demo/left-padder-pro  refused
+  Refused. Intercepta: The address has a confirmed history of malicious activity, including scams, phishing, or other harmful behavior.
+  Refused. Intercepta: The address is officially listed as sanctioned and poses significant legal and financial risks.
+  Refused. Intercepta: The address appears on external or internal blacklist sources due to prior involvement in high‑risk or malicious activity.
+  Screened as its mainnet equivalent (Base, chain 8453).
+
+@endcredits-demo/moved-payout  held, then paid
+  Held: the funding address for @endcredits-demo/moved-payout changed 0 days ago. Waiting for the owner.
+  Screened as its mainnet equivalent (Base, chain 8453).
+  Approved by the owner. Released 0.25 USDC to 0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551.
+```
+
+The release is covered in [Held money](#held-money-the-owner-signs-the-release-on-chain).
+
+TODO(live): the final judged demo session id and its roll link.
 
 ### What we learned from the docs
 
@@ -173,10 +230,17 @@ TODO(live): session id and roll link for the recorded run.
 
 ### Feedback on the API
 
-- Time to first call: TODO(live)
-- What confused us: TODO(live)
-- What was missing: TODO(live)
-- What worked well: TODO(live)
+- **Time to first call:** minutes once the key arrived. The key took several hours to arrive by
+  email; meanwhile we built the client against `llms.txt` and the OpenAPI pages via `.md`, which were
+  enough to have it ready before the first request.
+- **What confused us:** an address Intercepta has never seen returns HTTP 404 with an error body, not
+  a 200 "no history" verdict. A client naturally reads that as an outage. We had to special-case it;
+  before that, our simulation fallback could have paid on a clean simulation of a plain transfer.
+- **What was missing:** testnet chain ids (we map Base Sepolia to Base 8453 and say so on every
+  screen), and signature analysis for EIP-3009 `TransferWithAuthorization`, which is what x402
+  `exact` payments sign. The Permit family is covered.
+- **What worked well:** the impersonation (poisoning) endpoint exists and is fast (about 350 ms in
+  the probe), and the trait descriptions are clear enough to show an owner verbatim.
 
 ## x402
 
@@ -214,10 +278,38 @@ of signing: "Refused: the payment request names a different address than the one
 [`0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`](https://sepolia.basescan.org/tx/0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1)
 (block 47293505, [`scripts/x402-smoke.ts`](scripts/x402-smoke.ts)).
 
+## Held money: the owner signs the release, on chain
+
+A `held` credit sits in `EndCreditsEscrow` v2 until the owner decides. Our server cannot release it
+alone: `release` needs an EIP-712 signature from the owner's approver wallet, checked by the
+contract.
+
+| Rule | Where |
+|---|---|
+| Each payer names an approver wallet with `setApprover`. The first set is immediate; any later change waits `changeDelay` (3 days) and is public as `ApproverSet` meanwhile | [`contracts/src/EndCreditsEscrow.sol#L117-L133`](contracts/src/EndCreditsEscrow.sol#L117-L133) |
+| `release(tipId, approvalRef, deadline, signature)` is sent by the recorder, but reverts `BadApproval` unless the payer's current approver signed it (ECDSA or ERC-1271) | [`#L163-L184`](contracts/src/EndCreditsEscrow.sol#L163-L184) |
+| The signed struct binds the stored payee and amount, the tip, a deadline and the escrow's domain, so a signature cannot move other money | [`#L272-L277`](contracts/src/EndCreditsEscrow.sol#L272-L277) |
+| The payer can refund its own pending tip at any time (a deny without our server); anyone can after expiry | [`#L189`](contracts/src/EndCreditsEscrow.sol#L189) |
+
+The flow on `/approve/<tipId>`: `POST /api/approve/:tipId/prepare` returns typed data rebuilt from
+our rows ([`lib/approve/typed-data.ts`](lib/approve/typed-data.ts)); the owner signs it with MetaMask
+or a Base Account passkey wallet ([`components/approver/sign-release.tsx`](components/approver/sign-release.tsx),
+[`components/approver/connect-wallet.tsx`](components/approver/connect-wallet.tsx)); the server checks
+the signature against the stored approver ([`lib/approve/signed.ts`](lib/approve/signed.ts)); then the
+recorder submits `release` with it ([`lib/approve/actions.ts#L91-L104`](lib/approve/actions.ts#L91-L104)).
+The owner names the approver on `/owner` ([`components/approver/set-approver.tsx`](components/approver/set-approver.tsx)).
+
+Live on 26 Sep: the `@endcredits-demo/moved-payout` hold in the session above was released with the
+owner's MetaMask signature. With a throwaway payer, a release signed by the wrong key reverted
+`BadApproval` and the approver-signed release
+[`0xd8c70875…`](https://sepolia.basescan.org/tx/0xd8c7087528872b003879e215d7b515e46b20d6728ec26a28f28d9684c648d95d)
+paid. Design and the mutation table: [`docs/plan/decisions.md`](docs/plan/decisions.md) (Escrow v2).
+
 ## Curvegrid MultiBaas
 
-**Summary.** MultiBaas deploys and indexes `EndCreditsEscrow`, and its event queries and webhook are
-the whole backend of the End Credits dashboard and of the owner's "money is held" notification.
+**Summary.** End Credits is an AI agent that pays the open-source packages a Claude Code session
+used, and MultiBaas deploys and indexes its escrow so that saved event queries and one webhook are the
+whole backend of its money dashboard and of the owner's "money is held" notification.
 
 ### How MultiBaas is used
 
@@ -230,9 +322,29 @@ the whole backend of the End Credits dashboard and of the owner's "money is held
 | Webhook `endcredits` on `event.emitted`: HMAC over the exact body bytes, 300 s skew, de-dup by `txHash:logIndex`; a `Held` event notifies the owner of that payer | [`lib/multibaas/webhook.ts`](lib/multibaas/webhook.ts), [`app/api/webhooks/multibaas/route.ts`](app/api/webhooks/multibaas/route.ts) |
 | REST client: bearer auth, envelope unwrap, 8 s deadline, typed errors | [`lib/multibaas/client.ts`](lib/multibaas/client.ts), [`lib/multibaas/rows.ts`](lib/multibaas/rows.ts) |
 
-The settler is the AI agent (it attributes, screens, decides and pays on its own); `/dashboard` is
-the digital asset dashboard. Only package names come from our database; amounts come from
-MultiBaas. Refused credits are a count from our decision log, since refused money never moves.
+### The AI agent (Best AI Agent Project)
+
+- **Claude Code is the working agent.** The `endcredits` hooks record what it used, with no code and
+  no repo paths ([`cli/src/record.ts`](cli/src/record.ts)).
+- **It can ask for its own settlement.** `endcredits init` registers the End Credits MCP server
+  (`endcredits mcp`, [`cli/src/mcp.ts`](cli/src/mcp.ts), [`cli/src/mcp-tools.ts`](cli/src/mcp-tools.ts))
+  in `.mcp.json`. Three tools: `end_credits_status` (what this session used and the estimated
+  split), `end_credits_roll` (upload the session and request settlement), `end_credits_explain`
+  (each package's outcome with its stored reason, Basescan links, and approve links for held money).
+- **The settler is the autonomous paying agent.** It resolves payees, screens them with Intercepta,
+  decides, and pays over x402 or writes to the escrow, with no human in the loop except for held
+  money ([`lib/settle/settle.ts`](lib/settle/settle.ts), run by `pnpm worker`).
+- **The LLM never decides who gets paid.** The MCP tools read and request; the payee, the screen and
+  the matrix decide. Every tool description says so.
+
+### The dashboard (Best Digital Asset Dashboard)
+
+`/dashboard` (https://end-credits.up.railway.app/dashboard) shows USDC paid to maintainers, held
+money split into pending, approved, denied and expired, reserved USDC per package, a per-package
+table, the session count, and recent escrow and USDC events with Basescan links. Every amount comes from the MultiBaas event queries above
+([`lib/multibaas/dashboard.ts`](lib/multibaas/dashboard.ts)); only package names come from our
+database. Refused credits are a count from our decision log, since refused money never moves. The
+webhook turns each `Held` event into an owner notification.
 
 ### Team
 
@@ -280,98 +392,6 @@ Faisal, solo. GitHub [`zexoverz`](https://github.com/zexoverz).
   `Link Contract: Error during validation` and the script still exits 0. The link also runs during
   simulation, so a broadcast that fails afterwards leaves a MultiBaas address with no contract.
 
-## World ID for Agents
-
-The protected action is **releasing money an agent held**. A held tip leaves escrow only after the
-owner passes a fresh World ID verification bound to that exact tip. Code: [`lib/world/`](lib/world).
-
-### Journey
-
-1. **Sign-in, once.** `/api/auth/world/start` → World authorize (code flow, PKCE `S256`,
-   `scope=openid`) → `/api/auth/world/callback`. The first sign-in binds the owner row to
-   `(iss, sub)` ([`lib/world/oidc.ts`](lib/world/oidc.ts), [`lib/world/owner.ts`](lib/world/owner.ts)).
-2. **Request.** A tip is held on chain; MultiBaas delivers `Held` and the owner gets a notification.
-   `/approve/<tipId>` shows package, amount, payee, the reason, and "Release {amount} USDC to
-   {address} for {package}."
-3. **Completion.** **Approve with World ID** calls `POST /api/approve/{tipId}/start`, which stores a
-   pending approval and redirects to World with `max_age=0`, `prompt=login`,
-   `acr_values=https://world.org/oidc/acr/orb-v3`, PKCE and a nonce bound to the tip:
-   `base64url(sha256(canonical_json({tipId, packageKey, payee, amount, action:"release", text_version, owner_sub_hash, attempt}) || APPROVE_SALT))`
-   ([`lib/world/stepup.ts`](lib/world/stepup.ts), [`lib/world/nonce.ts`](lib/world/nonce.ts)).
-4. **Validated result.** `/api/approve/callback` exchanges the code on our server and checks the ID
-   token ([`lib/world/approve-callback.ts`](lib/world/approve-callback.ts),
-   [`lib/world/verify.ts`](lib/world/verify.ts)).
-5. **Protected action.** Only then the recorder calls `release(tipId, keccak256(nonce))` on
-   `EndCreditsEscrow`, under a row lock so a tip is released once. The credit becomes `paid` with
-   `APPROVED`.
-
-### Backend validation
-
-All checks run server side; the page never decides an outcome.
-
-| Check | Failure code |
-|---|---|
-| signature against the issuer's JWKS (RS256) | `SIG` |
-| `iss` equals `WORLD_ISSUER` | `ISS` |
-| `aud` is our client id | `AUD` |
-| `exp` not passed (30 s skew) | `EXP` |
-| `nonce` equals the one stored for this approval | `NONCE` |
-| `acr` is `https://world.org/oidc/acr/orb-v3` | `ACR` |
-| `amr` contains `pop` | `AMR` |
-| `(iss, sub)` is the owner of this hold | `WRONG_HUMAN` |
-| `auth_time` present and not before the approval started | `STALE_AUTH` |
-
-### Unsuccessful paths
-
-Each marks the approval `failed`, releases nothing and returns to `/approve/<tipId>` with its message.
-
-| Path | Code | Shown |
-|---|---|---|
-| cancelled in World App (any `error` on the callback) | `CANCELLED` | "Verification cancelled. Nothing was released." |
-| old World session, or the approval was started more than 10 min ago | `STALE_AUTH` | "A fresh verification is required. Nothing was released." |
-| a different human | `WRONG_HUMAN` | "This approval belongs to a different human." |
-| token not issued for this approval | `NONCE` | "This verification was not issued for this approval." |
-| not Orb-verified (`ACR` or `AMR`) | `ACR` | "A proof-of-human credential is required." |
-| unknown or reused `state` | `UNKNOWN_STATE` | "This verification is not for a pending approval. Nothing was released." |
-| bad signature, issuer, audience or expiry | `VERIFY_FAILED` | "The verification could not be checked. Nothing was released." |
-| owner presses **Deny** | `DENIED` | refund to the owner |
-| nobody approves before the TTL | `EXPIRED` | the expirer calls `refund` ([`lib/settle/expire.ts`](lib/settle/expire.ts)) |
-
-The denied-path tests assert the code and that `release` was never called
-([`lib/world/stepup.test.ts`](lib/world/stepup.test.ts)); each token check has its own test in
-[`lib/world/verify.test.ts`](lib/world/verify.test.ts).
-
-### CLI sign-in with the device grant
-
-`endcredits login` → `POST /api/agent/device/start` → World `device_authorization`. The terminal shows
-the code, the owner confirms in World App, and `/api/agent/device/poll` issues an agent key only when
-the ID token passes `verifyIdToken` and its `(iss, sub)` is already an owner
-([`lib/world/device.ts`](lib/world/device.ts), [`cli/src/login.ts`](cli/src/login.ts)). The device
-grant ignores `nonce`, `max_age` and `prompt`, so it is used for sign-in only, never for approvals.
-
-### Environment
-
-The issuer is `WORLD_ISSUER`; endpoints are the fixed paths from the discovery doc. The prize's dev
-environment is `https://sandbox.auth.world.org`. TODO(live): which issuer the deployed app runs
-against, and whether `WORLD_REQUIRED=true` is set in production.
-
-### Debrief
-
-Full notes: [`docs/world-debrief.md`](docs/world-debrief.md).
-
-- **Time to first success:** discovery doc to a green suite (sign-in, step-up with denied paths,
-  device grant) against a local IdP double in one session on 26 Sep. TODO(live): first real
-  sign-in, first approval released on the phone.
-- **Friction:** HTTPS-only exact-match callbacks and a pairwise `sub` per hostname mean nothing runs
-  on localhost; sign-in and approval must share one hostname. `openid-client`'s
-  `client_secret_basic` percent-encodes `_` (`app_…` becomes `app%5F…`), so we send our own Basic
-  header.
-- **Missing docs:** which claims each grant's ID token carries (`auth_time` after `max_age=0`, `acr`
-  and `amr` on the device grant), the `error` value on cancel, and `max_age` is absent from the
-  discovery doc.
-- **One improvement:** TODO(live) (candidate: document the ID token claims per grant, with an
-  example token for each).
-
 ## Attribution weights and caps
 
 These are ours, not a standard. They exist so that a prompt-injected README telling the agent to read
@@ -401,7 +421,10 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
    screen before signing, but cannot prove who wrote the file beyond "it is on the default branch".
 4. `tea.yaml` addresses come from a scheme that was farmed; they are screened like every other.
 5. The payer key is server-held for the demo and everything moves on Base Sepolia. What is screened
-   is the payees' real mainnet addresses.
+   is the payees' real mainnet addresses. Because the server holds the payer key, it could call
+   `setApprover` as the payer; the 3-day delay makes that change public before it counts, and holds
+   with the default 24 h TTL expire and refund before then. The payer refund is a server-free deny
+   only once the payer is the owner's own wallet.
 6. The claim needs a merged PR; orgs that restrict OAuth apps use the prefilled "new file" link, whose
    `filename` and `value` parameters are known from use, not from GitHub's docs. We ask for
    `public_repo`, which GitHub's docs contradict each other on for writing contents.
@@ -414,10 +437,14 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
    for a mainnet round, not for testnet.
 10. The dashboard is cached for 60 s to stay inside the MultiBaas free plan. Owner notifications have
     no mark-read yet.
-11. The approve page's "World required" flag reads `WORLD_REQUIRED` only; with `APPROVE_METHOD=world`
-    alone the button reads **Approve** but still goes through World.
+11. The owner signs in with `OWNER_DEV_TOKEN` in the demo deployment. A World ID sign-in and Orb
+    step-up are in [`lib/world/`](lib/world) but off (`WORLD_REQUIRED` unset); the release guard is the
+    on-chain approver signature either way.
 12. USDC sent straight to the escrow address (not through `hold` or `reserve`) is stuck. Nothing reads
     the balance, so this is left as is.
+13. A new payee with no mainnet history holds (`HELD_NO_HISTORY`). As a claim wallet the same answer
+    passes the screen, since new passkey wallets are fresh; the claim is still gated by repo write
+    access and the funding file.
 
 ## Measurement
 
@@ -455,9 +482,10 @@ All on Base Sepolia (chain `84532`). Testnet keys only.
 | Deployer | [`0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13`](https://sepolia.basescan.org/address/0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13) |
 | USDC | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
-Deploy tx
-[`0x3ddf9e353bcef632cf5d77543d957aa323b0cbc8241622d951d3e176560e6ed8`](https://sepolia.basescan.org/tx/0x3ddf9e353bcef632cf5d77543d957aa323b0cbc8241622d951d3e176560e6ed8),
-sent through the forge-multibaas plugin. The MultiBaas deployment (free plan, Base Sepolia) links the
+v2 deploy tx
+[`0x7f4f4f1fabbb7bca64b0b4babd0752ec71f6519339588c72efc3a25548111fb2`](https://sepolia.basescan.org/tx/0x7f4f4f1fabbb7bca64b0b4babd0752ec71f6519339588c72efc3a25548111fb2),
+sent through the forge-multibaas plugin, which moved the MultiBaas `escrow` alias to v2 as
+`endcredits_escrow` 2.0. v1 held only test events; the dashboard history starts at v2. The MultiBaas deployment (free plan, Base Sepolia) links the
 escrow as `escrow` and USDC as `usdc`, holds the six saved queries, and posts to
 `/api/webhooks/multibaas` through the webhook `endcredits`. Live checks on 26 Sep: hold then refund
 round trips indexed by MultiBaas, `Held` and `Refunded` delivered by the webhook, owner notifications
@@ -490,8 +518,10 @@ so every rehearsal gets its own unclaimed package. If a real package's payee com
 high risk during prep, that package is left out of the demo session.
 
 The demo app is [zexoverz/endcredits-demo-reports](https://github.com/zexoverz/endcredits-demo-reports)
-(Next.js, `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`, plus the fixtures).
-TODO(live): confirm the fixtures are published to npm (`scripts/publish-fixtures.sh`).
+(Next.js, `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`, plus the fixtures). The
+fixtures install from GitHub (`pnpm add @endcredits-demo/moved-payout@github:zexoverz/endcredits-fixture-moved-payout`),
+since they are not on the npm registry; the settler then takes the repository from the installed
+`package.json` and says so (`REPO_DECLARED`).
 
 ## Setup and testing
 
@@ -513,8 +543,9 @@ checks the boot set and throws `Missing required env: <NAME>` on the first read 
 | Web boot | `APP_URL`, `DATABASE_URL`, `SESSION_SECRET` |
 | Worker boot | `APP_URL`, `DATABASE_URL`, `INTERCEPTA_API_KEY`, `INTERCEPTA_BASE`, `BASE_SEPOLIA_RPC`, `USDC_ADDRESS`, `ESCROW_ADDRESS`, `PAYER_PRIVATE_KEY`, `RECORDER_PRIVATE_KEY`, `X402_FACILITATOR_URL` |
 | x402 resource | `RECEIPT_SIGNING_KEY` |
-| Owner login | `OWNER_DEV_TOKEN` (off when `WORLD_REQUIRED=true`), `WORLD_REQUIRED`, `APPROVE_METHOD` |
-| World ID (required when `WORLD_REQUIRED=true`) | `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
+| Owner login | `OWNER_DEV_TOKEN` |
+| Escrow v2 seed | `APPROVER_ADDRESS` (the owner's approver wallet, named by the payer on first seed) |
+| Optional World ID (off unless `WORLD_REQUIRED=true`) | `WORLD_REQUIRED`, `APPROVE_METHOD`, `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
 | MultiBaas | `MULTIBAAS_URL`, `MULTIBAAS_API_KEY`, `MULTIBAAS_WEBHOOK_SECRET`, `PAYER_ADDRESS` (optional) |
 | GitHub claim | `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_TOKEN_READ` (optional, rate limit) |
 | Optional | `ETH_MAINNET_RPC`, `BASE_MAINNET_RPC`, `CHECK_NO_CODE` |
@@ -537,7 +568,6 @@ pnpm --filter endcredits build          # cli/dist/endcredits.mjs
 cd cli && npm link && cd ..             # puts `endcredits` on PATH for the hooks
 endcredits init                         # hooks into ./.claude/settings.json (--global for ~/.claude)
 endcredits key <token> --api https://end-credits.up.railway.app   # key from the Owner page
-endcredits login                        # or: World ID device grant instead of a pasted key
 endcredits attribute --session <id> --dry-run   # the table and upload body, nothing sent
 ```
 
@@ -546,13 +576,13 @@ endcredits attribute --session <id> --dry-run   # the table and upload body, not
 | Command | What runs |
 |---|---|
 | `pnpm test` | unit tests; Postgres integration tests skip without `TEST_DATABASE_URL` |
-| `TEST_DATABASE_URL=<migrated db> pnpm test` | also the integration tests (settle, approve, World step-up and device grant, history, owner), one file at a time |
+| `TEST_DATABASE_URL=<migrated db> pnpm test` | also the integration tests (settle, approve, history, owner, and the optional World code), one file at a time |
 | with `anvil` on PATH and `contracts/out` built (`forge build`) | also `lib/chain/escrow.anvil.test.ts` against the real contract; `lib/settle/settle.anvil.test.ts` also needs `TEST_DATABASE_URL` |
 | `OFFLINE=1 pnpm test` | skips the mainnet `getCode` test |
 | `LIVE=1` / `INTERCEPTA_API_KEY=…` | adds the live npm registry and live Intercepta tests |
 | `cd contracts && forge test -vv` | escrow unit, fuzz and invariant tests |
 
-Mocks live only inside tests; the app calls Intercepta, MultiBaas, the facilitator and World for real.
+Mocks live only inside tests; the app calls Intercepta, MultiBaas and the x402 facilitator for real.
 
 ## AI usage
 
