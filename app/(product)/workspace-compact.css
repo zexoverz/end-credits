@@ -1146,3 +1146,197 @@
   border-radius: 12px;
   font-size: 14px;
 }
+
+/* Policy editor: three readable limit rows, with amounts aligned for comparison. */
+.control-sheet:has(.rules-editor) {
+  width: min(700px, calc(100vw - 32px));
+}
+.control-sheet:has(.rules-editor) .control-sheet-body {
+  background: #fff;
+}
+.control-sheet .rules-editor {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+.rules-editor .rules-intro {
+  margin: 0 0 20px;
+  font-size: 15px;
+  color: #59634f;
+}
+.owner-setup .rules-editor form {
+  padding: 0;
+}
+.owner-setup .rules-editor .money-fields {
+  display: block;
+  counter-reset: limit;
+}
+.rules-editor .money-fields .control-field {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 154px;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 18px 0;
+  border-top: 1px solid #e1e6dc;
+  counter-increment: limit;
+}
+.rules-editor .money-fields .control-field::before {
+  content: "0" counter(limit);
+  grid-column: 1;
+  grid-row: 1/3;
+  font:
+    12px var(--font-mono),
+    monospace;
+  color: #637257;
+}
+.rules-editor .money-fields label {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 15px;
+  margin: 0;
+  color: #242b22;
+}
+.rules-editor .money-fields .control-field > p {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rules-editor .money-fields .money-input {
+  grid-column: 3;
+  grid-row: 1/3;
+}
+.owner-setup .rules-editor .money-input input {
+  padding: 13px 50px 13px 14px;
+  font-size: 24px;
+  height: 56px;
+  border-radius: 10px;
+  background: #f7f8f3;
+  font-variant-numeric: tabular-nums;
+}
+.rules-editor .money-input > span {
+  left: auto;
+  right: 12px;
+  bottom: 20px;
+  font-size: 10px;
+}
+.rules-editor .money-fields .control-field > .control-field-error {
+  grid-column: 2/-1;
+  grid-row: 3;
+  margin-top: 5px;
+}
+.rules-editor .control-schedule {
+  grid-template-columns: 1.1fr 1fr;
+  gap: 20px;
+  margin: 4px 0 0;
+  padding: 20px 0 0;
+}
+.rules-editor .control-schedule label {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #242b22;
+}
+.rules-editor .control-schedule input,
+.rules-editor .control-schedule select {
+  font-size: 15px;
+  min-height: 46px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.rules-editor .control-schedule .control-field > p {
+  font-size: 12px;
+  line-height: 1.55;
+  margin-top: 8px;
+}
+.rules-editor .control-save {
+  margin-top: 20px;
+  padding: 16px 0 0;
+}
+.rules-editor .control-save > div {
+  font-size: 12px;
+}
+.rules-editor .control-save .product-button {
+  padding: 11px 18px;
+  font-size: 14px;
+}
+.rules-editor .control-save .control-reset {
+  font-size: 12px;
+}
+.control-sheet .setup-funding.funding-disclosure {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid #e1e6dc;
+}
+.funding-disclosure > summary {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0 0;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.funding-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.funding-disclosure > summary > strong {
+  margin-left: auto;
+  font:
+    12px var(--font-mono),
+    monospace;
+}
+.funding-disclosure-body {
+  padding-top: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #526048;
+}
+.funding-disclosure-body > a {
+  display: block;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
+.funding-disclosure-body > p {
+  margin: 10px 0 0;
+}
+@media (max-width: 600px) {
+  .control-sheet:has(.rules-editor) {
+    width: calc(100vw - 16px);
+  }
+  .rules-editor .money-fields .control-field {
+    grid-template-columns: 18px minmax(0, 1fr) 110px;
+    gap: 4px 8px;
+    padding: 16px 0;
+  }
+  .rules-editor .money-fields label {
+    font-size: 13px;
+  }
+  .rules-editor .money-fields .control-field > p {
+    font-size: 11px;
+  }
+  .owner-setup .rules-editor .money-input input {
+    font-size: 22px;
+    padding: 11px 34px 11px 10px;
+  }
+  .rules-editor .money-input > span {
+    font-size: 8px;
+    right: 7px;
+    bottom: 22px;
+  }
+  .rules-editor .control-schedule {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .rules-editor .control-save {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .rules-editor .control-save > div:last-child {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
