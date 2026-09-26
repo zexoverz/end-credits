@@ -35,6 +35,19 @@ export function pull(owner: Address, amount: bigint, ctx: ChainContext = chain()
   });
 }
 
+/**
+ * Hot key sends `amount` USDC back to `owner`: what it pulled and did not end up moving, or a held
+ * tip the escrow refunded to it. Exact or nothing; a short balance reverts and the caller retries.
+ */
+export function returnToOwner(owner: Address, amount: bigint, ctx: ChainContext = chain()): Promise<Hash> {
+  return queueFor(ctx).submit(ctx.payer.account.address, {
+    address: ctx.usdc,
+    abi: [...erc20Abi, ...usdcErrors] as Abi,
+    functionName: "transfer",
+    args: [owner, amount],
+  });
+}
+
 /** What `spender` (default: the hot key) can still pull from `owner` in the current window. */
 export function remaining(owner: Address, spender?: Address, ctx: ChainContext = chain(), budget?: Address): Promise<bigint> {
   return ctx.publicClient.readContract({
