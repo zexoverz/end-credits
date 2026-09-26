@@ -1,321 +1,288 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { WEBSITE as C } from "@/lib/copy/website";
-import { REPO_URL, ESCROW_ADDRESS } from "@/lib/copy/landing";
-import { addressUrl } from "@/lib/client/format";
+import { EXPERIENCE as C } from "@/lib/copy/experience";
+import { WEBSITE as W } from "@/lib/copy/website";
+import { Arrow, BrandMark } from "@/components/landing/artwork";
 import {
-  Arrow,
-  BrandMark,
-  CreditsMachine,
-  FolderArt,
-  Spark,
-} from "@/components/landing/artwork";
-import {
-  BudgetCard,
-  LandingHeader,
-  Outcomes,
-  SetupTerminal,
+  Header,
   Workflow,
-} from "@/components/landing/interactive";
+  SetupCommands,
+} from "@/components/landing/experience";
 import s from "./landing.module.css";
 
-export const metadata: Metadata = {
-  title: `${C.name} — ${C.eyebrow}`,
-  description: C.description,
-};
-
-export default function LandingPage() {
+function LineArt({ kind }: { kind: string }) {
   return (
-    <div className={s.landing} id="top">
-      <a className={s.skipLink} href="#main">
+    <svg
+      viewBox="0 0 100 100"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {kind === "shield" ? (
+        <>
+          <path d="m50 12 30 12v24c0 20-18 33-30 40-12-7-30-20-30-40V24Z" />
+          <path d="m36 48 10 11 20-24" />
+          <path d="m12 9 3 7M84 78l7 4M9 60l7-2" />
+        </>
+      ) : kind === "budget" ? (
+        <>
+          <rect x="15" y="27" width="70" height="51" rx="9" />
+          <path d="M20 27V17h54v10M64 45h21v18H64a9 9 0 0 1 0-18Z" />
+          <circle cx="69" cy="54" r="2" />
+          <path d="M30 44v16M24 52h12M25 87h48" />
+        </>
+      ) : (
+        <>
+          <path d="m50 12 33 18v39L50 88 17 69V30Zm0 38L17 30m33 20 33-20M50 50v38M33 21l33 19v16" />
+          <path d="m7 13 5 5M87 11l-5 7M87 86l-4-5" />
+        </>
+      )}
+    </svg>
+  );
+}
+function AgentScene() {
+  return (
+    <div className={s.heroScene}>
+      <span className={s.sceneLabel}>{C.example}</span>
+      <svg
+        className={s.sceneOrbit}
+        viewBox="0 0 500 530"
+        fill="none"
+        aria-hidden="true"
+      >
+        <ellipse
+          cx="250"
+          cy="270"
+          rx="220"
+          ry="194"
+          stroke="currentColor"
+          strokeWidth="1"
+          strokeDasharray="4 8"
+        />
+        <path
+          d="M404 47v32m-16-16h32M76 429v24m-12-12h24"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
+      <div className={s.agentCard}>
+        <div className={s.agentName}>
+          <span className={s.agentGlyph}>✳</span>
+          {C.agent}
+          <span className={s.agentCode}>⌘</span>
+        </div>
+        <p>{C.prompt}</p>
+        <div className={s.agentMessage}>
+          <span>↳</span>
+          {C.agentDone}
+        </div>
+      </div>
+      <div className={s.receiptCard}>
+        <div className={s.receiptHeader}>
+          <BrandMark />
+          <span>{C.receipt}</span>
+        </div>
+        {C.packages.slice(0, 3).map((p) => (
+          <div className={s.receiptRow} key={p.name}>
+            <span className={s.packageMark}>{p.mark}</span>
+            <strong>{p.name}</strong>
+            <span>{p.role}</span>
+            <span className={s.check}>✓</span>
+          </div>
+        ))}
+        <p>{C.receiptNote}</p>
+      </div>
+      <div className={s.sceneBottom}>
+        <span className={s.statusDot} />
+        {W.sessionDone}
+        <Arrow />
+      </div>
+    </div>
+  );
+}
+export default function Landing() {
+  return (
+    <div className={s.site} id="top">
+      <a href="#content" className={s.skip}>
         {C.skip}
       </a>
-      <LandingHeader />
-      <main id="main" className={s.main}>
-        <section className={s.hero}>
-          <div className={s.illustrationCard}>
-            <span className={s.eyebrow}>{C.artLabel}</span>
-            <CreditsMachine className={s.machine} />
-            <h2>
-              {C.artTitle.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </h2>
-            <span className={s.cardIndex} aria-hidden="true">
-              001 — ∞
-            </span>
-          </div>
-          <div className={s.mintCard}>
-            <Spark className={s.spark} />
-            <div>
-              <h2>
-                {C.mintTitle.map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </h2>
-              <p>{C.mintNote}</p>
-            </div>
-          </div>
-          <a href="#get-started" className={s.setupCard}>
-            <span className={s.circleArrow}>
-              <Arrow />
-            </span>
-            <h2>{C.setupShort}</h2>
-            <p>{C.setupSub}</p>
-          </a>
-          <div className={s.heroHeading}>
-            <p className={s.eyebrow}>
-              <span className={s.liveDot} />
-              {C.eyebrow}
-            </p>
-            <h1>
-              {C.hero.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </h1>
-            <p className={s.heroIntro}>{C.intro}</p>
-            <a href="#get-started" className={s.button}>
-              {C.heroAction}
-              <Arrow />
-            </a>
-            <p className={s.heroNote}>{C.heroNote}</p>
-          </div>
-          <div className={s.creditsCard}>
-            <div className={s.creditsCardCopy}>
-              <p className={s.eyebrow}>{C.example}</p>
-              <h2>{C.rollTitle}</h2>
-              <p>{C.rollSub}</p>
-              <div className={s.miniIcons} aria-hidden="true">
-                <span>✳</span>
-                <span>{"{ }"}</span>
-                <span>↗</span>
-              </div>
-            </div>
-            <div className={s.receiptStack}>
-              <div className={s.receiptBack} />
-              <div className={s.receipt}>
-                <div className={s.receiptHeading}>
-                  <BrandMark />
-                  <span>{C.name}</span>
-                  <span>↗</span>
-                </div>
-                {C.rollPackages.map((name, i) => (
-                  <div className={s.receiptRow} key={name}>
-                    <span className={s.packageInitial}>{name.charAt(0)}</span>
-                    <span>{name}</span>
-                    <span
-                      className={s.packageCheck}
-                      aria-label={C.exampleStatus}
-                    >
-                      ✓
-                    </span>
-                    <span className={s.receiptNumber}>
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                ))}
-                <div className={s.receiptBottom}>
-                  <span>{C.sessionDone}</span>
-                  <span>✳</span>
-                </div>
-              </div>
-              <div className={s.receiptToast}>
-                <span className={s.check}>✓</span>
-                <div>
-                  {C.sessionDone}
-                  <small>{C.sessionSub}</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        <div className={s.partnerStrip}>
-          <p>{C.strip}</p>
-          <div>
-            {C.partners.map((name, i) => (
-              <span key={name} className={s.partner}>
-                <strong>{name}</strong>
-                <small>{C.partnerRoles[i]}</small>
-              </span>
-            ))}
-          </div>
-          <span className={s.network}>
-            <span className={s.liveDot} />
-            {C.network}
-          </span>
-        </div>
-        <section className={s.section} id="how-it-works">
-          <div className={s.sectionHeading}>
-            <div>
-              <p className={s.eyebrow}>{C.flowEyebrow}</p>
-              <h2>
-                {C.flowTitle.map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </h2>
-            </div>
-            <p className={s.body}>{C.flowBody}</p>
-          </div>
-          <Workflow />
-          <div className={s.featureGrid}>
-            <article className={s.integrationCard}>
-              <h3>{C.connectionTitle}</h3>
-              <p className={s.body}>{C.connectionSub}</p>
-              <div className={s.chips}>
-                {C.integrationChips.map((name, i) => (
-                  <span key={name}>
-                    <i aria-hidden="true">{["✳", "↗", "⌘", "$", "—"][i]}</i>
-                    {name}
+      <div className={s.wrap}>
+        <Header />
+        <main id="content">
+          <section className={s.hero}>
+            <div className={s.heroCopy}>
+              <p className={s.eyebrow}>{C.eyebrow}</p>
+              <h1>
+                {C.hero.map((line, i) => (
+                  <span key={line} className={i === 2 ? s.heroLast : undefined}>
+                    {line}
                   </span>
                 ))}
+              </h1>
+              <p className={s.intro}>{C.intro}</p>
+              <div className={s.actions}>
+                <a className={s.button} href="#setup">
+                  {C.cta}
+                  <Arrow />
+                </a>
+                <a className={s.textLink} href="#how">
+                  {C.secondary}
+                  <span>↓</span>
+                </a>
               </div>
-            </article>
-            <BudgetCard />
-            <article className={s.privacyCard}>
-              <FolderArt />
-              <h3>{C.privacy}</h3>
-              <p className={s.body}>{C.privacyBody}</p>
-              <span className={s.privacyDecoration} aria-hidden="true">
-                ↳
-              </span>
-            </article>
-          </div>
-        </section>
-        <section className={s.section} id="guardrails">
-          <div className={s.sectionHeading}>
-            <div>
-              <p className={s.eyebrow}>{C.safeEyebrow}</p>
-              <h2>
-                {C.safeTitle.map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </h2>
+              <p className={s.footnote}>{C.footnote}</p>
             </div>
-            <p className={s.body}>{C.safeBody}</p>
-          </div>
-          <Outcomes />
-        </section>
-        <section className={s.measurement} id="why">
-          <div className={s.measurementCopy}>
-            <p className={s.eyebrow}>{C.measurementEyebrow}</p>
-            <h2>
-              {C.measurementTitle.map((line) => (
-                <span key={line}>{line}</span>
+            <AgentScene />
+          </section>
+          <section className={s.ecosystem}>
+            <div className={s.ecosystemIntro}>
+              <h2>{C.packageHeading}</h2>
+              <p>{C.packageBody}</p>
+            </div>
+            <div className={s.packageGrid}>
+              {C.packages.map((p) => (
+                <a href={p.url} key={p.name} className={s.project}>
+                  <span className={s.projectMark}>{p.mark}</span>
+                  <span>
+                    <strong>{p.name}</strong>
+                    <small>{p.role}</small>
+                  </span>
+                  <span className={s.projectArrow}>↗</span>
+                </a>
               ))}
-            </h2>
-            <p className={s.body}>{C.measurementBody}</p>
-            <a href="#guardrails" className={s.textLink}>
-              {C.reserveLink}
-              <Arrow />
-            </a>
-          </div>
-          <div className={s.measurementVisual}>
-            <div className={s.measurementStats}>
+            </div>
+            <p className={s.caption}>{C.packageNote}</p>
+          </section>
+          <section className={s.problem} id="why">
+            <div className={s.sectionHeading}>
               <div>
-                <strong>{C.measurementNumber}</strong>
-                <span>{C.measurementLabel}</span>
+                <p className={s.eyebrow}>{C.problemLabel}</p>
+                <h2>
+                  {C.problemTitle.map((t) => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </h2>
               </div>
-              <div>
-                <strong>{C.measurementOtherNumber}</strong>
-                <span>{C.measurementOther}</span>
-              </div>
+              <p>{C.problemBody}</p>
             </div>
-            <svg
-              className={s.dotMatrix}
-              viewBox="0 0 600 240"
-              role="img"
-              aria-label={C.measurementGrid}
-            >
-              {Array.from({ length: 1000 }, (_, i) => (
-                <circle
-                  key={i}
-                  cx={(i % 50) * 12 + 6}
-                  cy={Math.floor(i / 50) * 12 + 6}
-                  r="2.8"
-                  fill={i < 21 ? "#9bf6b8" : "#444640"}
-                />
+            <div className={s.stats}>
+              <article className={s.valueCard}>
+                <span className={s.statNumber}>{C.value}</span>
+                <h3>{C.valueTitle}</h3>
+                <p>{C.valueBody}</p>
+                <a href={C.valueUrl}>{C.valueSource}</a>
+                <svg viewBox="0 0 230 180" fill="none" aria-hidden="true">
+                  <path
+                    d="M20 150 68 103l30 23 70-84 43 17M173 22l39 36-49 8"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M20 168h190M38 139v29m40-48v48m40-65v65m40-91v91m40-90v90"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </article>
+              <article className={s.gapCard}>
+                <div className={s.dotGrid} aria-hidden="true">
+                  {Array.from({ length: 100 }, (_, i) => (
+                    <span key={i} className={i < 2 ? s.filledDot : undefined} />
+                  ))}
+                </div>
+                <span className={s.statNumber}>{C.gap}</span>
+                <h3>{C.gapTitle}</h3>
+                <p>{C.gapBody}</p>
+                <a href={C.gapUrl}>{C.gapSource}</a>
+                <small>{C.gapNote}</small>
+              </article>
+            </div>
+          </section>
+          <section className={s.flowSection} id="how">
+            <div className={s.sectionHeading}>
+              <div>
+                <p className={s.eyebrow}>{C.flowLabel}</p>
+                <h2>
+                  {C.flowTitle.map((t) => (
+                    <span key={t}>{t}</span>
+                  ))}
+                </h2>
+              </div>
+              <p>{C.flowIntro}</p>
+            </div>
+            <Workflow />
+          </section>
+          <section className={s.controls}>
+            <p className={s.eyebrow}>{C.controlsLabel}</p>
+            <h2>{C.controlsTitle}</h2>
+            <div className={s.controlGrid}>
+              {C.controls.map((item) => (
+                <article key={item.title}>
+                  <LineArt kind={item.icon} />
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </article>
               ))}
-            </svg>
-            <p className={s.finePrint}>{C.measurementFootnote}</p>
-          </div>
-        </section>
-        <section className={`${s.section} ${s.faq}`} id="questions">
-          <div>
-            <p className={s.eyebrow}>{C.faq}</p>
-            <h2>
-              {C.faqTitle.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </h2>
-            <Spark className={s.faqSpark} />
-          </div>
-          <div>
-            {C.faqs.map(({ q, a }, i) => (
-              <details key={q} name="landing-faq">
-                <summary>
-                  <span className={s.faqNumber}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  {q}
-                  <span className={s.faqPlus} aria-hidden="true">
-                    +
-                  </span>
-                </summary>
-                <p>{a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-        <section className={s.finalCta} id="get-started">
-          <div>
-            <p className={s.eyebrow}>{C.setupEyebrow}</p>
-            <h2>
-              {C.setupTitle.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </h2>
-            <p className={s.body}>{C.setupBody}</p>
-            <div className={s.ctaActions}>
-              <Link href="/owner" className={s.button}>
-                {C.ownerKey}
+            </div>
+            <div className={s.maintainer}>
+              <div>
+                <h3>{C.maintainer}</h3>
+                <p>{C.maintainerBody}</p>
+              </div>
+              <Link className={s.buttonOutline} href="/app/packages">
+                {C.maintainerAction}
                 <Arrow />
               </Link>
-              <a href={REPO_URL} className={s.textLink}>
-                {C.clone}
+            </div>
+          </section>
+          <section className={s.faq}>
+            <h2>{W.faqTitle.join(" ")}</h2>
+            <div>
+              {W.faqs.map((f) => (
+                <details key={f.q}>
+                  <summary>
+                    {f.q}
+                    <span>+</span>
+                  </summary>
+                  <p>{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+          <section className={s.setup} id="setup">
+            <div>
+              <p className={s.eyebrow}>{C.setupLabel}</p>
+              <h2>
+                {C.setupTitle.map((t) => (
+                  <span key={t}>{t}</span>
+                ))}
+              </h2>
+              <p>{C.setupBody}</p>
+              <Link href="/app/owner" className={s.button}>
+                {C.setupAction}
                 <Arrow />
+              </Link>
+              <a href={C.github} className={s.setupSource}>
+                {C.source} ↗
               </a>
             </div>
-          </div>
-          <SetupTerminal />
-        </section>
-      </main>
-      <footer className={s.footer}>
-        <div className={s.footerTop}>
-          <p>{C.footer}</p>
+            <SetupCommands />
+          </section>
+        </main>
+        <footer className={s.footer}>
           <div>
-            <a href={REPO_URL}>
-              {C.github}
-              <Arrow />
-            </a>
-            <a href={addressUrl(ESCROW_ADDRESS)}>
-              {C.contract}
-              <Arrow />
-            </a>
-            <a href="#top">
-              {C.top}
-              <Arrow />
-            </a>
+            <Link className={s.brand} href="/landing">
+              <BrandMark />
+              {C.name}
+            </Link>
+            <p>{C.footer}</p>
           </div>
-        </div>
-        <div className={s.footerWordmark} aria-hidden="true">
-          {C.name}
-          <BrandMark />
-        </div>
-        <div className={s.footerBottom}>
-          <span>{C.footerNote}</span>
-          <span>{C.network}</span>
-        </div>
-      </footer>
+          <p>{C.footerNote}</p>
+          <a href="#top">↑ {W.top}</a>
+        </footer>
+      </div>
     </div>
   );
 }
