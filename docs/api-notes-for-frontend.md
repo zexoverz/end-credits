@@ -314,3 +314,13 @@ Two new credit reasons can appear:
 | `BUDGET_CAP` | "The owner's on-chain budget has nothing left this period. Nothing was sent." on every credit (dust) when the allowance has nothing left |
 
 The session row has a new `budget_pull_tx` (the pull's tx hash, null when there was no pull).
+
+## Package page: refused payee and public claim (26 Sep)
+
+`GET /api/npm/<name>` adds two fields:
+- `payeeRefused: string | null`: set when Intercepta's latest verdict on the package's payee is a
+  refusal (a critical trait such as a sanction, or a score above 50). Then `alreadyPayable` is null.
+  Show it as the package's state ("Agents refuse to pay …: Intercepta flags the address it lists. …"),
+  never as payable. Live example: `@endcredits-demo/left-padder-pro`.
+- `claimed: {wallet, setClaimTx, claimTxs} | null`: the newest finished claim for the repo, public
+  (no sign-in needed). Link the txs to Basescan. Live example: `@endcredits-demo/unclaimed-rehearsal-1`.

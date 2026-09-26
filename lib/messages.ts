@@ -59,6 +59,7 @@ export const MESSAGES = {
   CLAIM_REFUSED: "This address cannot receive funds. Intercepta: {description}",
   CLAIMED: "Claimed {amount} USDC to {address}.",
   ALREADY_PAYABLE: "{package} already lists a wallet. Agents pay it directly.",
+  PAYEE_REFUSED: "Agents refuse to pay {package}: Intercepta flags the address it lists. {description}",
   COOLING: "The funding address changed. Claims reopen at {time}.",
   NOT_A_PAYWALL:
     "End Credits is opt-in for whoever runs the agent. Packages stay free for everyone.",

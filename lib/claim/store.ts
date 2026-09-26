@@ -74,6 +74,17 @@ export function claimStore(database: Database) {
       return row ?? null;
     },
 
+    /** The newest finished claim for a repo, whoever made it: public on the package page. */
+    async latestClaimedForRepo(repo: string): Promise<ClaimRow | null> {
+      const [row] = await database
+        .select()
+        .from(claims)
+        .where(and(eq(claims.repoFullName, repo), eq(claims.status, "claimed")))
+        .orderBy(desc(claims.createdAt))
+        .limit(1);
+      return row ?? null;
+    },
+
     async insertClaim(c: { repoFullName: string; maintainerId: string } & ClaimPatch): Promise<ClaimRow> {
       const [row] = await database.insert(claims).values(c).returning();
       return row;

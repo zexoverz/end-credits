@@ -147,6 +147,39 @@ describe.skipIf(!DB_URL)("GET /api/npm/<name> summary (integration)", () => {
     expect(r.body.payeeRisk).toMatchObject({ address: FUNDED, source: "db", screens: { count: 0 } });
   });
 
+  it("a payee Intercepta flags is refused, never shown as already payable", async () => {
+    payee = { address: FUNDED, source: "drips", sourceUrl: "x" };
+    deps.riskOf = async (address) => ({
+      address,
+      source: "db",
+      screens: { count: 1, firstAt: null, lastAt: null },
+      intercepta: {
+        address: { toxicScore: 100, traits: [{ name: "sanction_address", description: "Sanctioned.", risk: 100 }], noHistory: false, screenedAt: "2026-09-26T00:00:00Z" },
+        impersonation: null,
+        simulation: null,
+      },
+      payeeOf: [],
+      decisions: { count: 0, sessions: 0, byOutcome: {} as never, last: null },
+    });
+    const r = await get();
+    expect(r.body.alreadyPayable).toBeNull();
+    expect(r.body.payeeRefused).toBe(msg("PAYEE_REFUSED", { package: pkg, description: "Sanctioned." }));
+  });
+
+  it("a finished claim is public: wallet and escrow txs without signing in", async () => {
+    const [m] = await db().insert(s.maintainers).values({ githubId: Date.now(), githubLogin: "someone" }).returning();
+    await db().insert(s.claims).values({
+      repoFullName: repo,
+      maintainerId: m.id,
+      walletAddress: FUNDED,
+      status: "claimed",
+      setClaimTx: "0x" + "a".repeat(64),
+      claimTxs: ["0x" + "b".repeat(64)],
+    });
+    const r = await get();
+    expect(r.body.claimed).toEqual({ wallet: FUNDED, setClaimTx: "0x" + "a".repeat(64), claimTxs: ["0x" + "b".repeat(64)] });
+  });
+
   it("payeeRisk failure is reported, not guessed", async () => {
     deps.riskOf = async () => {
       throw new Error("db down");

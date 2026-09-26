@@ -1,6 +1,7 @@
 // GET /api/npm/<name> (T10.5 backend): what the /npm/[name] page shows. The reserved amount and the
 // cooling window come from the escrow itself (MultiBaas is wired on another branch); the session
 // count from our credits. A failed read is reported in `errors`, never replaced by a number.
+import { CRITICAL, REFUSE_ABOVE } from "../decision/matrix";
 import { formatUnits, zeroAddress, type Hex } from "viem";
 import { isValidPackageName } from "../attribution/specifier";
 import { msg, sessionsLabel } from "../messages";
@@ -22,7 +23,9 @@ export type PackageSummary = {
   headline: string | null; // CLAIM_HEADLINE, when something is reserved
   alsoAccepts: string[];
   payee: { address: string; source: string } | null;
-  alreadyPayable: string | null; // ALREADY_PAYABLE, when the payee is not from a claim
+  alreadyPayable: string | null; // ALREADY_PAYABLE, when the payee is not from a claim and not flagged
+  payeeRefused: string | null; // PAYEE_REFUSED, when Intercepta's latest verdict on the payee refuses it
+  claimed: { wallet: string | null; setClaimTx: string | null; claimTxs: string[] } | null; // public, any maintainer
   cooling: { until: string; message: string } | null;
   maintainer: { login: string } | null;
   claim: ClaimView | null;
@@ -99,6 +102,18 @@ export async function packageSummary(req: Request, slug: string[], deps: ClaimDe
   const payeeRisk =
     found && deps.riskOf ? await deps.riskOf(found.address).catch(() => (errors.push("risk"), null)) : null;
 
+  // Same line the settler draws (lib/decision/matrix.ts): a critical trait or a score above the
+  // refuse threshold means agents will not pay this address, so never call it payable.
+  const verdict = payeeRisk?.intercepta.address;
+  const critical = verdict?.traits.find((t) => CRITICAL.has(t.name));
+  const refusal = critical
+    ? critical.description
+    : verdict && verdict.toxicScore > REFUSE_ABOVE
+      ? `toxic score ${verdict.toxicScore}`
+      : null;
+
+  const done = pkg.repoFullName ? await deps.store.latestClaimedForRepo(pkg.repoFullName) : null;
+
   const state: SummaryState =
     claimRow?.status === "claimed" || claimRow?.status === "refused"
       ? claimRow.status
@@ -120,7 +135,9 @@ export async function packageSummary(req: Request, slug: string[], deps: ClaimDe
       onChain && onChain.reserved > 0n ? msg("CLAIM_HEADLINE", { amount: reserved!, package: name, sessions: sessionsLabel(sessions) }) : null,
     alsoAccepts: pkg.fundingLinks,
     payee: found,
-    alreadyPayable: found && found.source !== "claim" ? msg("ALREADY_PAYABLE", { package: name }) : null,
+    alreadyPayable: found && found.source !== "claim" && !refusal ? msg("ALREADY_PAYABLE", { package: name }) : null,
+    payeeRefused: refusal ? msg("PAYEE_REFUSED", { package: name, description: refusal }) : null,
+    claimed: done ? { wallet: done.walletAddress, setClaimTx: done.setClaimTx, claimTxs: done.claimTxs } : null,
     cooling: onChain?.cooling ? { until: onChain.cooling, message: msg("COOLING", { time: onChain.cooling }) } : null,
     maintainer: maintainer ? { login: maintainer.githubLogin } : null,
     claim: claimRow && pkg.repoFullName ? claimView(pkg.repoFullName, claimRow) : null,
