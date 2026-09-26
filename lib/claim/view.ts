@@ -13,6 +13,8 @@ export type ClaimView = {
   prNumber: number | null;
   prUrl: string | null; // the PR, or the prefilled new-file link
   claimedAmount: string | null; // USDC, e.g. "0.75"
+  setClaimTx: string | null; // the escrow setClaim tx (the latest one when several packages)
+  claimTxs: string[]; // the escrow claim txs, one per package of the repo
   coolingUntil: string | null; // ISO time
   code: MessageCode | null;
   message: string | null;
@@ -29,6 +31,8 @@ export function claimView(repo: string, row: ClaimRow | null, note?: Note): Clai
     prNumber: row?.prNumber ?? null,
     prUrl: row?.prUrl ?? null,
     claimedAmount: row?.claimedMicro != null ? formatUnits(row.claimedMicro, 6) : null,
+    setClaimTx: row?.setClaimTx ?? null,
+    claimTxs: row?.claimTxs ?? [],
     coolingUntil: note?.coolingUntil ?? null,
     code: note?.code ?? null,
     message: note ? msg(note.code, note.vars) : null,
