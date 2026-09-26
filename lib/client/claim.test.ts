@@ -30,7 +30,7 @@ function summary(over: Partial<PackageSummary> = {}): PackageSummary {
     state: "reserved",
     reserved: "1.5",
     sessions: 3,
-    headline: msg("CLAIM_HEADLINE", { amount: "1.5", package: "date-fns", sessions: 3 }),
+    headline: msg("CLAIM_HEADLINE", { amount: "1.5", package: "date-fns", sessions: "3 sessions" }),
     alsoAccepts: [],
     payee: null,
     alreadyPayable: null,

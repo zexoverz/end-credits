@@ -124,7 +124,7 @@ describe.skipIf(!DB_URL)("GET /api/npm/<name> summary (integration)", () => {
       cooling: null,
       claim: null,
     });
-    expect(r.body.headline).toBe(msg("CLAIM_HEADLINE", { amount: "0.5", package: pkg, sessions: 2 }));
+    expect(r.body.headline).toBe(msg("CLAIM_HEADLINE", { amount: "0.5", package: pkg, sessions: "2 sessions" }));
   });
 
   it("nothing reserved: no headline", async () => {

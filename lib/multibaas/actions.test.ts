@@ -82,7 +82,7 @@ describe("buildActions", () => {
       href: "/app/npm/@endcredits-demo/unclaimed-utils",
       amount: { micro: "400000" },
       sessions: 2,
-      title: msg("ACTION_RESERVE", { amount: "0.4", package: "@endcredits-demo/unclaimed-utils", sessions: 2 }),
+      title: msg("ACTION_RESERVE", { amount: "0.4", package: "@endcredits-demo/unclaimed-utils", sessions: "2 sessions" }),
     });
   });
 });
