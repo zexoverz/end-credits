@@ -12,7 +12,7 @@ import { readEnv } from "../env";
 import { interceptaFromEnv } from "../intercepta/client";
 import { drizzleScreenRepo } from "../intercepta/repo";
 import { dbObservations } from "../payee/observe";
-import { firstSeenPush } from "../payee/push";
+import { firstSeenPush, repoCreatedAt } from "../payee/push";
 import { resolvePayee } from "../payee/resolve";
 import { loadPackage } from "../registry/npm";
 import { payCredit, payMaintainer } from "../x402/client";
@@ -49,6 +49,7 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
         },
       }),
     pushedAt: (repo, file, since) => firstSeenPush(repo, file, { since, githubToken }),
+    repoCreatedAt: (repo) => repoCreatedAt(repo, { githubToken }),
     screenPayee: (payee, opts) => intercepta.screenPayee(payee, opts),
     // Off by default: Intercepta simulates only with the payer's mainnet balance (decisions.md).
     ...(env.SIMULATE_PAYMENTS === "true"

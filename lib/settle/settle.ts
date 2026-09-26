@@ -34,6 +34,7 @@ export type SettleDeps = {
   resolvePayee(pkg: PackageRef): Promise<Resolution>;
   /** GitHub push time of a funding file (T2.6); omitted → our own observations only. */
   pushedAt?(repo: string, file: string, since: Date): Promise<Date | null>;
+  repoCreatedAt?(repo: string): Promise<Date | null>;
   screenPayee(payee: Address, opts: { from: Address; amount: bigint }): Promise<Screen>;
   /** Intercepta simulation of this exact payment; only for a paid or capped decision. Off unless
    *  SIMULATE_PAYMENTS=true: the API needs the payer's mainnet balance (decisions.md). */
@@ -315,7 +316,8 @@ function changeOf(w: Work, address: Address, source: string, deps: SettleDeps, n
     deps.pushedAt && file && repo
       ? () => deps.pushedAt!(repo, file, new Date(now.getTime() - CHANGE_WINDOW_DAYS * DAY_MS))
       : undefined;
-  return recentlyChanged(deps.observations, w.packageId, address, { now, pushedAt });
+  const repoCreatedAt = deps.repoCreatedAt && repo ? () => deps.repoCreatedAt!(repo) : undefined;
+  return recentlyChanged(deps.observations, w.packageId, address, { now, pushedAt, repoCreatedAt });
 }
 
 // Phase 2: screen, decide, store the decision. Nothing is signed here.
