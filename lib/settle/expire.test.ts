@@ -74,7 +74,7 @@ describe.skipIf(!DB_URL)("expireHolds (integration)", () => {
     expect(credit.outcome).toBe("held");
     expect(credit.reasons).toEqual([
       expect.objectContaining({ code: "HELD_MEDIUM" }),
-      { source: "policy", code: "EXPIRED", text: "Not approved in time. 0.12 USDC returned to the owner." },
+      { source: "policy", code: "EXPIRED", text: "Not approved in time. 0.12 USDC returned to your wallet." },
     ]);
   });
 
