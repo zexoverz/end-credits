@@ -3,13 +3,20 @@
 **Your AI agent pays every open-source project it used, and never pays the scammers pretending to be
 them.**
 
-ETHGlobal Tokyo 2026. Solo build by Faisal ([`zexoverz`](https://github.com/zexoverz)).
+End Credits splits the owner's budget across the open-source packages a Claude Code session used,
+screens every payee with Intercepta before signing, pays clean ones over x402, and holds or reserves
+the rest in an escrow that only the owner's wallet can release from.
+
+ETHGlobal Tokyo 2026. Solo build by Faisal ([`zexoverz`](https://github.com/zexoverz)). Partners:
+**Intercepta** ([the moment of decision](#intercepta-the-moment-of-decision)) and **Curvegrid
+MultiBaas** ([how it is used](#curvegrid-multibaas)).
 
 | | |
 |---|---|
 | App | https://end-credits.up.railway.app |
 | Dashboard (MultiBaas) | https://end-credits.up.railway.app/dashboard |
 | Decision history | https://end-credits.up.railway.app/history |
+| First live settlement (roll) | https://end-credits.up.railway.app/credits/9233161f-1de0-4161-abc8-387379cc2b8b |
 | `EndCreditsEscrow` on Basescan | https://sepolia.basescan.org/address/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46#code |
 | `EndCreditsEscrow` on Sourcify (`exact_match`) | https://repo.sourcify.dev/84532/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46 |
 
@@ -471,9 +478,10 @@ All on Base Sepolia (chain `84532`). Testnet keys only.
 | Deployer | [`0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13`](https://sepolia.basescan.org/address/0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13) |
 | USDC | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
-Deploy tx
-[`0x3ddf9e353bcef632cf5d77543d957aa323b0cbc8241622d951d3e176560e6ed8`](https://sepolia.basescan.org/tx/0x3ddf9e353bcef632cf5d77543d957aa323b0cbc8241622d951d3e176560e6ed8),
-sent through the forge-multibaas plugin. The MultiBaas deployment (free plan, Base Sepolia) links the
+v2 deploy tx
+[`0x7f4f4f1fabbb7bca64b0b4babd0752ec71f6519339588c72efc3a25548111fb2`](https://sepolia.basescan.org/tx/0x7f4f4f1fabbb7bca64b0b4babd0752ec71f6519339588c72efc3a25548111fb2),
+sent through the forge-multibaas plugin, which moved the MultiBaas `escrow` alias to v2 as
+`endcredits_escrow` 2.0. v1 held only test events; the dashboard history starts at v2. The MultiBaas deployment (free plan, Base Sepolia) links the
 escrow as `escrow` and USDC as `usdc`, holds the six saved queries, and posts to
 `/api/webhooks/multibaas` through the webhook `endcredits`. Live checks on 26 Sep: hold then refund
 round trips indexed by MultiBaas, `Held` and `Refunded` delivered by the webhook, owner notifications
@@ -506,8 +514,10 @@ so every rehearsal gets its own unclaimed package. If a real package's payee com
 high risk during prep, that package is left out of the demo session.
 
 The demo app is [zexoverz/endcredits-demo-reports](https://github.com/zexoverz/endcredits-demo-reports)
-(Next.js, `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`, plus the fixtures).
-TODO(live): confirm the fixtures are published to npm (`scripts/publish-fixtures.sh`).
+(Next.js, `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`, plus the fixtures). The
+fixtures install from GitHub (`pnpm add @endcredits-demo/moved-payout@github:zexoverz/endcredits-fixture-moved-payout`),
+since they are not on the npm registry; the settler then takes the repository from the installed
+`package.json` and says so (`REPO_DECLARED`).
 
 ## Setup and testing
 
