@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionNotice } from "@/components/product/feedback";
+import { CONTROL as U } from "@/lib/copy/control-room";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { SignRelease } from "@/components/approver/sign-release";
@@ -30,14 +32,10 @@ type StartResponse =
 
 function NoticeBox({ notice }: { notice: Notice }) {
   if (notice.kind === "error") return <ErrorBox>{notice.text}</ErrorBox>;
-  const cls =
-    notice.kind === "ok"
-      ? "border-paid/40 bg-paid/10 text-paid"
-      : "border-line bg-card";
   return (
-    <div className={`rounded border px-3 py-2 text-sm ${cls}`}>
+    <ActionNotice tone={notice.kind === "ok" ? "success" : "info"}>
       {notice.text}
-    </div>
+    </ActionNotice>
   );
 }
 
@@ -149,7 +147,12 @@ export function ApproveClient({
 
   return (
     <div className="approval-page">
-      <h1 className="mb-4 text-xl font-semibold">{C.TITLE}</h1>
+      <header className="approval-heading">
+        <Link href="/app/owner?section=approvals">← {U.backControls}</Link>
+        <p className="control-eyebrow">{U.approvalEyebrow}</p>
+        <h1>{U.approvalTitle}</h1>
+        <p>{U.approvalSummary}</p>
+      </header>
       {load.state === "loading" && <p className="text-muted">{C.LOADING}</p>}
       {load.state === "missing" && <ErrorBox>{C.NOT_FOUND}</ErrorBox>}
       {load.state === "error" && (
@@ -157,9 +160,7 @@ export function ApproveClient({
       )}
       {view && (
         <div className="flex flex-col gap-4">
-          <p className="text-2xl font-semibold leading-snug break-words">
-            {view.sentence}
-          </p>
+          <p className="approval-sentence">{view.sentence}</p>
 
           <Card>
             <Row label={C.PACKAGE}>{view.package}</Row>
@@ -251,6 +252,7 @@ function Actions({
   onApprove: (v: ApproveView, approvalId: string) => void;
   onDeny: (v: ApproveView) => void;
 }) {
+  const [signing, setSigning] = useState(false);
   if (!view.signedIn) {
     return (
       <div className="flex flex-col gap-2 text-sm">
@@ -272,11 +274,18 @@ function Actions({
         hasApprover={view.hasApprover}
         disabled={busy !== null}
         busyLabel={label}
+        onBusyChange={setSigning}
         onSigned={(approvalId) => onApprove(view, approvalId)}
       />
+      {busy === "deny" && (
+        <ActionNotice tone="pending">
+          <strong>{U.denying}</strong>
+          <p>{U.denyingBody}</p>
+        </ActionNotice>
+      )}
       <Button
         className="bg-transparent py-3 text-base text-foreground ring-1 ring-line"
-        disabled={busy !== null}
+        disabled={busy !== null || signing}
         onClick={() => onDeny(view)}
       >
         {busy === "deny" ? C.WORKING : C.DENY}

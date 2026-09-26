@@ -1,5 +1,7 @@
 "use client";
 // **Roll credits**: POST /api/sessions/:id/settle as the owner (202 / 401 / 403 / 409).
+import { ActionNotice } from "@/components/product/feedback";
+import { CONTROL as U } from "@/lib/copy/control-room";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/components/product/request";
@@ -41,8 +43,10 @@ export function RollButton({
       >
         {ROLL_COPY.ROLL_BUTTON}
       </button>
+      {busy && <ActionNotice tone="pending">{U.working}</ActionNotice>}
       {result && (
         <p
+          role="status"
           className={
             result.kind === "requested" ? "text-white/70" : "text-held"
           }

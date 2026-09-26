@@ -1,18 +1,29 @@
 // The package header: name, repo, what is reserved, other funding links, payee and cooling.
+import { ActionNotice } from "@/components/product/feedback";
 import { Mono } from "@/components/ui";
-import { githubRepoUrl, reserveLine, safeLinks, type Notice, type PackageSummary } from "@/lib/client/claim";
+import {
+  githubRepoUrl,
+  reserveLine,
+  safeLinks,
+  type Notice,
+  type PackageSummary,
+} from "@/lib/client/claim";
 import { addressUrl } from "@/lib/client/format";
 import { claimCopy } from "@/lib/copy/claim";
 
 export function NoticeLine({ notice }: { notice: Notice | null }) {
   if (!notice) return null;
-  const cls =
-    notice.tone === "error"
-      ? "border-refused/40 bg-refused/10 text-refused"
-      : notice.tone === "ok"
-        ? "border-paid/40 bg-paid/10 text-paid"
-        : "border-line bg-background text-foreground";
-  return <p className={`rounded border px-3 py-2 text-sm ${cls}`}>{notice.text}</p>;
+  if (notice.tone === "error")
+    return (
+      <p role="alert" className="product-error">
+        {notice.text}
+      </p>
+    );
+  return (
+    <ActionNotice tone={notice.tone === "ok" ? "success" : "info"}>
+      {notice.text}
+    </ActionNotice>
+  );
 }
 
 export function Header({ s }: { s: PackageSummary }) {
@@ -23,7 +34,12 @@ export function Header({ s }: { s: PackageSummary }) {
       {s.repo ? (
         <p className="text-sm text-muted">
           {claimCopy("REPO")}:{" "}
-          <a className="underline" href={githubRepoUrl(s.repo)} target="_blank" rel="noreferrer">
+          <a
+            className="underline"
+            href={githubRepoUrl(s.repo)}
+            target="_blank"
+            rel="noreferrer"
+          >
             {s.repo}
           </a>
         </p>
@@ -37,25 +53,55 @@ export function Header({ s }: { s: PackageSummary }) {
           {links.map((u, i) => (
             <span key={u}>
               {i > 0 && ", "}
-              <a className="underline" href={u} target="_blank" rel="noreferrer">
+              <a
+                className="underline"
+                href={u}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {u}
               </a>
             </span>
           ))}
         </p>
       )}
-      {s.alreadyPayable && <NoticeLine notice={{ tone: "info", text: s.alreadyPayable, code: "ALREADY_PAYABLE" }} />}
+      {s.alreadyPayable && (
+        <NoticeLine
+          notice={{
+            tone: "info",
+            text: s.alreadyPayable,
+            code: "ALREADY_PAYABLE",
+          }}
+        />
+      )}
       {s.payee && (
         <p className="text-sm">
           {claimCopy("PAYEE")}:{" "}
-          <a className="underline" href={addressUrl(s.payee.address)} target="_blank" rel="noreferrer">
+          <a
+            className="underline"
+            href={addressUrl(s.payee.address)}
+            target="_blank"
+            rel="noreferrer"
+          >
             <Mono>{s.payee.address}</Mono>
           </a>{" "}
           <span className="text-muted">({s.payee.source})</span>
         </p>
       )}
-      {s.errors.includes("payee") && <NoticeLine notice={{ tone: "error", text: claimCopy("PAYEE_ERROR"), code: "payee" }} />}
-      {s.cooling && <NoticeLine notice={{ tone: "info", text: s.cooling.message, code: "COOLING" }} />}
+      {s.errors.includes("payee") && (
+        <NoticeLine
+          notice={{
+            tone: "error",
+            text: claimCopy("PAYEE_ERROR"),
+            code: "payee",
+          }}
+        />
+      )}
+      {s.cooling && (
+        <NoticeLine
+          notice={{ tone: "info", text: s.cooling.message, code: "COOLING" }}
+        />
+      )}
     </header>
   );
 }
