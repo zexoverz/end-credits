@@ -153,6 +153,8 @@ describe.skipIf(!TEST_DB)("wallet sign-in (integration)", () => {
     const other = await ownerOf(OTHER_KEY.address);
     expect(other.id).toBe(body.ownerId);
     expect(other.payerAddress).toBe(deps.newPayer(other.id));
+    expect(other.approverAddress).toBe(OTHER_KEY.address);
+    expect(other.budgetOwner).toBe(OTHER_KEY.address);
     expect(await auth.requireOwner(req("/", { cookie: cookieOf(res) }))).toEqual({ ownerId: other.id });
     expect(await walletOf()).toBe(OWNER_KEY.address);
   });

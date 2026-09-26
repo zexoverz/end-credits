@@ -152,7 +152,10 @@ async function boundOwner(address: Address): Promise<string | null> {
   return bound?.id ?? null;
 }
 
-/** A new owner for `address`: default limits, its own derived payer, the wallet bound. */
+/**
+ * A new owner for `address`: default limits, its own derived payer, the wallet bound. The wallet is
+ * also its approver (the provisioner names it on chain) and its budget wallet until it names another.
+ */
 async function newOwner(address: Address, deps: WalletAuthDeps): Promise<Bound> {
   const id = randomUUID();
   const inserted = await db()
@@ -162,6 +165,8 @@ async function newOwner(address: Address, deps: WalletAuthDeps): Promise<Bound> 
       displayName: `${address.slice(0, 6)}…${address.slice(-4)}`,
       payerAddress: deps.newPayer(id),
       walletAddress: address,
+      approverAddress: address,
+      budgetOwner: address,
     })
     .onConflictDoNothing({ target: owners.walletAddress })
     .returning({ id: owners.id });
