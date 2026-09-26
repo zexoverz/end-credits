@@ -33,6 +33,8 @@ export const RESULTS: Record<string, { rows: Record<string, unknown>[] }> = {
       { contract: "usdc", sender: PAYER, recipient: B, amount: 50000, block: 14, tx: T3, at: "2026-09-26T01:02:00Z" },
       // another linked token with a Transfer event
       { contract: "othertoken", sender: PAYER, recipient: A, amount: "999", block: 15, tx: tx(4), at: "2026-09-26T01:03:00Z" },
+      // A payer transfer no credit points to (a test or manual transfer): not a payment to a maintainer.
+      { contract: "usdc", sender: PAYER, recipient: A, amount: "10000", block: 16, tx: tx(5), at: "2026-09-26T01:04:00Z" },
     ],
   },
   held_status: {
