@@ -143,7 +143,7 @@ describe("failure policy", () => {
     const { c } = client(f);
     await c.quickScan(PAYEE);
     await c.quickScan(PAYEE);
-    expect(f).toHaveBeenCalledTimes(2);
+    expect(f).toHaveBeenCalledTimes(4); // two calls, each with its one retry
   });
 });
 
