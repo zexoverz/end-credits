@@ -1,5 +1,5 @@
 // /npm/<name>: the maintainer claim page (T10.5). The server part only reads the params; the page
-// itself is a client component because the passkey wallet runs in the browser.
+// itself is a client component because the MetaMask wallet runs in the browser.
 import { notFound } from "next/navigation";
 import { packageNameFrom } from "@/lib/client/claim";
 import { ClaimPage } from "./claim-page";
