@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, ErrorBox } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import { fill } from "@/lib/client/approve";
 import { APPROVER_COPY as C } from "@/lib/copy/approver";
 import { connectWallet, errorName, signTypedData } from "./connect-wallet";
@@ -38,7 +38,7 @@ export function SignRelease({
     return (
       <div className="flex flex-col gap-2 text-sm">
         <p>{C.NO_APPROVER}</p>
-        <Link href="/owner" className="underline">
+        <Link href="/app/owner" className="underline">
           {C.NO_APPROVER_LINK}
         </Link>
       </div>

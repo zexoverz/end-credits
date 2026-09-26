@@ -1,30 +1,32 @@
 // Copy for /dashboard (AGENTS rule 14). The redesign rewrites the words here, not in the page.
 export const DASHBOARD = {
-  TITLE: "Dashboard",
-  INTRO: "Every amount and count here is read from the escrow and USDC events MultiBaas has indexed on Base Sepolia.",
+  TITLE: "Your impact, on record.",
+  INTRO:
+    "Track transfers, reserved contributions, and escrow activity. On-chain amounts come from MultiBaas; refused credits come from the decision log.",
   REFRESH: "Refresh",
   REFRESHING: "Refreshing…",
   LOADING: "Loading from MultiBaas…",
   UPDATED: "Updated {time}",
   AUTO_REFRESH: "Refreshes every 30 s.",
-  ERROR_TITLE: "The dashboard could not read MultiBaas, so no numbers are shown.",
+  ERROR_TITLE:
+    "The dashboard could not read MultiBaas, so no numbers are shown.",
   ERROR_STATUS: "HTTP {status}",
 
-  CARD_PAID: "Paid to maintainers",
+  CARD_PAID: "Confirmed payer transfers",
   CARD_PAID_SUB: "{count} payments",
-  CARD_PROJECTS: "Projects credited",
+  CARD_PROJECTS: "Projects supported",
   CARD_PROJECTS_SUB: "paid or reserved",
-  CARD_HELD: "Held",
+  CARD_HELD: "Escrow holds",
   HELD_APPROVED: "Approved",
   HELD_DENIED: "Denied",
   HELD_EXPIRED: "Expired",
   HELD_PENDING: "Pending",
-  CARD_REFUSED: "Refused",
+  CARD_REFUSED: "Payments refused",
   CARD_REFUSED_SUB: "from the decision log, not the chain",
-  CARD_RESERVED: "Reserved, waiting",
+  CARD_RESERVED: "Reserved for maintainers",
   CARD_RESERVED_SUB: "for {count} packages without a wallet",
 
-  PACKAGES: "Packages",
+  PACKAGES: "The packages behind your sessions",
   PACKAGES_EMPTY: "No package has been paid or reserved yet.",
   COL_PACKAGE: "Package",
   COL_SESSIONS: "Sessions",
@@ -55,7 +57,10 @@ export const DASHBOARD = {
   NO_VALUE: "—",
 } as const;
 
-export function fill(template: string, vars: Record<string, string | number>): string {
+export function fill(
+  template: string,
+  vars: Record<string, string | number>,
+): string {
   return template.replace(/\{(\w+)\}/g, (_, name: string) => {
     if (!(name in vars)) throw new Error(`Missing copy var: ${name}`);
     return String(vars[name]);

@@ -4,7 +4,7 @@
 // it takes over (a change is timelocked on chain; shown, never hidden). Connect a wallet and name it.
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, ErrorBox, Mono } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import { fill } from "@/lib/client/approve";
 import { APPROVER_COPY as C } from "@/lib/copy/approver";
 import { ConnectWallet } from "./connect-wallet";
