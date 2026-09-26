@@ -1,0 +1,10 @@
+{
+  "drips": {
+    "ethereum": {
+      "ownedBy": "0x9ebdC8ACc879a8284Ae5B3CecfbD280ec307aFA3"
+    }
+  },
+  "x402": {
+    "endpoint": "https://endcredits-tipjar.up.railway.app/clipper/tip"
+  }
+}
