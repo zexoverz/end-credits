@@ -111,8 +111,16 @@ export const packages = pgTable(
     firstPublishedAt: ts("first_published_at"),
     fundingLinks: text("funding_links").array().notNull().default(sql`'{}'::text[]`),
     fetchedAt: ts("fetched_at"),
+    // From an uploaded package.json, used only when the npm registry 404s (decisions.md).
+    declaredRepo: text("declared_repo"),
+    declaredDirectory: text("declared_directory"),
+    declaredHomepage: text("declared_homepage"),
+    repoSource: text("repo_source"),
   },
-  (t) => [unique().on(t.ecosystem, t.name)],
+  (t) => [
+    unique().on(t.ecosystem, t.name),
+    check("packages_repo_source", sql`${t.repoSource} in ('registry','declared')`),
+  ],
 );
 
 export const payeeObservations = pgTable(

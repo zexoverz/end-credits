@@ -29,6 +29,13 @@
       "when": 1790395668391,
       "tag": "0003_escrow_v2_approver",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790401276571,
+      "tag": "0004_declared_repo",
+      "breakpoints": true
     }
   ]
 }
