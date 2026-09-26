@@ -3,6 +3,7 @@ import {
   spendingAmount,
   approvalCovers,
   spendingArguments,
+  limitStatus,
 } from "./spending-limit";
 import { BUDGET_COPY as C } from "@/lib/copy/budget";
 
@@ -35,5 +36,24 @@ describe("spending limit transaction guards", () => {
       period: 3600n,
     });
     expect(spendingArguments("20", 2592000, "21").period).toBe(2592000n);
+  });
+});
+
+describe("limitStatus", () => {
+  const set = { perPeriod: "20", period: 86400, remaining: "5" };
+  it("is none without a limit on chain", () => {
+    expect(limitStatus(null, "20", 86400)).toBe("none");
+  });
+  it("is active when the selection is the limit on chain and has room", () => {
+    expect(limitStatus(set, "20", 86400)).toBe("active");
+    expect(limitStatus(set, "20.000000", 86400)).toBe("active");
+  });
+  it("is used_up when that limit is spent for this window", () => {
+    expect(limitStatus({ ...set, remaining: "0" }, "20", 86400)).toBe("used_up");
+  });
+  it("is change when the amount or the period differs", () => {
+    expect(limitStatus(set, "25", 86400)).toBe("change");
+    expect(limitStatus(set, "20", 3600)).toBe("change");
+    expect(limitStatus(set, "", 86400)).toBe("change");
   });
 });

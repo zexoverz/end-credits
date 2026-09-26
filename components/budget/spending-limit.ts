@@ -32,3 +32,26 @@ export function spendingArguments(
   if (!approvalCovers(approved, value)) throw new Error(C.APPROVAL_REQUIRED);
   return { amount, period: BigInt(period) };
 }
+
+export type LimitStatus = "none" | "active" | "used_up" | "change";
+
+/**
+ * Where the chosen amount and period stand against the limit on chain: `active` when that exact
+ * limit is set and has room left, `used_up` when it is set but this window is spent, `change` when
+ * the selection differs from what is set, `none` when no limit is set.
+ */
+export function limitStatus(
+  onchain: { perPeriod: string; period: number; remaining: string } | null | undefined,
+  value: string,
+  period: number,
+): LimitStatus {
+  if (!onchain) return "none";
+  let same = false;
+  try {
+    same = parseUsdc(onchain.perPeriod) === spendingAmount(value) && onchain.period === period;
+  } catch {
+    same = false;
+  }
+  if (!same) return "change";
+  return USDC_PATTERN.test(onchain.remaining) && parseUsdc(onchain.remaining) > 0n ? "active" : "used_up";
+}
