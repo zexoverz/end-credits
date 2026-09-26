@@ -1,6 +1,6 @@
 {
   "title": "End Credits / Identity studies",
-  "heading": "Eight ways to give credit.",
+  "heading": "Eighteen ways to give credit.",
   "intro": "Pilih arah identitasnya. Setiap konsep punya logo persegi, cover 16:9, dan versi vector yang bisa langsung dipakai.",
   "logo": "Logo",
   "cover": "Cover",
@@ -53,6 +53,66 @@
       "name": "Orbit Credit",
       "description": "Satu coin, banyak kontributor di sekelilingnya. Terbuka dan terus bergerak.",
       "note": "Paling dinamis"
+    },
+    {
+      "slug": "coin-press",
+      "name": "Coin Press",
+      "description": "Keping solid dengan pahatan E bertingkat. Lebih tebal, lebih tenang, tanpa detail kecil yang mengganggu.",
+      "note": "Coin yang paling tegas"
+    },
+    {
+      "slug": "ledger-weave",
+      "name": "Ledger Weave",
+      "description": "Tiga jalur kontribusi saling menyambung. Huruf E muncul dari susunan ledger yang terbuka.",
+      "note": "Sistem, bukan sekadar simbol"
+    },
+    {
+      "slug": "contributor-loop",
+      "name": "Contributor Loop",
+      "description": "Dua mata rantai yang saling mengunci. Menghubungkan pekerjaan agent dengan kerja maintainer.",
+      "note": "Hubungan yang saling mendukung"
+    },
+    {
+      "slug": "credit-ticket",
+      "name": "Credit Ticket",
+      "description": "Potongan tiket dengan coin di tengah. Referensi cinema yang terasa dekat dengan end credits.",
+      "note": "Karakter sinematik"
+    },
+    {
+      "slug": "split-credit",
+      "name": "Split Credit",
+      "description": "Satu lingkaran dibagi menjadi tiga porsi. Menggambarkan budget yang dibagi ke kontributor.",
+      "note": "Alokasi jadi identitas"
+    },
+    {
+      "slug": "credit-aperture",
+      "name": "Credit Aperture",
+      "description": "Empat sudut membentuk ruang terbuka di tengah. Session selesai, kontribusi mulai bergerak.",
+      "note": "Geometris dan presisi"
+    },
+    {
+      "slug": "terminal-coin",
+      "name": "Terminal Coin",
+      "description": "Prompt terminal dipahat ke dalam keping. Simbol ringkas untuk kontribusi dari coding session.",
+      "note": "Code bertemu coin"
+    },
+    {
+      "slug": "credit-bloom",
+      "name": "Credit Bloom",
+      "description": "Empat keping membentuk satu bunga modular. Dukungan kecil yang membuat ekosistem tumbuh.",
+      "note": "Lebih hangat dan organik"
+    },
+    {
+      "slug": "ec-token",
+      "name": "EC Token",
+      "description": "Monogram EC dipahat ke token bundar. Bentuk tebal untuk avatar, favicon, dan stempel.",
+      "note": "Monogram dengan karakter coin"
+    },
+    {
+      "slug": "credit-ribbon",
+      "name": "Credit Ribbon",
+      "description": "Pita credits melipat membentuk huruf C. Satu garis yang menghubungkan awal dan akhir.",
+      "note": "Paling fleksibel untuk motion"
     }
   ],
   "exportLabels": [
@@ -64,7 +124,7 @@
     "SMALL-SIZE CHECK",
     "Transparent SVG ↓",
     "End Credits · Identity exploration",
-    "8 concepts / Original vector artwork / PNG + SVG"
+    "18 concepts / Original vector artwork / PNG + SVG"
   ],
   "coverCopy": [
     "End Credits",
@@ -79,6 +139,14 @@
     "Observe the work.",
     "Screen the payee.",
     "Keep the receipt.",
-    "BUILT WITH OPEN SOURCE. CREDIT WHERE IT’S DUE."
+    "BUILT WITH OPEN SOURCE. CREDIT WHERE IT’S DUE.",
+    "End",
+    "Credits.",
+    "The open source behind your AI.",
+    "Seen. Credited. Supported.",
+    "FROM CODE TO CONTRIBUTION.",
+    "Built together.",
+    "Credited together.",
+    "Give the open source behind your AI session its credits."
   ]
 }
