@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { isValidPackageName } from "../attribution/specifier";
 import { CAP, MAX_PACKAGES, type Signal } from "../attribution/types";
+import { declaredRepository, isHttpsUrl, MAX_DIRECTORY_CHARS, MAX_URL_CHARS } from "../registry/declared";
 
 const MAX_EVIDENCE_CHARS = 512;
 
@@ -21,9 +22,23 @@ const signals = z
   })
   .refine((s) => Object.values(s).some(Boolean), "no signals");
 
+// From the installed package.json, used only when the npm registry has no document for the name.
+const repository = z
+  .union([
+    z.string().max(MAX_URL_CHARS),
+    z.strictObject({
+      type: z.string().max(32).optional(),
+      url: z.string().max(MAX_URL_CHARS),
+      directory: z.string().max(MAX_DIRECTORY_CHARS).optional(),
+    }),
+  ])
+  .refine((r) => declaredRepository(r) !== null, "repository must name a GitHub owner/repo");
+
 const packageUse = z.strictObject({
   name: z.string().refine(isValidPackageName, "invalid npm package name"),
   version: z.string().min(1).max(64).optional(),
+  repository: repository.optional(),
+  homepage: z.string().max(MAX_URL_CHARS).refine(isHttpsUrl, "homepage must be an https URL").optional(),
   signals,
 });
 

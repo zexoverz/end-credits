@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { TxRevertedError } from "../chain/txqueue";
 import type { Screen } from "../decision/types";
 import { msg } from "../messages";
+import { packageKey } from "../payee/keys";
 import type { Resolution } from "../payee/resolve";
 import type { NpmPackageWithDownloads } from "../registry/npm";
 
@@ -319,5 +320,72 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
     const [row] = await database.select().from(s.sessions).where(eq(s.sessions.id, id));
     expect(row.status).toBe("failed");
     expect(lines.join("\n")).toContain(id);
+  });
+
+  describe("a package not on the npm registry", () => {
+    const REPO = "zexoverz/endcredits-fixture-moved-payout";
+    const RAW = `https://raw.githubusercontent.com/${REPO}/HEAD`;
+
+    // The real resolver against a fake GitHub: package.json names `publishes`, FUNDING.json names `payee`.
+    async function declaredSetup(opts: { publishes?: string; registryStatus?: number; declare?: boolean } = {}) {
+      const name = `@endcredits-demo/declared-${suffix()}`;
+      const payee = randomAddress();
+      if (opts.declare !== false) {
+        await database.insert(s.packages).values({ name, packageKey: packageKey(name), declaredRepo: REPO });
+      }
+      const { id } = await seedSession({ [name]: { import: 1 } });
+      const { deps, calls } = fakes({}, {});
+      const files: Record<string, string> = {
+        [`${RAW}/package.json`]: JSON.stringify({ name: opts.publishes ?? name }),
+        [`${RAW}/FUNDING.json`]: JSON.stringify({ drips: { ethereum: { ownedBy: payee } } }),
+      };
+      const fakeFetch = (async (url: string) =>
+        files[url] ? new Response(files[url]) : new Response("Not Found", { status: 404 })) as typeof fetch;
+      const { RegistryNotFound } = await import("../registry/npm");
+      const { resolvePayee } = await import("../payee/resolve");
+      deps.loadPackage = async (n) => {
+        if (opts.registryStatus && opts.registryStatus !== 404) throw new Error(`npm registry ${opts.registryStatus} for ${n}`);
+        throw new RegistryNotFound(n);
+      };
+      deps.resolvePayee = (pkg) => resolvePayee(pkg, { store: observations, fetch: fakeFetch, claimOf: async () => null });
+      await mod.settleSession(id, deps);
+      const [row] = await database
+        .select({ c: s.credits, p: s.packages })
+        .from(s.credits)
+        .innerJoin(s.packages, eq(s.packages.id, s.credits.packageId))
+        .where(eq(s.credits.sessionId, id));
+      return { ...row, payee, calls };
+    }
+
+    it("falls back to the declared repo on a 404 and resolves the payee from FUNDING.json", async () => {
+      const { c, p, payee, calls } = await declaredSetup();
+      expect(c.payee).toBe(payee);
+      expect(c.payeeSource).toBe("drips");
+      expect(c.outcome).toBe("capped");
+      expect(calls.pay).toEqual([c.id]);
+      expect(c.reasons).toEqual(expect.arrayContaining([{ source: "payee", code: "REPO_DECLARED", text: msg("REPO_DECLARED") }]));
+      expect(p).toMatchObject({ repoFullName: REPO, repoSource: "declared", weeklyDownloads: null, firstPublishedAt: null });
+    });
+
+    it("still reserves with SPOOF_REPO when the declared repo publishes another name", async () => {
+      const { c, calls } = await declaredSetup({ publishes: "someone-else" });
+      expect(c.payee).toBeNull();
+      expect(c.outcome).toBe("reserved");
+      expect(c.reasons).toEqual(expect.arrayContaining([expect.objectContaining({ code: "SPOOF_REPO" })]));
+      expect(calls.pay).toEqual([]);
+    });
+
+    it("refuses on a registry error other than 404, declared repo or not", async () => {
+      const { c, calls } = await declaredSetup({ registryStatus: 503 });
+      expect(c.outcome).toBe("refused");
+      expect(c.reasons).toEqual([expect.objectContaining({ code: "RESOLVE_FAILED" })]);
+      expect(calls.resolve).toEqual([]);
+    });
+
+    it("refuses on a 404 when nothing was declared", async () => {
+      const { c } = await declaredSetup({ declare: false });
+      expect(c.outcome).toBe("refused");
+      expect(c.reasons).toEqual([expect.objectContaining({ code: "RESOLVE_FAILED" })]);
+    });
   });
 });

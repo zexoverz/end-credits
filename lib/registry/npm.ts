@@ -21,7 +21,18 @@ export type NpmPackage = {
   createdAt: Date | null;
 };
 
-export type NpmPackageWithDownloads = NpmPackage & { weeklyDownloads: number | null };
+/** Where repoFullName came from: the registry, or the package.json the uploader declared. */
+export type RepoSource = "registry" | "declared";
+
+export type NpmPackageWithDownloads = NpmPackage & { weeklyDownloads: number | null; repoSource?: RepoSource };
+
+/** The registry has no document for this name (never published, or installed from git). */
+export class RegistryNotFound extends Error {
+  constructor(name: string) {
+    super(`npm registry 404 for ${name}`);
+    this.name = "RegistryNotFound";
+  }
+}
 
 type Fetch = typeof fetch;
 type Doc = Record<string, unknown>;
@@ -87,6 +98,7 @@ export async function loadPackage(
   if (hit && now - hit.at < CACHE_TTL_MS) return hit.value;
 
   const res = await fetchFn(registryUrl(name));
+  if (res.status === 404) throw new RegistryNotFound(name);
   if (!res.ok) throw new Error(`npm registry ${res.status} for ${name}`);
   const parsed = parseRegistryDoc((await res.json()) as Doc, opts.version);
   const value = { ...parsed, weeklyDownloads: await weeklyDownloads(name, fetchFn) };

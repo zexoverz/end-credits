@@ -1,4 +1,4 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildUpload, formatTable, readLedger } from "./attribute";
@@ -33,12 +33,13 @@ describe("buildUpload", () => {
         {
           name: "viem",
           version: "2.21.0",
+          repository: "wevm/viem",
           signals: {
             dep_added: { count: 1 },
             docs: { count: 1, evidence: ["https://github.com/wevm/viem/blob/main/README.md"] },
           },
         },
-        { name: "zod", version: "3.23.8", signals: { import: { count: 1 } } },
+        { name: "zod", version: "3.23.8", homepage: "https://zod.dev", signals: { import: { count: 1 } } },
         {
           name: "lodash",
           version: "4.17.21",
@@ -56,6 +57,18 @@ describe("buildUpload", () => {
     const { body } = buildUpload(fx.home, fx.sid, new Date());
     expect(JSON.stringify(body)).not.toContain("secret-repo");
     expect(JSON.stringify(body)).not.toContain(fx.cwd);
+  });
+
+  it("drops a local or non-GitHub repository and a non-https homepage", () => {
+    const fx = makeFixture([{ t: "read", p: "/x/node_modules/lodash/map.js" }]);
+    writeFileSync(
+      path.join(fx.cwd, "node_modules", "lodash", "package.json"),
+      JSON.stringify({ name: "lodash", version: "4.17.21", repository: "../secret-repo", homepage: "http://lodash.com" }),
+    );
+    const { body } = buildUpload(fx.home, fx.sid, new Date());
+    const lodash = body.packages.find((p) => p.name === "lodash")!;
+    expect(lodash).not.toHaveProperty("repository");
+    expect(lodash).not.toHaveProperty("homepage");
   });
 });
 

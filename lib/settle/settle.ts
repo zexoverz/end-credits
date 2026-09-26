@@ -16,7 +16,7 @@ import { CHANGE_WINDOW_DAYS, recentlyChanged, type Change } from "../payee/chang
 import { packageKey, tipId } from "../payee/keys";
 import type { ObservationStore } from "../payee/observe";
 import type { PackageRef, Resolution } from "../payee/resolve";
-import type { NpmPackageWithDownloads } from "../registry/npm";
+import { RegistryNotFound, type NpmPackageWithDownloads } from "../registry/npm";
 import { split } from "../allocation/split";
 import { PaymentRefused, type ClientCredit } from "../x402/client";
 import { manifestOf } from "./manifest";
@@ -174,7 +174,7 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
 async function lookup(w: Work, deps: SettleDeps, now: Date): Promise<void> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const registry = await deps.loadPackage(w.name, w.version);
+      const registry = await registryOrDeclared(w, deps);
       await store.saveRegistry(deps.database, w.packageId, registry, now);
       const resolution = await deps.resolvePayee({
         id: w.packageId,
@@ -194,6 +194,28 @@ async function lookup(w: Work, deps: SettleDeps, now: Date): Promise<void> {
     } catch (err) {
       w.lookupError = errorLabel(err);
     }
+  }
+}
+
+// A registry 404 falls back to the repo the uploader's package.json declared; downloads and first
+// publish stay unknown. Any other registry error still fails the lookup.
+async function registryOrDeclared(w: Work, deps: SettleDeps): Promise<NpmPackageWithDownloads> {
+  try {
+    return await deps.loadPackage(w.name, w.version);
+  } catch (err) {
+    if (!(err instanceof RegistryNotFound)) throw err;
+    const declared = await store.declaredRepo(deps.database, w.packageId);
+    if (!declared) throw err;
+    return {
+      name: w.name,
+      version: w.version ?? null,
+      ...declared,
+      funding: null,
+      fundingLinks: [],
+      createdAt: null,
+      weeklyDownloads: null,
+      repoSource: "declared",
+    };
   }
 }
 
@@ -237,7 +259,7 @@ async function decideAndExecute(
     spam: payee ? spamCount(payee, sessionPackages(all), deps.now()) : null,
     noCodeOnBase: w.noCode ?? false,
   });
-  const reasons = [...decision.reasons, ...payeeReason(w.resolution)];
+  const reasons = [...decision.reasons, ...payeeReason(w.resolution), ...declaredReason(w)];
   w.outcome = decision.outcome;
   await store.recordDecision(
     database,
@@ -327,6 +349,12 @@ function sessionPackages(all: Work[]): SessionPackage[] {
 function payeeReason(r: Resolution): Reason[] {
   if (r.address || !r.reason) return [];
   return [{ source: "payee", code: r.reason, text: msg(r.reason, r.vars ?? {}) }];
+}
+
+function declaredReason(w: Work): Reason[] {
+  return w.registry?.repoSource === "declared"
+    ? [{ source: "payee", code: "REPO_DECLARED", text: msg("REPO_DECLARED") }]
+    : [];
 }
 
 function policy(code: MessageCode): Reason {

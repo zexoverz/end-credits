@@ -1,10 +1,12 @@
 // Store an uploaded session and its usage rows (DESIGN §6.1). Idempotent on
 // (owner_id, claude_session_id): a re-upload returns the first id and writes nothing.
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { keccak256, stringToBytes } from "viem";
 import { db } from "../db/client";
-import { sessions, usage } from "../db/schema";
+import { packages, sessions, usage } from "../db/schema";
+import { packageKey } from "../payee/keys";
+import { declaredRepository } from "../registry/declared";
 import type { AgentKeyOwner } from "./auth";
 import type { UploadInput } from "./schema";
 
@@ -34,6 +36,43 @@ function usageRows(sessionId: string, input: UploadInput) {
   );
 }
 
+// Repository and homepage from the uploader's package.json. The first declaration wins and is
+// only read when the npm registry has no document (decisions.md, packages not on the registry).
+function declaredRows(input: UploadInput) {
+  return input.packages.flatMap((p) => {
+    const repo = p.repository ? declaredRepository(p.repository) : null;
+    if (!repo && !p.homepage) return [];
+    return [
+      {
+        name: p.name,
+        packageKey: packageKey(p.name),
+        declaredRepo: repo?.fullName ?? null,
+        declaredDirectory: repo?.directory ?? null,
+        declaredHomepage: p.homepage ?? null,
+      },
+    ];
+  });
+}
+
+type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+
+async function storeDeclared(tx: Tx, input: UploadInput): Promise<void> {
+  const rows = declaredRows(input);
+  if (rows.length === 0) return;
+  await tx
+    .insert(packages)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: [packages.ecosystem, packages.name],
+      set: {
+        declaredRepo: sql`excluded.declared_repo`,
+        declaredDirectory: sql`excluded.declared_directory`,
+        declaredHomepage: sql`coalesce(${packages.declaredHomepage}, excluded.declared_homepage)`,
+      },
+      setWhere: sql`${packages.declaredRepo} is null`,
+    });
+}
+
 export async function ingestSession(
   key: AgentKeyOwner,
   input: UploadInput,
@@ -58,6 +97,7 @@ export async function ingestSession(
     if (rows.length === 0) return false; // already uploaded (a retry or a concurrent upload)
     const values = usageRows(id, input);
     if (values.length > 0) await tx.insert(usage).values(values);
+    await storeDeclared(tx, input);
     return true;
   });
   if (inserted) return { id, created: true };
