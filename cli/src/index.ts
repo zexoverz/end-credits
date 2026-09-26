@@ -1,4 +1,4 @@
-// endcredits init | key | login | start | record | settle | attribute (DESIGN §4, §14.4)
+// endcredits init | key | login | start | record | settle | attribute | mcp (DESIGN §4, §14.4)
 import { existsSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import path from "node:path";
@@ -9,6 +9,7 @@ import { writeConfig } from "./config";
 import { readStdin } from "./hook";
 import { runInit } from "./init";
 import { runLogin } from "./login";
+import { runMcp } from "./mcp";
 import { ecHome, isSessionId, ledgerPath } from "./paths";
 import { runRecord } from "./record";
 import { openInBrowser, runSettleHook, settleSession, spawnDetachedSettle } from "./settle";
@@ -100,6 +101,10 @@ async function main(argv: string[]): Promise<number> {
       return settle(flag(args, "session"));
     case "attribute":
       return attributeCmd(flag(args, "session"), args.flags["dry-run"] === true);
+    case "mcp":
+      // Serves until Claude Code closes stdin; stdin keeps the process alive.
+      await runMcp(ecHome());
+      return 0;
     default:
       say(cliMsg("USAGE"));
       return 1;

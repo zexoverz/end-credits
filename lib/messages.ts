@@ -58,7 +58,7 @@ export type MessageCode = keyof typeof MESSAGES;
 // The `endcredits` CLI's own output (E1). Kept apart from the §11 codes above.
 export const CLI_MESSAGES = {
   USAGE:
-    "Usage: endcredits init [--global] | key <token> [--api <url>] | login [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run]",
+    "Usage: endcredits init [--global] | key <token> [--api <url>] | login [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run] | mcp",
   LOGIN_CODE: "Open {url} in World App and confirm the code {code}.",
   LOGIN_SAVED: "Signed in with World ID. Agent key saved to {path}.",
   LOGIN_DENIED: "Sign-in was cancelled in World App. No key was saved.",
