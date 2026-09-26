@@ -147,3 +147,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | docs readme split | README.md, docs/{intercepta,x402,money,multibaas,details}.md, lib/copy/onboarding.ts | Claude Code wrote it: README cut to a short overview with the recorded demo session; the detailed sections moved unchanged into docs/ with links rewritten. Human review pending. |
 
 | docs how it works diagram | docs/assets/how-it-works.png, README.md | Diagram drawn by Codex for the pitch deck; Claude Code placed it under How it works. Human review pending. |
+
+| docs maintainer claim section | README.md, docs/assets/maintainer-claim.png | Claude Code wrote the section from the claim code and the on-chain claims; screenshot of the claim page. Human review pending. |
