@@ -63,9 +63,9 @@ flowchart LR
    times and GitHub push times, never commit dates ([`lib/payee/change.ts`](lib/payee/change.ts),
    [`lib/payee/push.ts`](lib/payee/push.ts)).
 5. **Screen.** Every payee is screened by Intercepta before anything is signed (see
-   [Intercepta](#intercepta)).
-6. **Decide and execute.** The matrix below picks one outcome; the decision is stored before any
-   signature ([`lib/settle/settle.ts#L228-L250`](lib/settle/settle.ts#L228-L250)).
+   [Intercepta](#intercepta-the-moment-of-decision)).
+6. **Decide and execute.** The [matrix](#decision-matrix-as-built) picks one outcome; the decision is stored before any
+   signature ([`lib/settle/settle.ts#L248-L272`](lib/settle/settle.ts#L248-L272)).
 7. **Roll.** `/credits/<id>` lists every package with its badge, reason and Basescan link; the
    recorder emits one `SessionSettled` event per session with a manifest hash.
 
@@ -84,6 +84,43 @@ TODO(live): roll screenshot from the recorded demo session.
 Shares under 0.01 USDC are `dust` and never sent. A payee lookup that fails (registry, GitHub or RPC
 down twice) is `refused` with `RESOLVE_FAILED`, so the money stays with the owner.
 
+## Intercepta: the moment of decision
+
+Every payee is screened live by Intercepta before a payment is signed or a hold is sent, and the
+answer picks what happens to the money. We pay on Base Sepolia, but the payees are the real
+addresses maintainers published, so their **mainnet** reputation is what gets screened.
+
+The order, per credit, in [`lib/settle/settle.ts`](lib/settle/settle.ts):
+
+1. Screen the payee ([`#L248-L249`](lib/settle/settle.ts#L248-L249)). A screen that throws becomes
+   `error: "HTTP"` ([`#L330-L337`](lib/settle/settle.ts#L330-L337)), which holds.
+2. `decide` runs the matrix on the screen ([`#L250-L261`](lib/settle/settle.ts#L250-L261)).
+3. The decision and its reasons are stored, with the ids of the screens that produced it
+   ([`#L262-L269`](lib/settle/settle.ts#L262-L269)).
+4. Only then is anything signed or sent ([`#L271-L327`](lib/settle/settle.ts#L271-L327)): x402 for
+   `paid` / `capped`, `hold` or `reserve` on the escrow, nothing for `refused`.
+5. At signing time the x402 client checks the 402 challenge against the screened payee and the
+   stored decision ([`lib/x402/client.ts#L39-L68`](lib/x402/client.ts#L39-L68)), and the resource
+   refuses to quote a credit whose payee has no successful screen from the last 10 minutes
+   ([`lib/x402/server.ts#L72-L78`](lib/x402/server.ts#L72-L78)).
+
+Timeout or error from Intercepta means hold, never pay.
+
+### Where the API is called
+
+| File | What |
+|---|---|
+| [`lib/intercepta/client.ts#L53-L92`](lib/intercepta/client.ts#L53-L92) | the one HTTP path: `X-API-KEY`, 8 s deadline, every call stored in `screens` with status, body and latency |
+| [`lib/intercepta/client.ts#L96-L105`](lib/intercepta/client.ts#L96-L105) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` |
+| [`lib/intercepta/client.ts#L107-L113`](lib/intercepta/client.ts#L107-L113) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
+| [`lib/intercepta/client.ts#L115-L122`](lib/intercepta/client.ts#L115-L122) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
+| [`lib/intercepta/client.ts#L124-L137`](lib/intercepta/client.ts#L124-L137) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, only when the quick scan fails |
+| [`lib/intercepta/client.ts#L141-L181`](lib/intercepta/client.ts#L141-L181) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure left sets `Screen.error` |
+| [`lib/decision/matrix.ts#L50-L101`](lib/decision/matrix.ts#L50-L101) | how the screen decides: token block, screen error, traits, score, impersonation, medium, no history |
+| [`lib/claim/wallet-screen.ts`](lib/claim/wallet-screen.ts), called from [`lib/claim/env.ts#L48`](lib/claim/env.ts#L48) | a maintainer's claim wallet is quick-scanned before `setClaim` |
+| [`lib/intercepta/cache.ts`](lib/intercepta/cache.ts) | reuse: address screens 5 min, token screens 1 h, only rows that parsed |
+| [`scripts/probe-intercepta.ts`](scripts/probe-intercepta.ts) | the probe behind [`docs/intercepta-probe.md`](docs/intercepta-probe.md) (10 real responses, verbatim) |
+
 ### Decision matrix, as built
 
 [`lib/decision/matrix.ts`](lib/decision/matrix.ts). First match wins. Thresholds are ours.
@@ -101,36 +138,12 @@ down twice) is `refused` with `RESOLVE_FAILED`, so the money stays with the owne
 | 4 | our spam rule: same payee for 5+ packages in the session, each new or under 1,000 weekly downloads | `refused` | `SPAM` |
 | 5 | funding address changed in the last 30 days | `held` | `HELD_CHANGED` |
 | 6 | `20 <= toxicScore <= 50`, or token `action == warn` | `held` | `HELD_MEDIUM` |
+| 6b | Intercepta has no mainnet history for the address (see below) | `held` | `HELD_NO_HISTORY` |
 | 7 | contract on Ethereum with no code on Base (only with `CHECK_NO_CODE=true`) | `held` | `HELD_NO_CODE` |
 | 8 | otherwise | `capped` if the split capped it, else `paid` | `CAPPED` / `PAID` |
 
 Every decision made on a successful screen also carries `SCREENED_AS`: "Screened as its mainnet
 equivalent (Base, chain 8453)." All user-facing text is in [`lib/messages.ts`](lib/messages.ts).
-
-## Intercepta
-
-Every payee is screened live before a payment is signed or a hold is sent, and the result picks the
-outcome. We pay on Base Sepolia, but the payees are the real addresses maintainers published, so
-their **mainnet** reputation is what gets screened.
-
-### Where the API is called
-
-| File | What |
-|---|---|
-| [`lib/intercepta/client.ts#L59-L73`](lib/intercepta/client.ts#L59-L73) | the one HTTP call: `X-API-KEY`, 8 s deadline, every call stored in `screens` with its latency |
-| [`lib/intercepta/client.ts#L85-L91`](lib/intercepta/client.ts#L85-L91) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` |
-| [`lib/intercepta/client.ts#L93-L98`](lib/intercepta/client.ts#L93-L98) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
-| [`lib/intercepta/client.ts#L101-L108`](lib/intercepta/client.ts#L101-L108) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
-| [`lib/intercepta/client.ts#L110-L123`](lib/intercepta/client.ts#L110-L123) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, fallback when quick scan fails |
-| [`lib/intercepta/client.ts#L127-L162`](lib/intercepta/client.ts#L127-L162) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure sets `Screen.error` |
-| [`lib/settle/settle.ts#L227-L239`](lib/settle/settle.ts#L227-L239) | the settler screens the payee, then calls `decide` with the result |
-| [`lib/settle/settle.ts#L309-L315`](lib/settle/settle.ts#L309-L315) | a screen that throws becomes `error: "HTTP"`, so it holds |
-| [`lib/decision/matrix.ts#L50-L95`](lib/decision/matrix.ts#L50-L95) | how the screen decides: token block, screen error, traits, score, impersonation |
-| [`lib/claim/env.ts#L38-L39`](lib/claim/env.ts#L38-L39) | a maintainer's claim wallet is quick-scanned before `setClaim` |
-| [`lib/intercepta/cache.ts`](lib/intercepta/cache.ts) | reuse: address screens 5 min, token screens 1 h, only status-200 rows that parse |
-
-Timeout or error from Intercepta means hold, never pay. The x402 route also refuses to quote a credit
-whose payee has no successful address screen from the last 10 minutes.
 
 ### Testnet to mainnet mapping
 
@@ -145,6 +158,16 @@ Intercepta has no testnet chain ids. [`lib/intercepta/mapping.ts`](lib/intercept
 Every screened result on the roll and in `/history` carries `SCREENED_AS`, so nobody reads a testnet
 payment as a mainnet one. Separately, a local pin refuses any payment token that is not Base Sepolia
 USDC (`TOKEN_PIN`).
+
+### No history is not an outage
+
+For an address it has never seen on mainnet, quick scan answers HTTP 404 with
+`"An Externally Owned Account with this address doesn't exist."`
+([probe #3](docs/intercepta-probe.md)). Treated as an error, a fresh payee would have held as
+`SCREEN_UNAVAILABLE` or fallen back to a simulation that finds nothing wrong with a plain transfer.
+[`lib/intercepta/no-history.ts`](lib/intercepta/no-history.ts) matches only that 404 and that
+message; the client turns it into `noHistory: true`, stores the raw 404, and the matrix holds it as
+`HELD_NO_HISTORY`. Any other 404 is still an error. A fresh address is never paid unscreened.
 
 ### Paid, held and refused in the demo
 
