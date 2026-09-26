@@ -8,7 +8,7 @@
   right: 0;
   z-index: 60;
   height: 3px;
-  background: #387d48;
+  background: var(--mint-deep);
   transform: scaleX(var(--reading-progress));
   transform-origin: left;
   pointer-events: none;
@@ -20,7 +20,7 @@
   font-size: 10px;
   letter-spacing: 0;
   line-height: 1.5;
-  color: #4f6549;
+  color: var(--muted);
   padding: 9px 0;
   margin-top: 5px;
   cursor: pointer;
@@ -31,11 +31,11 @@
   width: 21px;
   height: 21px;
   border-radius: 50%;
-  border: 1px solid #b4c4aa;
+  border: 1px solid var(--line-strong);
   font-size: 11px;
 }
 .toggle:hover {
-  color: #1e4325;
+  color: var(--ink);
 }
 .toggle:disabled {
   cursor: default;
@@ -107,11 +107,11 @@
 @media (hover: hover) and (pointer: fine) {
   .motionSite[data-page-motion="on"] [data-project]:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 0 #cfdec54d;
+    box-shadow: 0 8px 0 rgb(32 38 31 / 30.2%);
   }
   .motionSite[data-page-motion="on"] [data-project]:hover > span:first-child {
     transform: rotate(-9deg) scale(1.08);
-    background: #a2f4bc;
+    background: var(--mint);
   }
   .motionSite[data-page-motion="on"] :is(a, button) svg {
     transition: transform 0.25s;
@@ -187,7 +187,7 @@
   [data-setup-terminal][data-seen="true"]
   [data-terminal-cursor] {
   animation: cursorBlink 1.3s steps(1, end) infinite;
-  color: #a2f4bc;
+  color: var(--mint);
 }
 .motionSite [data-motion-zone][data-in-view="false"] * {
   animation-play-state: paused !important;
