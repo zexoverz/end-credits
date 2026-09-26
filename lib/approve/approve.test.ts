@@ -1,12 +1,17 @@
 // Integration: real Postgres, fake chain. Run with TEST_DATABASE_URL set (migrated); skipped otherwise.
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { keccak256, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Hex } from "viem";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { TxRevertedError } from "../chain/txqueue";
 import { msg } from "../messages";
 import { ISSUER, worldEnv } from "../world/__fixtures__/idp";
+import { approvalRefFor } from "./typed-data";
 import {
+  APPROVER,
   connect,
+  ESCROW,
   fakeChain,
   HELD_TEXT,
   makeOwner,
@@ -14,6 +19,7 @@ import {
   req,
   seedHold,
   signInCookie,
+  signPrepared,
   TEST_DB,
 } from "../__fixtures__/owner-db";
 
@@ -36,8 +42,28 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
     delete process.env.WORLD_REQUIRED;
   });
 
-  const start = (tipId: string, chain: ReturnType<typeof fakeChain>, c: string | undefined = cookie) =>
-    h.handleApproveStart(req(`/api/approve/${tipId}/start`, { method: "POST", cookie: c }), tipId, { chain });
+  type Chain = ReturnType<typeof fakeChain>;
+  const post = (path: string, c: string | undefined, body?: unknown) =>
+    req(path, { method: "POST", cookie: c, body: body === undefined ? undefined : JSON.stringify(body) });
+  const prepare = (tipId: string, chain: Chain, c: string | undefined = cookie) =>
+    h.handleApprovePrepare(post(`/api/approve/${tipId}/prepare`, c), tipId, { chain });
+  const sign = (tipId: string, chain: Chain, body: unknown, c: string | undefined = cookie) =>
+    h.handleApproveSignature(post(`/api/approve/${tipId}/signature`, c, body), tipId, { chain });
+  /** prepare → sign with the approver → store; a random id when prepare is refused. */
+  async function signedId(tipId: string, chain: Chain, c: string | undefined = cookie): Promise<string> {
+    const p = await prepare(tipId, chain, c);
+    if (p.status !== 200) return randomUUID();
+    const { approvalId, typedData } = await p.json();
+    const r = await sign(tipId, chain, { approvalId, signature: await signPrepared(typedData) }, c);
+    expect(r.status).toBe(200);
+    return approvalId;
+  }
+  const start = async (tipId: string, chain: Chain, c: string | undefined = cookie, approvalId?: string) =>
+    h.handleApproveStart(
+      post(`/api/approve/${tipId}/start`, c, { approvalId: approvalId ?? (await signedId(tipId, chain, c)) }),
+      tipId,
+      { chain },
+    );
   const deny = (tipId: string, chain: ReturnType<typeof fakeChain>, c: string | undefined = cookie) =>
     h.handleDeny(req(`/api/approve/${tipId}/deny`, { method: "POST", cookie: c }), tipId, { chain });
   const rows = async (tipId: Hex) => {
@@ -53,8 +79,8 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
     const res = await start(seeded.tipId, chain);
     expect(res.status).toBe(200);
     expect(chain.calls.release).toHaveLength(1);
-    const [tipId, approvalRef] = chain.calls.release[0];
-    expect(tipId).toBe(seeded.tipId);
+    const call = chain.calls.release[0];
+    expect(call.tipId).toBe(seeded.tipId);
 
     const { hold, credit, approvals } = await rows(seeded.tipId);
     const releaseTx = (await res.json()).releaseTx;
@@ -70,23 +96,115 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
     ]);
     expect(approvals).toHaveLength(1);
     expect(approvals[0]).toMatchObject({ method: "session", status: "approved", ownerId });
-    expect(keccak256(approvals[0].nonce as Hex)).toBe(approvalRef);
+    expect(call).toEqual({
+      tipId: seeded.tipId,
+      approvalRef: approvals[0].approvalRef,
+      deadline: approvals[0].releaseDeadline,
+      signature: approvals[0].releaseSignature,
+      approver: APPROVER.address,
+    });
+    expect(call.approvalRef).toBe(approvalRefFor(seeded.tipId, approvals[0].id));
+  });
+
+  it("prepare returns the typed data for this hold and a pending approval", async () => {
+    const seeded = await seedHold(db, s, ownerId);
+    const res = await prepare(seeded.tipId, fakeChain());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const { hold, approvals } = await rows(seeded.tipId);
+    const deadline = String(Math.floor(hold.expiresAt.getTime() / 1000));
+    expect(body.approver).toBe(APPROVER.address);
+    expect(body.typedData).toMatchObject({
+      domain: { name: "EndCreditsEscrow", version: "2", chainId: 84532, verifyingContract: ESCROW },
+      primaryType: "Release",
+      message: {
+        tipId: seeded.tipId,
+        payee: PAYEE,
+        amount: "150000",
+        approvalRef: approvalRefFor(seeded.tipId, body.approvalId),
+        deadline,
+      },
+    });
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]).toMatchObject({
+      id: body.approvalId,
+      method: "session",
+      status: "pending",
+      approvalRef: body.typedData.message.approvalRef,
+      releaseDeadline: BigInt(deadline),
+      releaseSignature: null,
+    });
+  });
+
+  it("prepare is 409 no_approver when the owner has no approver wallet", async () => {
+    const bare = await makeOwner(db, s, { approver: null });
+    const seeded = await seedHold(db, s, bare);
+    const res = await prepare(seeded.tipId, fakeChain(), await signInCookie(bare));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "no_approver" });
+    expect((await rows(seeded.tipId)).approvals).toHaveLength(0);
+  });
+
+  it("start without a stored signature is 409 no_signature and releases nothing", async () => {
+    const seeded = await seedHold(db, s, ownerId);
+    const chain = fakeChain();
+    const { approvalId } = await (await prepare(seeded.tipId, chain)).json();
+    const res = await start(seeded.tipId, chain, cookie, approvalId);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "no_signature" });
+    expect(chain.calls.release).toHaveLength(0);
+  });
+
+  it("a signature from another key is 400 bad_signature and is not stored", async () => {
+    const seeded = await seedHold(db, s, ownerId);
+    const chain = fakeChain();
+    const { approvalId, typedData } = await (await prepare(seeded.tipId, chain)).json();
+    const other = privateKeyToAccount(`0x${"43".repeat(32)}`);
+    const res = await sign(seeded.tipId, chain, { approvalId, signature: await signPrepared(typedData, other) });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_signature" });
+    expect((await rows(seeded.tipId)).approvals[0].releaseSignature).toBeNull();
+    expect((await start(seeded.tipId, chain, cookie, approvalId)).status).toBe(409);
+    expect(chain.calls.release).toHaveLength(0);
+  });
+
+  it("a signature over typed data the client changed (amount) is 400 bad_signature", async () => {
+    const seeded = await seedHold(db, s, ownerId);
+    const chain = fakeChain();
+    const { approvalId, typedData } = await (await prepare(seeded.tipId, chain)).json();
+    const forged = { ...typedData, message: { ...typedData.message, amount: "1" } };
+    const res = await sign(seeded.tipId, chain, { approvalId, signature: await signPrepared(forged) });
+    expect(res.status).toBe(400);
+  });
+
+  it("signature and start take only this owner's approval for this tip", async () => {
+    const a = await seedHold(db, s, ownerId);
+    const b = await seedHold(db, s, ownerId);
+    const chain = fakeChain();
+    const { approvalId, typedData } = await (await prepare(a.tipId, chain)).json();
+    expect((await sign(b.tipId, chain, { approvalId, signature: await signPrepared(typedData) })).status).toBe(404);
+    expect((await sign(a.tipId, chain, { approvalId: "nope", signature: "0x12" })).status).toBe(400);
+    expect((await start(b.tipId, chain, cookie, approvalId)).status).toBe(404);
+    expect((await start(a.tipId, chain, cookie, randomUUID())).status).toBe(404);
+    expect(chain.calls.release).toHaveLength(0);
   });
 
   it("a second approve is 409 and releases nothing", async () => {
     const seeded = await seedHold(db, s, ownerId);
     const chain = fakeChain();
-    expect((await start(seeded.tipId, chain)).status).toBe(200);
-    const again = await start(seeded.tipId, chain);
-    expect(again.status).toBe(409);
+    const id = await signedId(seeded.tipId, chain);
+    expect((await start(seeded.tipId, chain, cookie, id)).status).toBe(200);
+    expect((await start(seeded.tipId, chain, cookie, id)).status).toBe(409);
+    expect((await start(seeded.tipId, chain)).status).toBe(409);
     expect(chain.calls.release).toHaveLength(1);
   });
 
   it("concurrent approves release once", async () => {
     const seeded = await seedHold(db, s, ownerId);
     const chain = fakeChain();
+    const ids = [await signedId(seeded.tipId, chain), await signedId(seeded.tipId, chain), await signedId(seeded.tipId, chain)];
     chain.delayMs = 100;
-    const results = await Promise.all([1, 2, 3].map(() => start(seeded.tipId, chain)));
+    const results = await Promise.all(ids.map((id) => start(seeded.tipId, chain, cookie, id)));
     expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409]);
     expect(chain.calls.release).toHaveLength(1);
   });
@@ -122,12 +240,16 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
     expect(hold.status).toBe("pending");
     expect(credit.outcome).toBe("held");
     expect(approvals.map((a) => [a.method, a.status])).toEqual([["world", "pending"]]);
+    expect(approvals[0].nonce).toBeTruthy();
+    expect(approvals[0].releaseSignature).toBeTruthy();
   });
 
   it("401 without an owner session, for approve and deny", async () => {
     const seeded = await seedHold(db, s, ownerId);
     const chain = fakeChain();
     expect((await start(seeded.tipId, chain, "")).status).toBe(401);
+    expect((await prepare(seeded.tipId, chain, "")).status).toBe(401);
+    expect((await sign(seeded.tipId, chain, { approvalId: randomUUID(), signature: "0x12" }, "")).status).toBe(401);
     expect((await deny(seeded.tipId, chain, "")).status).toBe(401);
     expect(chain.calls.release).toHaveLength(0);
     expect(chain.calls.refund).toHaveLength(0);
