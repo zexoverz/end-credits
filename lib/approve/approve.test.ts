@@ -330,6 +330,7 @@ describe.skipIf(!TEST_DB)("approve and deny (integration)", () => {
         sentence: msg("APPROVE_SENTENCE", { amount: "0.15", address: PAYEE, package: seeded.packageName }),
         status: "pending",
         worldRequired: false,
+        hasApprover: true,
         signedIn: true,
         isOwner: true,
         txHash: null,
