@@ -13,7 +13,7 @@ export async function recentlyChanged(
   store: ObservationStore,
   packageId: string,
   address: string,
-  opts: { now?: Date; pushedAt?: () => Promise<Date | null> } = {},
+  opts: { now?: Date; pushedAt?: () => Promise<Date | null>; repoCreatedAt?: () => Promise<Date | null> } = {},
 ): Promise<Change> {
   const now = (opts.now ?? new Date()).getTime();
   const windowStart = now - CHANGE_WINDOW_DAYS * DAY_MS;
@@ -37,6 +37,11 @@ export async function recentlyChanged(
   if (opts.pushedAt && firstObserved > windowStart) {
     const pushed = await opts.pushedAt();
     if (pushed && pushed.getTime() > windowStart) {
+      // A payout file that appears on an established project is what a takeover looks like. A
+      // project that is itself new lists funding from its first days; that is a first listing,
+      // screened like any payee. An unknown age stays conservative (a change).
+      const created = opts.repoCreatedAt ? await opts.repoCreatedAt() : null;
+      if (created && created.getTime() > windowStart) return NOT_CHANGED;
       return { changed: true, days: daysSince(pushed.getTime()) };
     }
   }

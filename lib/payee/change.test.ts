@@ -51,6 +51,21 @@ describe("recentlyChanged", () => {
     });
   });
 
+  it("a funding file on a repo created inside the window is a first listing, not a change", async () => {
+    const store = memoryStore([obs(B, 0)]);
+    const pushedAt = async () => daysAgo(0);
+    const repoCreatedAt = async () => daysAgo(0);
+    expect(await recentlyChanged(store, "p", B, { now: NOW, pushedAt, repoCreatedAt })).toEqual({ changed: false, days: 0 });
+  });
+
+  it("a recent funding file on an established repo is a change; an unknown repo age stays a change", async () => {
+    const store = memoryStore([obs(B, 0)]);
+    const pushedAt = async () => daysAgo(2);
+    for (const repoCreatedAt of [async () => daysAgo(400), async () => null]) {
+      expect(await recentlyChanged(store, "p", B, { now: NOW, pushedAt, repoCreatedAt })).toEqual({ changed: true, days: 2 });
+    }
+  });
+
   it("a push older than 30 days, or none found, is not a change", async () => {
     const store = memoryStore([obs(B, 0)]);
     for (const pushedAt of [async () => daysAgo(31), async () => null]) {

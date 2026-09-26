@@ -1360,3 +1360,13 @@ Supersedes the "Leftover" bullet in "Budget integration (26 Sep)".
   chain; a lying endpoint could record a wrong hash, but the signed authorization only ever pays the
   screened `ownedBy`. Both fixture repos were pushed on 26 Sep, so a full settle holds them on first
   sight (`HELD_CHANGED`, the GitHub push is inside 30 days) before any endpoint is called.
+
+## A new project's first funding file is not a change (26 Sep)
+
+The T2.6 push-time rule held any funding file GitHub saw pushed in the last 30 days, so every package
+of a project younger than 30 days was held on first sight (both A2A fixtures were). The rule now
+applies only when the repository itself is older than the window (`created_at` from the GitHub API,
+server-set): a payout file appearing on an established project is what a takeover looks like; a new
+project listing funding from its first days is a first listing, screened by Intercepta like any
+payee, with the spam rule for farms. A change we observed ourselves (address A, then B) still holds,
+and an unknown repository age stays conservative (held).

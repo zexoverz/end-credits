@@ -38,6 +38,13 @@ async function pushesSince(repo: string, branch: string, since: Date, opts: GitH
   return out;
 }
 
+/** When GitHub says the repository was created (server-set), or null when unknown. */
+export async function repoCreatedAt(repo: string, opts: GitHubOpts): Promise<Date | null> {
+  const meta = await getJson<{ created_at?: string }>(`${API}/${repo}`, opts);
+  const t = meta?.body.created_at ? Date.parse(meta.body.created_at) : NaN;
+  return Number.isFinite(t) ? new Date(t) : null;
+}
+
 export async function firstSeenPush(
   repo: string,
   filePath: string,
