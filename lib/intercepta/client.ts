@@ -8,6 +8,7 @@ import type { Address, Screen, ScreenError } from "../decision/types";
 import { readEnv } from "../env";
 import { freshScreen, type ScreenKey, type ScreenRepo } from "./cache";
 import { timedJson } from "./http";
+import { isNoHistory } from "./no-history";
 import { BASE_SEPOLIA, BASE_SEPOLIA_USDC, BASE_USDC, mapChain, mapToken } from "./mapping";
 import {
   Impersonation,
@@ -21,6 +22,9 @@ import {
 } from "./schemas";
 
 export const TIMEOUT_MS = 8000;
+
+// A quick scan of an address Intercepta has never seen on mainnet (decisions.md, 26 Sep).
+const NO_HISTORY_SCAN: QuickScanResult = { toxicScore: 0, traits: [], noHistory: true };
 
 export type CallResult<T> =
   | { ok: true; data: T; screenId: string }
@@ -45,14 +49,19 @@ export function createIntercepta(cfg: InterceptaConfig) {
   const now = cfg.now ?? (() => new Date());
   const base = cfg.base.replace(/\/+$/, "");
 
+  // `noHistory`: what the no-history 404 means for this call (quick scan only); absent, it is an error.
   async function call<S extends z.ZodType>(
     key: ScreenKey,
     mappedFrom: string | null,
     schema: S,
     req: Request,
+    noHistory?: z.infer<S>,
   ): Promise<CallResult<z.infer<S>>> {
     const cached = await freshScreen(cfg.repo, key, now());
     if (cached) {
+      if (noHistory !== undefined && isNoHistory(cached.status, cached.response)) {
+        return { ok: true, data: noHistory, screenId: cached.id };
+      }
       const parsed = schema.safeParse(cached.response);
       if (parsed.success) return { ok: true, data: parsed.data, screenId: cached.id };
     }
@@ -72,8 +81,10 @@ export function createIntercepta(cfg: InterceptaConfig) {
       timeoutMs,
     );
     const latencyMs = Math.max(0, Math.round(clock() - started));
-    const row = { ...key, mappedFrom, response: res.body, status: res.status, latencyMs };
-    const screenId = await cfg.repo.insert(row);
+    const fresh = noHistory !== undefined && !res.ok && isNoHistory(res.status, res.raw);
+    const response = fresh && !res.ok ? res.raw : res.body;
+    const screenId = await cfg.repo.insert({ ...key, mappedFrom, response, status: res.status, latencyMs });
+    if (fresh) return { ok: true, data: noHistory, screenId };
     if (!res.ok) return { ok: false, error: res.error, screenId };
     const parsed = schema.safeParse(res.body);
     if (!parsed.success) return { ok: false, error: "PARSE", screenId };
@@ -84,10 +95,13 @@ export function createIntercepta(cfg: InterceptaConfig) {
 
   function quickScan(address: Address): Promise<CallResult<QuickScanResult>> {
     const a = address.toLowerCase();
-    return call({ kind: "address", subject: a, chainId: null }, payeeFrom, QuickScan, {
-      method: "GET",
-      path: `/api/public/v2/extension/account/${a}/quick-scan`,
-    });
+    return call(
+      { kind: "address", subject: a, chainId: null },
+      payeeFrom,
+      QuickScan,
+      { method: "GET", path: `/api/public/v2/extension/account/${a}/quick-scan` },
+      NO_HISTORY_SCAN,
+    );
   }
 
   function checkImpersonation(address: Address): Promise<CallResult<ImpersonationResult>> {

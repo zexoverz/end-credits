@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createIntercepta } from "./client";
 import { BASE_USDC } from "./mapping";
 import { memoryRepo } from "./__fixtures__/memory-repo";
+import { NO_HISTORY_BODY } from "./no-history";
 
 const PAYEE = "0xAbCdEf0000000000000000000000000000001234" as const;
 const PAYER = "0x9999999999999999999999999999999999999999" as const;
@@ -61,6 +62,37 @@ describe("quickScan", () => {
     const again = await c.quickScan(PAYEE);
     expect(again.ok).toBe(true);
     expect(f).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("quickScan: address with no mainnet history", () => {
+  it("the no-history 404 is a clean screen marked noHistory, stored with status 404 and the raw body", async () => {
+    const { c, rows } = client(router({ "/quick-scan": () => json(NO_HISTORY_BODY, 404) }));
+    const r = await c.quickScan(PAYEE);
+    expect(r).toEqual({ ok: true, data: { toxicScore: 0, traits: [], noHistory: true }, screenId: rows[0].id });
+    expect(rows[0]).toMatchObject({ kind: "address", status: 404, response: NO_HISTORY_BODY });
+  });
+
+  it("is reused from the cache like a 200", async () => {
+    const f = router({ "/quick-scan": () => json(NO_HISTORY_BODY, 404) });
+    const { c } = client(f);
+    await c.quickScan(PAYEE);
+    const again = await c.quickScan(PAYEE);
+    expect(again).toMatchObject({ ok: true, data: { noHistory: true } });
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("any other 404 stays an HTTP error", async () => {
+    const f = router({ "/quick-scan": () => json({ status: 404, response: { statusCode: 404, message: "Not Found" } }, 404) });
+    const { c } = client(f);
+    expect(await c.quickScan(PAYEE)).toMatchObject({ ok: false, error: "HTTP" });
+    await c.quickScan(PAYEE);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("the no-history body on the impersonation route is still an error", async () => {
+    const { c } = client(router({ "/check-address/": () => json(NO_HISTORY_BODY, 404) }));
+    expect(await c.checkImpersonation(PAYEE)).toMatchObject({ ok: false, error: "HTTP" });
   });
 });
 
