@@ -87,9 +87,22 @@ export async function saveRegistry(database: Database, packageId: string, pkg: N
       weeklyDownloads: pkg.weeklyDownloads,
       firstPublishedAt: pkg.createdAt,
       fundingLinks: pkg.fundingLinks,
+      repoSource: pkg.repoSource ?? "registry",
       fetchedAt: now,
     })
     .where(eq(packages.id, packageId));
+}
+
+/** The repo an uploader declared for this package (set at ingest), or null. */
+export async function declaredRepo(
+  database: Database,
+  packageId: string,
+): Promise<{ repoFullName: string; repoDirectory: string | null; homepage: string | null } | null> {
+  const [row] = await database
+    .select({ repo: packages.declaredRepo, dir: packages.declaredDirectory, homepage: packages.declaredHomepage })
+    .from(packages)
+    .where(eq(packages.id, packageId));
+  return row?.repo ? { repoFullName: row.repo, repoDirectory: row.dir, homepage: row.homepage } : null;
 }
 
 export type NewCredit = typeof credits.$inferInsert;
