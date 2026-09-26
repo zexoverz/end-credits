@@ -905,3 +905,12 @@ Run on 2026-09-26; `git diff` on `src/` was clean afterwards. The v1 table above
 - Not verified: Base Account `eth_signTypedData_v4` on a real phone (passkey prompt, and whether an
   undeployed wallet returns a 6492 envelope as expected), and `multibaas-setup.ts` against the live
   MultiBaas deployment.
+
+## Escrow v2 deployed (26 Sep)
+
+`EndCreditsEscrow` v2 at `0x849F6cd44e4A3248d033aBB1b670257F77bFCc46` (tx
+`0x7f4f4f1fabbb7bca64b0b4babd0752ec71f6519339588c72efc3a25548111fb2`), deployed from
+`ethglobal-tokyo` with the forge-multibaas plugin, which moved the MultiBaas `escrow` alias to it as
+`endcredits_escrow` 2.0. Verified on Sourcify (`exact_match`) and Basescan. v1 at
+`0x63047583FbCe241D72d71137C940aa27BBdC60f1` held only test events and is no longer used; the
+dashboard history restarts from v2.
