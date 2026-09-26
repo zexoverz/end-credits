@@ -9,7 +9,10 @@ export function PublicClaim({ claim }: { claim: PackageSummary["claimed"] }) {
     <section className="public-claim" aria-label={c("PUBLIC_CLAIM_TITLE")}>
       <header>
         <span className="public-claim-mark" aria-hidden="true">
-          ↗
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M12 7h24v34l-4-3-4 3-4-3-4 3-4-3-4 3V7Z" />
+            <path d="M18 16h12M18 22h8m-8 8 4 4 8-9" />
+          </svg>
         </span>
         <div>
           <h2>{c("PUBLIC_CLAIM_TITLE")}</h2>

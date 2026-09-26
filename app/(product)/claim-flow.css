@@ -434,3 +434,206 @@
     animation: none;
   }
 }
+
+/* Shared claim proof: readable hashes, compact receipts and a separate wallet summary. */
+.public-claim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);
+  align-items: center;
+  gap: 28px 40px;
+  padding: 32px;
+  background: #fff;
+  border: 1px solid #d5ded0;
+  border-radius: 24px;
+}
+.public-claim > header {
+  align-items: flex-start;
+  gap: 18px;
+  min-width: 0;
+}
+.public-claim-mark {
+  width: 60px;
+  height: 64px;
+  border-radius: 16px;
+  background: #adf3c0;
+  color: #20261f;
+}
+.public-claim-mark svg {
+  width: 38px;
+  height: 38px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.public-claim h2 {
+  font-size: clamp(23px, 2vw, 30px);
+  line-height: 1.2;
+  margin: 2px 0 0;
+}
+.public-claim p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #53604f;
+}
+.public-claim-wallet {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 20px 24px;
+  background: #f5f7f1;
+  border: 1px solid #e4e9df;
+  border-radius: 16px;
+  min-width: 0;
+}
+.public-claim-wallet > span {
+  font-size: 12px;
+  color: #53604f;
+}
+.public-claim-wallet a {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  text-underline-offset: 4px;
+  text-decoration-color: #bac8b2;
+}
+.public-claim .claim-transactions {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #dfe5da;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.claim-transaction,
+.public-claim .claim-transaction {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #e3e8df;
+  color: #20261f;
+  text-decoration: none;
+  transition: background 0.18s ease;
+}
+.claim-transaction:last-child {
+  border-bottom: 0;
+}
+.claim-transaction:hover,
+.public-claim .claim-transaction:hover {
+  background: #f5f9f1;
+}
+.claim-transaction:focus-visible {
+  outline: 2px solid #39734b;
+  outline-offset: -3px;
+}
+.claim-transaction-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 44px;
+  border: 1px solid #dce5d5;
+  border-radius: 10px;
+  background: #f7f9f3;
+}
+.claim-transaction-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: #53604f;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.claim-transaction-detail {
+  min-width: 0;
+}
+.claim-transaction strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.claim-transaction code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 7px;
+  color: #64705d;
+  overflow-wrap: anywhere;
+}
+.claim-transaction small {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 9px 13px;
+  border: 1px solid #d5ded0;
+  border-radius: 8px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.public-claim .claim-transactions > p {
+  margin: 0;
+  padding: 22px 24px;
+}
+@media (max-width: 900px) {
+  .public-claim {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 24px;
+  }
+}
+@media (max-width: 600px) {
+  .public-claim {
+    padding: 20px;
+    border-radius: 20px;
+    gap: 20px;
+  }
+  .public-claim > header {
+    gap: 12px;
+  }
+  .public-claim-mark {
+    width: 44px;
+    height: 50px;
+    border-radius: 12px;
+  }
+  .public-claim-mark svg {
+    width: 30px;
+    height: 30px;
+  }
+  .public-claim-wallet {
+    padding: 16px;
+  }
+  .claim-transaction,
+  .public-claim .claim-transaction {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px 16px;
+    align-items: start;
+  }
+  .claim-transaction-icon {
+    width: 28px;
+    height: 34px;
+    border-radius: 7px;
+  }
+  .claim-transaction-icon svg {
+    width: 19px;
+    height: 19px;
+  }
+  .claim-transaction small {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .claim-transaction strong {
+    font-size: 14px;
+  }
+  .claim-transaction code {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .claim-transaction {
+    transition: none;
+  }
+}
