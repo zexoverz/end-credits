@@ -31,6 +31,8 @@ ETHGlobal Tokyo 2026 · solo build by Faisal ([`zexoverz`](https://github.com/ze
 
 ## How it works
 
+![From an AI session to a maintainer: observe, allocate, screen, then pay, hold or reserve](docs/assets/how-it-works.png)
+
 1. **Set up once.** Sign in with MetaMask, set a spending limit, install the CLI and connect Claude
    Code with a key. Your USDC stays in your own wallet; a contract lets your Agent wallet pull at most
    your limit, and one transaction revokes it.
