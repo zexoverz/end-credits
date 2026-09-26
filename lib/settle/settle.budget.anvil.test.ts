@@ -94,7 +94,7 @@ describe.skipIf(!ready)("settleSession with the budget wallet on anvil", () => {
   it("names the revert: no allowance, then no USDC approval, then over the period cap", async () => {
     await expect(pull(OWNER.address, BigInt(1), ctx, budget)).rejects.toMatchObject({ errorName: "NoAllowance" });
     const owner = wallet(OWNER);
-    await mined(await owner.writeContract({ address: budget, abi: budgetAbi, functionName: "setAllowance", args: [HOT.address, PER_DAY, 86400] }));
+    await mined(await owner.writeContract({ address: budget, abi: budgetAbi, functionName: "setAllowance", args: [HOT.address, PER_DAY, BigInt(86400)] }));
     await expect(pull(OWNER.address, BigInt(1), ctx, budget)).rejects.toMatchObject({ errorName: "ERC20InsufficientAllowance" });
     await mined(await owner.writeContract({ address: ctx.usdc, abi: erc20Abi, functionName: "approve", args: [budget, PER_DAY * BigInt(10)] }));
     const over = pull(OWNER.address, PER_DAY + BigInt(1), ctx, budget);
