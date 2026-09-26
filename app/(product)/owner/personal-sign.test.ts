@@ -4,7 +4,7 @@ import { signPersonalMessage } from "@/components/approver/connect-wallet";
 afterEach(() => vi.unstubAllGlobals());
 it("sends the exact SIWE message as UTF-8 hex to personal_sign without a transaction", async () => {
   const request = vi.fn().mockResolvedValue("0x1234");
-  vi.stubGlobal("window", { ethereum: { request } });
+  vi.stubGlobal("window", { ethereum: { isMetaMask: true, request } });
   expect(
     await signPersonalMessage(
       "0x1111111111111111111111111111111111111111",
@@ -22,7 +22,7 @@ it("sends the exact SIWE message as UTF-8 hex to personal_sign without a transac
 });
 it("rejects a non-hex wallet signature", async () => {
   vi.stubGlobal("window", {
-    ethereum: { request: vi.fn().mockResolvedValue("invalid") },
+    ethereum: { isMetaMask: true, request: vi.fn().mockResolvedValue("invalid") },
   });
   await expect(
     signPersonalMessage(

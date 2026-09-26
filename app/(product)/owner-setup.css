@@ -152,10 +152,7 @@
   font-size: 23px;
   color: #6c4b28;
 }
-.wallet-choice .base-account-icon {
-  background: #e7eafb;
-  color: #255bdd;
-}
+
 .wallet-choice > span:nth-child(2) {
   flex: 1;
   min-width: 0;

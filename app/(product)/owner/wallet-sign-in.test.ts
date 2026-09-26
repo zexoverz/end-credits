@@ -38,7 +38,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("owner wallet sign-in", () => {
-  it.each(["base", "injected"] as const)(
+  it.each(["injected"] as const)(
     "signs a fresh SIWE message and submits the same message with %s",
     async (kind) => {
       const stage = vi.fn();
@@ -157,7 +157,7 @@ describe("owner wallet sign-in", () => {
         error,
         body: { error },
       });
-    await expect(signInWithWallet("base", vi.fn())).rejects.toThrow(error);
+    await expect(signInWithWallet("injected", vi.fn())).rejects.toThrow(error);
     expect(walletSignInError(new Error(error))).toBe(C.errors[error]);
   });
 });

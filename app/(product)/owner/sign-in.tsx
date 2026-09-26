@@ -133,23 +133,6 @@ export function SignIn({
             </span>
             <b aria-hidden="true">→</b>
           </button>
-          <button
-            className="wallet-choice"
-            disabled={busy}
-            onClick={() => void wallet("base")}
-          >
-            <span
-              className="wallet-choice-icon base-account-icon"
-              aria-hidden="true"
-            >
-              ●
-            </span>
-            <span>
-              <strong>{O.passkey}</strong>
-              <small>{O.passkeyHint}</small>
-            </span>
-            <b aria-hidden="true">→</b>
-          </button>
         </div>
       )}
       {methods && !methods.wallet && <p>{O.unavailable}</p>}

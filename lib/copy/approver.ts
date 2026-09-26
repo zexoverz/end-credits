@@ -1,8 +1,9 @@
 // Copy for the approver wallet components (components/approver/*, escrow v2; AGENTS.md rule 14).
 export const APPROVER_COPY = {
+  MISSING_METAMASK:
+    "MetaMask is not available. Install the MetaMask extension and reload this page.",
   // connect-wallet
-  CONNECT: "Connect wallet",
-  CONNECT_BROWSER: "Use browser wallet",
+  CONNECT: "Connect MetaMask",
   CONNECTING: "Opening wallet…",
   CONNECTED: "Wallet",
   CONNECT_FAILED: "Could not connect the wallet ({error}).",
@@ -31,7 +32,8 @@ export const APPROVER_COPY = {
   SIGN_WORLD: "Sign, then approve with World ID",
   PREPARING: "Preparing…",
   SIGNING: "Confirm in your wallet…",
-  WRONG_WALLET: "Connect the approver wallet {approver}; this is {address}.",
+  WRONG_WALLET:
+    "Select approver {approver} in MetaMask. The selected account is {address}.",
   BAD_SIGNATURE:
     "That signature is not from the approver wallet. Nothing was released.",
   SIGN_FAILED: "Signing did not finish ({error}). Nothing was released.",
