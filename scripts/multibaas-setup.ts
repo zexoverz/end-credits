@@ -1,9 +1,13 @@
-// One-off, idempotent MultiBaas setup for the dashboard (T9.1). Run after the escrow is deployed and
-// linked as alias `escrow` (contracts/script/Deploy.s.sol):
+// One-off, idempotent MultiBaas setup for the dashboard (T9.1). Run after the escrow is deployed
+// (contracts/script/Deploy.s.sol, which may already have linked it):
 //   pnpm tsx scripts/multibaas-setup.ts
 // Env (or files): MULTIBAAS_URL (~/.config/dominion/multibaas-url), MULTIBAAS_API_KEY
 // (~/.config/dominion/multibaas-key, admin group), APP_URL, ESCROW_ADDRESS, and PAYER_ADDRESS or
 // PAYER_PRIVATE_KEY (~/.config/dominion/endcredits-payer.key). Prints no key or secret.
+//   0) links the escrow as label `endcredits_escrow` version 2.0 (as Deploy.s.sol) at alias `escrow`
+//      = ESCROW_ADDRESS. When the alias still points at an older escrow it is moved only with
+//      MULTIBAAS_ALLOW_UPDATE_ADDRESS=true (forge-multibaas semantics: delete the alias, recreate it);
+//      the ABI upload needs `contracts/out` (forge build). ESCROW_START_BLOCK defaults to "-100";
 //   a) links Base Sepolia USDC as label/alias `usdc` with the ERC-20 ABI, startingBlock "latest";
 //   b) PUTs every saved query in lib/multibaas/queries.ts;
 //   c) creates webhook `endcredits` → ${APP_URL}/api/webhooks/multibaas on `event.emitted`, and
@@ -22,6 +26,10 @@ const DOMINION = join(homedir(), ".config", "dominion");
 const SECRET_FILE = join(DOMINION, "multibaas-webhook-secret");
 const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 const WEBHOOK_LABEL = "endcredits";
+// Must match Deploy.s.sol's MultiBaas.withOptions("endcredits_escrow", "escrow", "2.0", "-100").
+const ESCROW_LABEL = "endcredits_escrow";
+const ESCROW_VERSION = "2.0";
+const ESCROW_ARTIFACT = join(__dirname, "..", "contracts", "out", "EndCreditsEscrow.sol", "EndCreditsEscrow.json");
 
 function fromEnvOrFile(name: string, file: string): string {
   const v = process.env[name] || (existsSync(join(DOMINION, file)) ? readFileSync(join(DOMINION, file), "utf8").trim() : "");
@@ -86,13 +94,68 @@ async function linkUsdc(mb: MultiBaasClient): Promise<void> {
   console.log("usdc: linked with startingBlock latest (events sync from now on)");
 }
 
-async function checkEscrow(mb: MultiBaasClient, escrow: string): Promise<void> {
-  const addr = (await exists(mb, `/chains/ethereum/addresses/${ESCROW_ALIAS}`)) as { address?: string } | undefined;
-  if (!addr) throw new Error(`alias ${ESCROW_ALIAS} not found: deploy and link the escrow first`);
-  if (!addr.address || getAddress(addr.address) !== getAddress(escrow)) {
-    throw new Error(`alias ${ESCROW_ALIAS} is ${addr.address}, ESCROW_ADDRESS is ${escrow}`);
+const truthy = (v: string | undefined) => v === "true" || v === "1";
+
+async function ensureEscrowContract(mb: MultiBaasClient): Promise<void> {
+  const path = `/contracts/${ESCROW_LABEL}/${ESCROW_VERSION}`;
+  if (await exists(mb, path)) {
+    console.log(`escrow: contract ${ESCROW_LABEL} ${ESCROW_VERSION} exists, skipped`);
+    return;
   }
-  console.log(`escrow: alias ${ESCROW_ALIAS} → ${addr.address}`);
+  if (!existsSync(ESCROW_ARTIFACT)) throw new Error(`no ${ESCROW_ARTIFACT}: run forge build in contracts/`);
+  const art = JSON.parse(readFileSync(ESCROW_ARTIFACT, "utf8"));
+  await mb.post(`/contracts/${ESCROW_LABEL}`, {
+    label: ESCROW_LABEL,
+    version: ESCROW_VERSION,
+    language: "solidity",
+    contractName: "EndCreditsEscrow",
+    rawAbi: JSON.stringify(art.abi),
+    bin: art.bytecode?.object ?? art.bytecode,
+  });
+  console.log(`escrow: contract ${ESCROW_LABEL} ${ESCROW_VERSION} uploaded`);
+}
+
+/** Alias `escrow` → ESCROW_ADDRESS, moving it off an older escrow only when allowed. */
+async function ensureEscrowAlias(mb: MultiBaasClient, escrow: string): Promise<void> {
+  const byAddress = (await exists(mb, `/chains/ethereum/addresses/${escrow}`)) as { alias?: string } | undefined;
+  if (byAddress?.alias && byAddress.alias !== ESCROW_ALIAS) {
+    throw new Error(`${escrow} is already under alias ${byAddress.alias}, not ${ESCROW_ALIAS}; fix it by hand`);
+  }
+  const current = (await exists(mb, `/chains/ethereum/addresses/${ESCROW_ALIAS}`)) as { address?: string } | undefined;
+  if (current?.address && getAddress(current.address) === getAddress(escrow)) {
+    console.log(`escrow: alias ${ESCROW_ALIAS} → ${current.address}`);
+    return;
+  }
+  if (current) {
+    if (!truthy(process.env.MULTIBAAS_ALLOW_UPDATE_ADDRESS)) {
+      throw new Error(
+        `alias ${ESCROW_ALIAS} is ${current.address}, ESCROW_ADDRESS is ${escrow}; rerun with MULTIBAAS_ALLOW_UPDATE_ADDRESS=true to move it`,
+      );
+    }
+    await mb.delete(`/chains/ethereum/addresses/${ESCROW_ALIAS}`);
+    console.log(`escrow: alias ${ESCROW_ALIAS} removed from old escrow ${current.address}`);
+  }
+  await mb.post("/chains/ethereum/addresses", { address: escrow, alias: ESCROW_ALIAS });
+  console.log(`escrow: alias ${ESCROW_ALIAS} → ${escrow}`);
+}
+
+async function linkEscrow(mb: MultiBaasClient, escrow: string): Promise<void> {
+  await ensureEscrowContract(mb);
+  await ensureEscrowAlias(mb, escrow);
+  const addr = (await mb.get(`/chains/ethereum/addresses/${ESCROW_ALIAS}`)) as {
+    contracts?: { label?: string; version?: string }[];
+  };
+  if (addr.contracts?.some((c) => c.label === ESCROW_LABEL && c.version === ESCROW_VERSION)) {
+    console.log(`escrow: ${ESCROW_LABEL} ${ESCROW_VERSION} already linked, skipped`);
+    return;
+  }
+  const startingBlock = process.env.ESCROW_START_BLOCK || "-100";
+  await mb.post(`/chains/ethereum/addresses/${ESCROW_ALIAS}/contracts`, {
+    label: ESCROW_LABEL,
+    version: ESCROW_VERSION,
+    startingBlock,
+  });
+  console.log(`escrow: linked ${ESCROW_LABEL} ${ESCROW_VERSION} from block ${startingBlock}`);
 }
 
 async function putQueries(mb: MultiBaasClient, payerAddr: string): Promise<void> {
@@ -143,7 +206,7 @@ async function main(): Promise<void> {
   });
   const payerAddr = payer();
   console.log(`payer ${payerAddr}`);
-  await checkEscrow(mb, required("ESCROW_ADDRESS"));
+  await linkEscrow(mb, getAddress(required("ESCROW_ADDRESS")));
   await linkUsdc(mb);
   await putQueries(mb, payerAddr);
   await createWebhook(mb, required("APP_URL"));
