@@ -96,7 +96,22 @@ export function GithubStep({
   login: string | null;
   cancelled: boolean;
 }) {
-  if (login) return <p>{claimCopy("GITHUB_AS", { login })}</p>;
+  if (login)
+    return (
+      <>
+        <p>{claimCopy("GITHUB_AS", { login })}</p>
+        <Button
+          type="button"
+          onClick={() =>
+            void fetch("/api/github/logout", { method: "POST" }).then(() =>
+              window.location.reload(),
+            )
+          }
+        >
+          {claimCopy("GITHUB_SIGN_OUT")}
+        </Button>
+      </>
+    );
   return (
     <>
       {cancelled && (
@@ -124,6 +139,8 @@ type WalletProps = {
   waiting: boolean;
   notice: Notice | null;
   onConnect: () => void;
+  /** Pick another account; offered while the wallet can still change (before the merge). */
+  onChange?: () => void;
 };
 
 export function WalletStep({
@@ -133,12 +150,22 @@ export function WalletStep({
   waiting,
   notice,
   onConnect,
+  onChange,
 }: WalletProps) {
   if (done && claim?.wallet) {
     return (
-      <p>
-        {claimCopy("WALLET_SET")} <WalletLink address={claim.wallet} />
-      </p>
+      <>
+        <p>
+          {claimCopy("WALLET_SET")} <WalletLink address={claim.wallet} />
+        </p>
+        {onChange && (
+          <Button type="button" onClick={onChange} disabled={busy}>
+            {claimCopy("WALLET_CHANGE")}
+          </Button>
+        )}
+        {busy && <p role="status">{claimCopy("SAVING_WALLET")}</p>}
+        <NoticeLine notice={notice} />
+      </>
     );
   }
   return (

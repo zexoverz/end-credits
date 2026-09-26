@@ -139,3 +139,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | frontend cli install step | app/(product)/owner/{owner-client,agent-keys}.tsx, lib/copy/onboarding.ts | Claude Code wrote it: the agent setup card now starts with the one-line CLI install, with a copy button. Design unchanged. Human review pending. |
 
 | backend claim signed-in state | lib/claim/summary.ts, test | Claude Code wrote it: after a finished claim drops the GitHub token, the package page asks to sign in again instead of showing signed in while the wallet step fails. Human review pending. |
+
+| frontend claim sign out and wallet switch | app/api/github/logout, app/(product)/npm/[...name]/*, components/approver/connect-wallet.tsx, lib/copy/claim.ts | Claude Code wrote it: sign out of GitHub on the claim page, and pick another MetaMask account before the merge. Human review pending. |

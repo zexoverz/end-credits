@@ -23,7 +23,7 @@ import {
 } from "@/lib/client/claim";
 import { claimCopy } from "@/lib/copy/claim";
 import { Header, NoticeLine } from "./header";
-import { connectWallet } from "@/components/approver/connect-wallet";
+import { chooseWallet, connectWallet } from "@/components/approver/connect-wallet";
 import { GithubStep, MergeStep, PrStep, Step, WalletStep } from "./steps";
 
 const POLL_MS = 5_000;
@@ -149,11 +149,11 @@ export function ClaimPage({
   };
 
   // Allow retry when a wallet popup closes without answering.
-  const onConnect = async () => {
+  const onConnect = async (pick = false) => {
     setWaiting(true);
     setWalletNotice(null);
     try {
-      const address = await connectWallet();
+      const address = pick ? await chooseWallet() : await connectWallet();
       if (!address)
         return setWalletNotice({
           tone: "error",
@@ -306,6 +306,11 @@ export function ClaimPage({
               waiting={waiting}
               notice={walletNotice}
               onConnect={() => void onConnect()}
+              onChange={
+                claim && (claim.status === "wallet" || claim.status === "pr_open")
+                  ? () => void onConnect(true)
+                  : undefined
+              }
             />
           </Step>
           <Step n={3} title="STEP_PR" state={st.pr}>
