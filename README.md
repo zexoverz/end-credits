@@ -513,31 +513,40 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
 3. The payee is whatever the repo publishes. A compromised repo can change it; we hold on change and
    screen before signing, but cannot prove who wrote the file beyond "it is on the default branch".
 4. `tea.yaml` addresses come from a scheme that was farmed; they are screened like every other.
-5. The payer key is server-held for the demo and everything moves on Base Sepolia. What is screened
-   is the payees' real mainnet addresses. Because the server holds the payer key, it could call
-   `setApprover` as the payer; the 3-day delay makes that change public before it counts, and holds
-   with the default 24 h TTL expire and refund before then. The payer refund is a server-free deny
-   only once the payer is the owner's own wallet.
-6. The claim needs a merged PR; orgs that restrict OAuth apps use the prefilled "new file" link, whose
+5. The payer key is server-held and everything moves on Base Sepolia. What is screened is the
+   payees' real mainnet addresses. With `EndCreditsBudget` the key is only a spender with a capped
+   pull on the owner's wallet, so a stolen key takes at most the cap (worst case `2 x perPeriod`
+   across a window edge). It still pays from its own address, so it is the escrow payer: it could
+   call `setApprover` as the payer; the 3-day delay makes that change public before it counts, and
+   holds with the default 24 h TTL expire and refund before then.
+6. USDC that was pulled but not spent stays on the agent key: if an x402 or escrow call fails after
+   the pull, the amount is not swept back to the owner, and escrow refunds also go to the agent key.
+   The next session still pulls its full spend.
+7. The claim needs a merged PR; orgs that restrict OAuth apps use the prefilled "new file" link, whose
    `filename` and `value` parameters are known from use, not from GitHub's docs. We ask for
    `public_repo`, which GitHub's docs contradict each other on for writing contents.
-7. The public Base Sepolia RPC is load-balanced over nodes that lag each other. Writes re-simulate on
-   a revert to cover it; reads such as `tipOf` or `reserved` right after a receipt can still be a
-   block or two behind.
-8. The last commit touching `FUNDING.json` may be a formatting change, which then reads as an address
+8. The public Base Sepolia RPC is load-balanced over nodes that lag each other. Writes re-simulate on
+   a revert, and the tx queue keeps the last nonce a node accepted per key, so back-to-back sends do
+   not reuse a nonce ([`lib/chain/txqueue.ts`](lib/chain/txqueue.ts)). That memory is per process: two
+   processes signing with one key could still collide, and `already known` is not retried, since it
+   may mean our own tx went through. Reads such as `tipOf` or `reserved` right after a receipt can
+   still be a block or two behind.
+9. The last commit touching `FUNDING.json` may be a formatting change, which then reads as an address
    change and holds. The cost is a hold, not a payment.
-9. Rule 7 (contract on Ethereum with no code on Base) only runs with `CHECK_NO_CODE=true`; it matters
-   for a mainnet round, not for testnet.
-10. The dashboard is cached for 60 s to stay inside the MultiBaas free plan. Owner notifications have
+10. Rule 7 (contract on Ethereum with no code on Base) only runs with `CHECK_NO_CODE=true`; it matters
+    for a mainnet round, not for testnet.
+11. The dashboard is cached for 60 s to stay inside the MultiBaas free plan. Owner notifications have
     no mark-read yet.
-11. The owner signs in with `OWNER_DEV_TOKEN` in the demo deployment. A World ID sign-in and Orb
-    step-up are in [`lib/world/`](lib/world) but off (`WORLD_REQUIRED` unset); the release guard is the
-    on-chain approver signature either way.
-12. USDC sent straight to the escrow address (not through `hold` or `reserve`) is stuck. Nothing reads
+12. The owner signs in with their wallet (SIWE). `OWNER_DEV_TOKEN` still works for scripts, so a
+    deployment that sets it has a second way in; the release guard is the on-chain approver
+    signature either way. A World ID sign-in is in [`lib/world/`](lib/world) but off.
+13. USDC sent straight to the escrow address (not through `hold` or `reserve`) is stuck. Nothing reads
     the balance, so this is left as is.
-13. A new payee with no mainnet history holds (`HELD_NO_HISTORY`). As a claim wallet the same answer
+14. A new payee with no mainnet history holds (`HELD_NO_HISTORY`). As a claim wallet the same answer
     passes the screen, since new passkey wallets are fresh; the claim is still gated by repo write
     access and the funding file.
+15. Payment simulation is off on testnet (see [Feedback on the API](#feedback-on-the-api)), so a paid
+    credit is screened by payee, impersonation and token, not by simulating the transfer.
 
 ## Measurement
 
