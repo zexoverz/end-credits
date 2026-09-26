@@ -64,6 +64,7 @@ async function packageRow(name: string, deps: ClaimDeps): Promise<PackageRow | n
     declaredDirectory: null,
     declaredHomepage: null,
     repoSource: "registry",
+    x402Endpoint: null,
   };
 }
 

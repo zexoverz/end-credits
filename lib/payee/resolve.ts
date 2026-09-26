@@ -68,7 +68,7 @@ export async function resolvePayee(pkg: PackageRef, deps: ResolveDeps): Promise<
       if (!hit) continue;
       // The maintainer's own x402 endpoint rides only on the FUNDING.json that named the payee.
       const endpoint = source === "drips" && text !== null ? parseX402Endpoint(text) : null;
-      return endpoint ? { ...hit, x402Endpoint: endpoint } : hit;
+      return endpoint && hit.address ? { ...hit, x402Endpoint: endpoint } : hit;
     }
   }
 
