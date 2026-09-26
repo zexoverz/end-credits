@@ -4,6 +4,7 @@ import "./product.css";
 import "./studio.css";
 import "./desk.css";
 import "./control-room.css";
+import "./claim-flow.css";
 export default function ProductLayout({
   children,
 }: {

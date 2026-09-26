@@ -1,0 +1,436 @@
+.maintainer-flow {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  gap: 40px;
+  margin: 40px 0 20px;
+  align-items: start;
+}
+.claim-guide {
+  background: #e6eddf;
+  border-radius: 24px;
+  padding: 34px;
+  position: sticky;
+  top: 24px;
+  color: #252c23;
+}
+.claim-guide .claim-eyebrow {
+  font:
+    11px var(--font-mono),
+    monospace;
+  letter-spacing: 0.12em;
+  margin: 0 0 24px;
+}
+.claim-guide h2 {
+  font-size: clamp(30px, 3vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  margin: 0 0 18px;
+}
+.claim-guide > p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #4f5b48;
+}
+.claim-reserve {
+  padding: 24px 0;
+  border-bottom: 1px solid #becab4;
+  margin-top: 22px;
+}
+.claim-reserve > span {
+  font-size: 12px;
+  color: #4f5b48;
+}
+.claim-reserve > strong {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 56px;
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  overflow-wrap: anywhere;
+}
+.claim-reserve small {
+  font:
+    13px var(--font-mono),
+    monospace;
+  letter-spacing: 0;
+}
+.claim-reserve p {
+  font-size: 12px;
+  margin: 0;
+  color: #4f5b48;
+}
+.claim-proof-art {
+  width: 100%;
+  max-height: 160px;
+  margin: 18px 0;
+}
+.claim-guide h3 {
+  font-size: 17px;
+  letter-spacing: -0.03em;
+}
+.claim-guide .claim-gas-note {
+  border-top: 1px solid #becab4;
+  padding-top: 20px;
+  margin-top: 22px;
+  font-size: 12px;
+}
+.claim-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.claim-workflow > li {
+  border: 1px solid #dbe0d4;
+  border-radius: 20px;
+  background: white;
+  overflow: hidden;
+}
+.claim-workflow > li[data-state="active"] {
+  border-color: #8baa7c;
+  box-shadow: 0 4px 24px #26302306;
+}
+.claim-workflow > li[data-state="locked"] {
+  background: transparent;
+}
+.claim-step-heading,
+.claim-workflow summary {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  padding: 22px;
+  list-style: none;
+}
+.claim-workflow summary {
+  cursor: pointer;
+}
+.claim-workflow summary::-webkit-details-marker {
+  display: none;
+}
+.claim-workflow summary:after {
+  content: "+";
+  font-size: 20px;
+}
+.claim-workflow details[open] summary:after {
+  content: "−";
+}
+.claim-step-heading h3,
+.claim-workflow summary h3 {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+.claim-step-number {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid #dbe0d4;
+  border-radius: 50%;
+  font:
+    12px var(--font-mono),
+    monospace;
+  color: #526348;
+}
+.claim-workflow [data-state="active"] .claim-step-number {
+  background: #252c23;
+  color: white;
+  border-color: #252c23;
+}
+.claim-workflow [data-state="done"] .claim-step-number {
+  background: #dff4e4;
+  border-color: #c3dcc7;
+}
+.claim-step-state {
+  font:
+    10px var(--font-mono),
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.claim-step-body {
+  padding: 0 26px 26px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.claim-step-body > * + * {
+  margin-top: 18px;
+}
+.claim-step-body a:not(.product-button) {
+  overflow-wrap: anywhere;
+}
+.claim-address-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.claim-address-form input {
+  min-width: 0;
+  flex: 1;
+}
+.claim-address-form button {
+  flex-shrink: 0;
+}
+.claim-step-body #wallet-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #5b6755;
+  margin-top: 10px;
+}
+.claim-file {
+  padding: 20px;
+  background: #f3f5ef;
+  border: 1px solid #dce2d4;
+  border-radius: 12px;
+}
+.claim-file > span {
+  display: block;
+  color: #5b6755;
+  font-size: 11px;
+}
+.claim-file > strong {
+  font:
+    13px var(--font-mono),
+    monospace;
+}
+.claim-file pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.7 var(--font-mono),
+    monospace;
+  margin: 16px 0 0;
+}
+.claim-verify {
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  gap: 12px;
+}
+.claim-verify h4 {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+  font-weight: 500;
+}
+.claim-verify p {
+  grid-column: 2;
+  color: #5b6755;
+}
+.claim-signal {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #588a53;
+  margin-top: 8px;
+  box-shadow: 0 0 0 5px #e6f0df;
+  animation: claim-breathe 2s ease-in-out infinite;
+}
+.claim-verify[data-failed="true"] .claim-signal {
+  background: #9c4338;
+  box-shadow: 0 0 0 5px #f4e8e3;
+  animation: none;
+}
+.claim-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e0e4da;
+  padding-top: 18px;
+}
+.claim-check > span {
+  font-size: 11px;
+  color: #5b6755;
+}
+.claim-last-check {
+  font:
+    11px var(--font-mono),
+    monospace;
+  color: #5b6755;
+  text-align: right;
+  margin: 0 0 36px;
+}
+.claim-receipt {
+  background: #f0f8ee;
+  border: 1px solid #d1e3c8;
+  border-radius: 14px;
+  padding: 28px;
+}
+.claim-success-mark {
+  width: 50px;
+  margin-bottom: 14px;
+}
+.claim-success-mark svg {
+  width: 100%;
+  fill: #c3efcd;
+  stroke: #34613a;
+  stroke-width: 2;
+}
+.claim-success-mark path {
+  fill: none;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 0;
+  animation: claim-tick 0.7s ease-out;
+}
+.claim-receipt h4 {
+  font-size: 32px;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+  margin-bottom: 24px;
+}
+.claim-receipt > p {
+  font-size: 12px;
+  color: #4e6447;
+}
+.claim-receipt-amount {
+  font-size: 52px;
+  line-height: 1.3;
+  letter-spacing: -0.055em;
+  overflow-wrap: anywhere;
+  margin: 4px 0 12px;
+}
+.claim-receipt-amount > span {
+  font:
+    13px var(--font-mono),
+    monospace;
+  letter-spacing: 0;
+  margin-left: 12px;
+}
+.claim-receipt-wallet {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 20px;
+  font-size: 12px;
+}
+.claim-receipt-wallet a {
+  font-family: var(--font-mono), monospace;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
+.claim-transactions {
+  border-top: 1px dashed #abc49e;
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.claim-transactions h5 {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+.claim-transaction {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid #d1e3c8;
+  padding: 16px 0;
+  text-decoration: none;
+}
+.claim-transaction strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.claim-transaction code {
+  display: block;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  color: #4e6447;
+  margin-top: 5px;
+}
+.claim-transaction small {
+  font-size: 11px;
+  text-decoration: underline;
+}
+.claim-workflow :focus-visible {
+  outline: 2px solid #527a43;
+  outline-offset: 4px;
+}
+@keyframes claim-breathe {
+  50% {
+    box-shadow: 0 0 0 8px #e6f0df80;
+  }
+}
+@keyframes claim-tick {
+  from {
+    stroke-dashoffset: 40;
+  }
+}
+@media (max-width: 900px) {
+  .maintainer-flow {
+    gap: 22px;
+    grid-template-columns: minmax(210px, 0.65fr) minmax(0, 1fr);
+  }
+  .claim-guide {
+    padding: 24px;
+  }
+  .claim-step-body {
+    padding: 0 20px 22px;
+  }
+  .claim-address-form {
+    flex-direction: column;
+  }
+}
+@media (max-width: 640px) {
+  .maintainer-flow {
+    grid-template-columns: 1fr;
+    margin-top: 24px;
+  }
+  .claim-guide {
+    position: static;
+  }
+  .claim-proof-art,
+  .claim-guide > h3,
+  .claim-guide > h3 + p {
+    display: none;
+  }
+  .claim-guide h2 {
+    font-size: 34px;
+  }
+  .claim-reserve {
+    margin-top: 12px;
+    padding: 16px 0;
+  }
+  .claim-reserve > strong {
+    font-size: 46px;
+  }
+  .claim-guide .claim-gas-note {
+    border: 0;
+    padding: 0;
+    margin: 16px 0 0;
+  }
+  .claim-step-heading,
+  .claim-workflow summary {
+    padding: 18px 16px;
+    gap: 10px;
+  }
+  .claim-step-heading h3,
+  .claim-workflow summary h3 {
+    font-size: 16px;
+  }
+  .claim-step-state {
+    font-size: 9px;
+  }
+  .claim-receipt {
+    padding: 20px;
+  }
+  .claim-check {
+    flex-wrap: wrap;
+  }
+  .claim-last-check {
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .claim-signal,
+  .claim-success-mark path {
+    animation: none;
+  }
+}
