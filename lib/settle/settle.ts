@@ -45,7 +45,9 @@ export type SettleDeps = {
     hold(a: HoldArgs): Promise<Hash>;
     recordSession(s: SessionTotals): Promise<Hash>;
   };
-  payCredit(credit: ClientCredit): Promise<{ tx: string; receipt: unknown }>;
+  /** Pays over x402: through `endpoint`, the maintainer's own (FUNDING.json `x402.endpoint`), when
+   *  set; else through our own credit route. */
+  payCredit(credit: SettleCredit): Promise<{ tx: string; receipt: unknown }>;
   /** EndCreditsBudget, when BUDGET_ADDRESS is set: the hot key pulls each session's spend from the
    *  owner's own wallet (`owners.budget_owner`) before anything moves. Omitted → the hot key pays
    *  from its own balance. */
@@ -60,6 +62,8 @@ export type SettleDeps = {
   concurrency?: number;
   log?: (line: string) => void;
 };
+
+export type SettleCredit = ClientCredit & { endpoint?: string };
 
 type Work = {
   creditId: string;
@@ -268,6 +272,7 @@ async function lookup(w: Work, deps: SettleDeps, now: Date): Promise<void> {
         funding: registry.funding,
       });
       await store.setPayee(deps.database, w.creditId, resolution.address, resolution.address ? resolution.source : null);
+      await store.setX402Endpoint(deps.database, w.packageId, endpointOf(resolution) ?? null);
       Object.assign(w, { registry, resolution });
       if (resolution.address) {
         w.change = await changeOf(w, resolution.address, resolution.source, deps, now);
@@ -370,8 +375,16 @@ async function executeOne(
   } catch (err) {
     w.tx = null;
     const code = executionFailureCode(err);
-    const text = code === "EXECUTION_FAILED" ? msg(code, { error: errorLabel(err) }) : msg(code);
-    await store.appendReason(database, w.creditId, { source: "policy", code, text });
+    const text =
+      err instanceof PaymentRefused ? err.message : code === "EXECUTION_FAILED" ? msg(code, { error: errorLabel(err) }) : msg(code);
+    const reason = { source: "policy" as const, code, text };
+    // Nothing was signed: a maintainer endpoint that fails the pre-sign check is a refusal.
+    if (err instanceof PaymentRefused && err.code !== "NOT_PAYABLE" && w.resolution && endpointOf(w.resolution)) {
+      w.outcome = "refused";
+      await store.refuseAtEndpoint(database, w.creditId, reason);
+    } else {
+      await store.appendReason(database, w.creditId, reason);
+    }
     deps.log?.(`settle: credit ${w.creditId} ${decision.outcome} not executed: ${errorLabel(err)}`);
   }
 }
@@ -391,8 +404,15 @@ async function execute(
       // The x402 route is idempotent on tx_hash; never start a second payment for a paid credit.
       const existing = await store.creditTx(database, w.creditId);
       if (existing) return existing;
-      const { tx, receipt } = await deps.payCredit({ id: w.creditId, payee: payee!, amountMicro: w.amount });
-      await store.recordExecution(database, w.creditId, { txHash: tx, receipt }, deps.now());
+      const endpoint = w.resolution ? endpointOf(w.resolution) : undefined;
+      const credit = { id: w.creditId, payee: payee!, amountMicro: w.amount, ...(endpoint ? { endpoint } : {}) };
+      const { tx, receipt } = await deps.payCredit(credit);
+      const paidVia = endpoint ? "maintainer_x402" : "endcredits_x402";
+      await store.recordExecution(database, w.creditId, { txHash: tx, receipt, paidVia }, deps.now());
+      if (endpoint) {
+        const text = msg("PAID_VIA_MAINTAINER", { host: new URL(endpoint).host });
+        await store.appendReason(database, w.creditId, { source: "policy", code: "PAID_VIA_MAINTAINER", text });
+      }
       return tx;
     }
     case "held": {
@@ -455,6 +475,11 @@ function sessionPackages(all: Work[]): SessionPackage[] {
 function payeeReason(r: Resolution): Reason[] {
   if (r.address || !r.reason) return [];
   return [{ source: "payee", code: r.reason, text: msg(r.reason, r.vars ?? {}) }];
+}
+
+// The maintainer's own x402 endpoint, only next to the FUNDING.json payee it came with.
+function endpointOf(r: Resolution): string | undefined {
+  return r.address && r.source === "drips" ? r.x402Endpoint : undefined;
 }
 
 function declaredReason(w: Work): Reason[] {
