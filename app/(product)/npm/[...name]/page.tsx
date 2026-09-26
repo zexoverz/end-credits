@@ -14,5 +14,11 @@ export default async function Page({
   const name = packageNameFrom((await params).name);
   if (!name) notFound();
   const { github } = await searchParams;
-  return <ClaimPage name={name} githubCancelled={github === "cancelled"} />;
+  return (
+    <ClaimPage
+      key={name}
+      name={name}
+      githubCancelled={github === "cancelled"}
+    />
+  );
 }

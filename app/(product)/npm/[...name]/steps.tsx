@@ -12,7 +12,7 @@ import {
 } from "@/lib/client/claim";
 import { addressUrl } from "@/lib/client/format";
 import { claimCopy, type ClaimCopyCode } from "@/lib/copy/claim";
-import { msg } from "@/lib/messages";
+import { ClaimReceipt } from "./claim-receipt";
 import { NoticeLine } from "./header";
 
 const STATE_LABEL: Record<StepState, ClaimCopyCode> = {
@@ -39,21 +39,36 @@ export function Step({
   state: StepState;
   children?: ReactNode;
 }) {
+  const body =
+    state !== "locked" && children ? (
+      <div className="claim-step-body">{children}</div>
+    ) : null;
+  const heading = (
+    <>
+      <span className="claim-step-number" aria-hidden="true">
+        {state === "done" ? "✓" : `0${n}`}
+      </span>
+      <h3>{claimCopy(title)}</h3>
+      <span className={`claim-step-state ${STATE_CLS[state]}`}>
+        {claimCopy(STATE_LABEL[state])}
+      </span>
+    </>
+  );
   return (
     <li
       data-state={state}
-      className="rounded-lg border border-line bg-card p-4"
+      aria-current={state === "active" ? "step" : undefined}
     >
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">
-          {n}. {claimCopy(title)}
-        </h2>
-        <span className={`text-xs uppercase ${STATE_CLS[state]}`}>
-          {claimCopy(STATE_LABEL[state])}
-        </span>
-      </div>
-      {state !== "locked" && children && (
-        <div className="mt-3 space-y-3 text-sm">{children}</div>
+      {state === "done" && n !== 4 ? (
+        <details>
+          <summary>{heading}</summary>
+          {body}
+        </details>
+      ) : (
+        <>
+          <div className="claim-step-heading">{heading}</div>
+          {body}
+        </>
       )}
     </li>
   );
@@ -94,10 +109,8 @@ export function GithubStep({
         />
       )}
       <p className="text-muted">{claimCopy("GITHUB_WHY", { repo })}</p>
-      <a
-        href={loginUrl(name)}
-        className="inline-block rounded bg-foreground px-3 py-1.5 text-background"
-      >
+      <p>{claimCopy("RETURN_NOTE")}</p>
+      <a href={loginUrl(name)} className="product-button">
         {claimCopy("GITHUB_BUTTON")}
       </a>
     </>
@@ -133,6 +146,7 @@ export function WalletStep({
     );
   }
   const submit = () => {
+    if (busy) return;
     const a = parseAddress(typed);
     setInvalid(!a);
     if (a) onAddress(a);
@@ -147,19 +161,29 @@ export function WalletStep({
         <label htmlFor="wallet-address" className="block text-muted">
           {claimCopy("WALLET_OR")}
         </label>
-        <div className="flex gap-2">
+        <form
+          className="claim-address-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
           <input
             id="wallet-address"
             className="w-full rounded border border-line bg-background px-2 py-1 font-mono text-xs"
-            placeholder="0x…"
+            placeholder={claimCopy("ADDRESS_PLACEHOLDER")}
+            aria-invalid={invalid}
+            aria-describedby="wallet-hint"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
           />
-          <Button onClick={submit} disabled={busy || !typed.trim()}>
+          <Button type="submit" disabled={busy || !typed.trim()}>
             {claimCopy("WALLET_USE")}
           </Button>
-        </div>
+        </form>
+        <p id="wallet-hint">{claimCopy("ADDRESS_HINT")}</p>
       </div>
+      {busy && <p role="status">{claimCopy("SAVING_WALLET")}</p>}
       {invalid && (
         <NoticeLine
           notice={{
@@ -188,6 +212,19 @@ export function PrStep({ repo, claim, done, busy, notice, onOpen }: PrProps) {
     return (
       <>
         <p className="text-muted">{claimCopy("PR_WHY", { repo })}</p>
+        {claim?.wallet && (
+          <div className="claim-file">
+            <span>{claimCopy("FILE_PREVIEW")}</span>
+            <strong>{claimCopy("FUNDING_FILE")}</strong>
+            <pre>
+              {JSON.stringify(
+                { drips: { ethereum: { ownedBy: claim.wallet } } },
+                null,
+                2,
+              )}
+            </pre>
+          </div>
+        )}
         <Button onClick={onOpen} disabled={busy}>
           {busy ? claimCopy("PR_OPENING") : claimCopy("PR_BUTTON")}
         </Button>
@@ -198,6 +235,12 @@ export function PrStep({ repo, claim, done, busy, notice, onOpen }: PrProps) {
   return (
     <>
       <NoticeLine notice={notice} />
+      {claim.prMode === "new_file_link" && (
+        <div>
+          <strong>{claimCopy("FALLBACK_TITLE")}</strong>
+          <p>{claimCopy("FALLBACK_BODY")}</p>
+        </div>
+      )}
       {claim.prMode === "new_file_link" ? (
         <a
           href={claim.prUrl}
@@ -230,33 +273,80 @@ type MergeProps = {
 };
 
 export function MergeStep({ claim, state, busy, notice, onCheck }: MergeProps) {
-  if (state === "done" && claim?.wallet) {
-    const text =
-      notice?.code === "CLAIMED"
-        ? notice.text
-        : msg("CLAIMED", {
-            amount: claim.claimedAmount ?? "0",
-            address: claim.wallet,
-          });
+  if (state === "done" && claim)
     return (
       <>
-        <NoticeLine notice={{ tone: "ok", text, code: "CLAIMED" }} />
-        <p>
-          {claimCopy("CLAIMED_TO")} <WalletLink address={claim.wallet} />
-        </p>
+        <NoticeLine notice={notice} />
+        <ClaimReceipt claim={claim} />
       </>
     );
-  }
+  const code = notice?.code ?? claim?.code;
+  const title =
+    state === "failed"
+      ? "REFUSED_TITLE"
+      : code === "COOLING"
+        ? "COOLING_TITLE"
+        : code === "SCREEN_UNAVAILABLE"
+          ? "SCREEN_TITLE"
+          : code === "FUNDING_MISMATCH"
+            ? "MISMATCH_TITLE"
+            : claim?.status === "merged" || claim?.status === "verified"
+              ? "VERIFY_TITLE"
+              : "WAIT_TITLE";
   return (
     <>
-      {state === "active" && (
-        <p className="text-muted">{claimCopy("MERGE_WHY")}</p>
+      <div className="claim-verify" data-failed={state === "failed"}>
+        <span className="claim-signal" aria-hidden="true" />
+        <h4>{claimCopy(title)}</h4>
+        {state === "active" && (
+          <p>
+            {claimCopy(
+              claim?.status === "pr_open" ? "MERGE_EXTERNAL" : "VERIFY_BODY",
+            )}
+          </p>
+        )}
+      </div>
+      {state === "active" &&
+        claim?.status === "pr_open" &&
+        claim.prMode === "new_file_link" && (
+          <div className="claim-fallback">
+            <strong>{claimCopy("FALLBACK_TITLE")}</strong>
+            <p>{claimCopy("FALLBACK_BODY")}</p>
+          </div>
+        )}
+      {state === "active" && claim?.status === "pr_open" && claim.prUrl && (
+        <a
+          className="product-button"
+          href={claim.prUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {claimCopy(
+            claim.prMode === "new_file_link"
+              ? "PR_OPEN_GITHUB"
+              : "MERGE_ACTION",
+          )}
+        </a>
       )}
-      <NoticeLine notice={notice} />
+      <NoticeLine
+        notice={
+          notice ??
+          (claim?.message
+            ? {
+                tone: state === "failed" ? "error" : "info",
+                text: claim.message,
+                code: claim.code,
+              }
+            : null)
+        }
+      />
       {state === "active" && (
-        <Button onClick={onCheck} disabled={busy}>
-          {busy ? claimCopy("CHECKING") : claimCopy("CHECK_NOW")}
-        </Button>
+        <div className="claim-check">
+          <span>{claimCopy("AUTO_CHECK")}</span>
+          <Button onClick={onCheck} disabled={busy}>
+            {claimCopy(busy ? "CHECKING" : "CHECK_NOW")}
+          </Button>
+        </div>
       )}
     </>
   );
