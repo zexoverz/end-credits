@@ -1209,3 +1209,9 @@ redundant (a missing allowance already has `period == 0`), so it was removed fro
 | _window: roll (branch removed) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow` |
 | _left: clamp at zero (removed) | `invariant_remainingMatchesTheModel`, `test_setAllowance_loweringCapKeepsSpent` |
 | remaining: zero for a missing allowance (short-circuit removed) | `invariant_remainingMatchesTheModel`, `test_remaining_zeroWithoutAllowance`, `test_revoke_deletesAndEmits` |
+
+**Deployed (26 Sep):** `EndCreditsBudget` at `0x1429498c0e6f2f474a5bd3230e79a838e3590b36` on Base
+Sepolia, verified on Sourcify (`exact_match`) and Basescan, linked in MultiBaas as `budget`. A first
+deployment at `0xd35cb8b89a219df7320eb0e9b47969cc709cc5c5` was built from a stale artifact (21 bytes
+longer, before the redundant check was removed), could not be verified against the final source, and
+is not used.
