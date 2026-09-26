@@ -19,6 +19,7 @@ MultiBaas** ([how it is used](#curvegrid-multibaas)).
 | First live settlement (roll) | https://end-credits.up.railway.app/credits/9233161f-1de0-4161-abc8-387379cc2b8b |
 | `EndCreditsEscrow` on Basescan | https://sepolia.basescan.org/address/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46#code |
 | `EndCreditsEscrow` on Sourcify (`exact_match`) | https://repo.sourcify.dev/84532/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46 |
+| `EndCreditsBudget` on Basescan (Sourcify `exact_match`) | https://sepolia.basescan.org/address/0x1429498c0e6f2f474a5bd3230e79a838e3590b36#code |
 
 ## Why
 
@@ -71,8 +72,11 @@ flowchart LR
    [`lib/payee/push.ts`](lib/payee/push.ts)).
 5. **Screen.** Every payee is screened by Intercepta before anything is signed (see
    [Intercepta](#intercepta-the-moment-of-decision)).
-6. **Decide and execute.** The [matrix](#decision-matrix-as-built) picks one outcome; the decision is stored before any
-   signature ([`lib/settle/settle.ts#L248-L272`](lib/settle/settle.ts#L248-L272)).
+6. **Decide, pull, execute.** The [matrix](#decision-matrix-as-built) picks one outcome per package
+   and every decision is stored first ([`lib/settle/settle.ts#L292-L332`](lib/settle/settle.ts#L292-L332)).
+   Then the settler pulls exactly what will move from the owner's wallet (see
+   [Money never sits on our server](#money-never-sits-on-our-server)), and only then pays, holds or
+   reserves ([`#L168-L172`](lib/settle/settle.ts#L168-L172)).
 7. **Roll.** `/credits/<id>` lists every package with its badge, reason and Basescan link; the
    recorder emits one `SessionSettled` event per session with a manifest hash.
 
@@ -305,6 +309,45 @@ owner's MetaMask signature. With a throwaway payer, a release signed by the wron
 [`0xd8c70875…`](https://sepolia.basescan.org/tx/0xd8c7087528872b003879e215d7b515e46b20d6728ec26a28f28d9684c648d95d)
 paid. Design and the mutation table: [`docs/plan/decisions.md`](docs/plan/decisions.md) (Escrow v2).
 
+## Money never sits on our server
+
+The owner's USDC stays in the owner's own wallet. `EndCreditsBudget`
+([`0x1429498C0E6F2f474a5BD3230e79a838E3590b36`](https://sepolia.basescan.org/address/0x1429498c0e6f2f474a5bd3230e79a838e3590b36#code),
+Sourcify `exact_match`) lets our agent key pull at most a per-period cap from it. The contract never
+holds funds and has no admin, no owner and no upgrade path
+([`contracts/src/EndCreditsBudget.sol`](contracts/src/EndCreditsBudget.sol)).
+
+| Step | Who | Where |
+|---|---|---|
+| `usdc.approve(budget, amount)` and `setAllowance(agent, perPeriod, period)`, sent from the owner's wallet in the browser | owner | [`#L49-L64`](contracts/src/EndCreditsBudget.sol#L49-L64), [`components/budget/budget-wallet.tsx`](components/budget/budget-wallet.tsx) |
+| The session budget is `min(session budget, daily limit left, remaining(owner, agent))`, read before the split; a zero on-chain remaining makes every share `BUDGET_CAP` dust | settler | [`lib/settle/settle.ts#L92-L101`](lib/settle/settle.ts#L92-L101) |
+| Every decision is stored, then one `pull(owner, need)` of exactly what will be paid, held or reserved, then the payments | settler | [`lib/settle/settle.ts#L206-L230`](lib/settle/settle.ts#L206-L230), [`lib/chain/budget.ts`](lib/chain/budget.ts) |
+| A refused pull (`OverPeriodCap`, `NoAllowance`, short approval or balance) moves nothing; each credit keeps its decision and gets `BUDGET_PULL_FAILED` with the revert name | settler | [`#L224-L230`](lib/settle/settle.ts#L224-L230) |
+| `revoke(agent)`, one tx, no server involved (or `approve(budget, 0)` on USDC) | owner | [`#L67-L70`](contracts/src/EndCreditsBudget.sol#L67-L70) |
+
+If the agent key is stolen:
+
+- it can pull at most what is left of the cap, then `perPeriod` per window until the owner revokes;
+  windows are fixed, so the worst burst is `2 x perPeriod` across a window edge;
+- it cannot raise its cap, change the period, undo a revoke, pull from an owner who did not name it,
+  use another spender's allowance, or touch any token but the pinned USDC;
+- the pulled USDC goes only to the agent key itself ([`#L74-L89`](contracts/src/EndCreditsBudget.sol#L74-L89)).
+
+35 Foundry tests, including 4 invariants against a model, in
+[`contracts/test/EndCreditsBudget.t.sol`](contracts/test/EndCreditsBudget.t.sol) and
+[`EndCreditsBudget.invariant.t.sol`](contracts/test/EndCreditsBudget.invariant.t.sol). Every guard was
+deleted or swapped in turn and a named test failed each time (mutation table in
+[`docs/plan/decisions.md`](docs/plan/decisions.md), EndCreditsBudget mutation pass). The settle
+integration runs on anvil against MockUSDC, the budget and the escrow
+([`lib/settle/settle.budget.anvil.test.ts`](lib/settle/settle.budget.anvil.test.ts)).
+
+Together with escrow v2 this is the policy an agent cannot talk its way past: session budget,
+per-package cap and daily limit in the split, the on-chain spend cap in `EndCreditsBudget`, the
+Intercepta screen before anything is signed, and the owner's signature for held money.
+
+Without `BUDGET_ADDRESS`, or for an owner with no budget wallet, the agent key pays from its own
+balance as before.
+
 ## Curvegrid MultiBaas
 
 **Summary.** End Credits is an AI agent that pays the open-source packages a Claude Code session
@@ -475,8 +518,9 @@ All on Base Sepolia (chain `84532`). Testnet keys only.
 | Role | Address |
 |---|---|
 | `EndCreditsEscrow` v2 (owner-signed release) | [`0x849F6cd44e4A3248d033aBB1b670257F77bFCc46`](https://sepolia.basescan.org/address/0x849F6cd44e4A3248d033aBB1b670257F77bFCc46#code), Sourcify `exact_match`, `changeDelay` 3 days |
+| `EndCreditsBudget` (owner's spend cap for the agent key) | [`0x1429498C0E6F2f474a5BD3230e79a838E3590b36`](https://sepolia.basescan.org/address/0x1429498c0e6f2f474a5bd3230e79a838e3590b36#code), Sourcify `exact_match`, MultiBaas alias `budget` |
 | `EndCreditsEscrow` v1 (superseded 26 Sep) | [`0x63047583FbCe241D72d71137C940aa27BBdC60f1`](https://sepolia.basescan.org/address/0x63047583FbCe241D72d71137C940aa27BBdC60f1#code), Sourcify `exact_match`, `changeDelay` 3 days |
-| Payer (x402 signatures, `hold`, `reserve`) | [`0xaf4C41858EDdb5Cf99c277Ee7755D918a0639Bb6`](https://sepolia.basescan.org/address/0xaf4C41858EDdb5Cf99c277Ee7755D918a0639Bb6) |
+| Payer, now the agent key (`pull` from the budget, x402 signatures, `hold`, `reserve`) | [`0xaf4C41858EDdb5Cf99c277Ee7755D918a0639Bb6`](https://sepolia.basescan.org/address/0xaf4C41858EDdb5Cf99c277Ee7755D918a0639Bb6) |
 | Recorder (`release`, `refund`, `setClaim`, `claim`, `recordSession`) | [`0xc8e1Bc6B6c1AD5275935B313288b2c6FF45472A8`](https://sepolia.basescan.org/address/0xc8e1Bc6B6c1AD5275935B313288b2c6FF45472A8) |
 | Receipt signer (x402 credit receipts, signs off chain) | `0xCD5f2A9eB66463aea82a6E41E03D42b798cD6725` |
 | Deployer | [`0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13`](https://sepolia.basescan.org/address/0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13) |
@@ -490,6 +534,9 @@ escrow as `escrow` and USDC as `usdc`, holds the six saved queries, and posts to
 `/api/webhooks/multibaas` through the webhook `endcredits`. Live checks on 26 Sep: hold then refund
 round trips indexed by MultiBaas, `Held` and `Refunded` delivered by the webhook, owner notifications
 created.
+
+A first `EndCreditsBudget` at `0xd35cb8b89a219df7320eb0e9b47969cc709cc5c5` was built from a stale
+artifact, could not be verified against the final source, and is not used.
 
 The contract is in [`contracts/src/EndCreditsEscrow.sol`](contracts/src/EndCreditsEscrow.sol). Every
 guard has a test that asserts its custom error selector; deleting each guard in turn makes its named
@@ -544,6 +591,7 @@ checks the boot set and throws `Missing required env: <NAME>` on the first read 
 | Worker boot | `APP_URL`, `DATABASE_URL`, `INTERCEPTA_API_KEY`, `INTERCEPTA_BASE`, `BASE_SEPOLIA_RPC`, `USDC_ADDRESS`, `ESCROW_ADDRESS`, `PAYER_PRIVATE_KEY`, `RECORDER_PRIVATE_KEY`, `X402_FACILITATOR_URL` |
 | x402 resource | `RECEIPT_SIGNING_KEY` |
 | Owner login | `OWNER_DEV_TOKEN` |
+| Budget wallet (optional) | `BUDGET_ADDRESS` |
 | Escrow v2 seed | `APPROVER_ADDRESS` (the owner's approver wallet, named by the payer on first seed) |
 | Optional World ID (off unless `WORLD_REQUIRED=true`) | `WORLD_REQUIRED`, `APPROVE_METHOD`, `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
 | MultiBaas | `MULTIBAAS_URL`, `MULTIBAAS_API_KEY`, `MULTIBAAS_WEBHOOK_SECRET`, `PAYER_ADDRESS` (optional) |
