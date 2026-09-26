@@ -137,12 +137,17 @@ export async function recordDecision(
 export async function recordExecution(
   database: Database,
   creditId: string,
-  e: { txHash: string; receipt?: unknown },
+  e: { txHash: string; receipt?: unknown; paidVia?: "maintainer_x402" | "endcredits_x402" },
   now: Date,
 ) {
   await database
     .update(credits)
-    .set({ txHash: e.txHash, ...(e.receipt ? { receipt: e.receipt } : {}), settledAt: now })
+    .set({
+      txHash: e.txHash,
+      ...(e.receipt ? { receipt: e.receipt } : {}),
+      ...(e.paidVia ? { paidVia: e.paidVia } : {}),
+      settledAt: now,
+    })
     .where(eq(credits.id, creditId));
 }
 
@@ -151,6 +156,25 @@ export async function appendReason(database: Database, creditId: string, reason:
     .update(credits)
     .set({ reasons: sql`${credits.reasons} || ${JSON.stringify([reason])}::jsonb` })
     .where(eq(credits.id, creditId));
+}
+
+/** A paid decision whose maintainer endpoint failed the pre-sign check: refused, nothing signed.
+ *  The PAID/CAPPED line goes, the rest of the decision stays and the refusal is added. */
+export async function refuseAtEndpoint(database: Database, creditId: string, reason: Reason) {
+  await database
+    .update(credits)
+    .set({
+      outcome: "refused",
+      reasons: sql`coalesce((select jsonb_agg(t.r order by t.i)
+        from jsonb_array_elements(${credits.reasons}) with ordinality as t(r, i)
+        where t.r->>'code' not in ('PAID','CAPPED')), '[]'::jsonb) || ${JSON.stringify([reason])}::jsonb`,
+    })
+    .where(eq(credits.id, creditId));
+}
+
+/** The maintainer's own x402 endpoint as last resolved from FUNDING.json, or null. */
+export async function setX402Endpoint(database: Database, packageId: string, endpoint: string | null) {
+  await database.update(packages).set({ x402Endpoint: endpoint }).where(eq(packages.id, packageId));
 }
 
 export async function insertHold(
