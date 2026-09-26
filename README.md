@@ -73,6 +73,27 @@ Across the event: 30 sessions from two developer accounts, 22 projects credited,
 maintainers in 28 payments, 185 USDC reserved for maintainers without a wallet. Live
 numbers on the [dashboard](https://end-credits.up.railway.app/dashboard).
 
+## Maintainer claim
+
+Only 2.1% of the top 1,000 npm packages publish a wallet, so most shares start as `reserved`. The
+maintainer claims them in about a minute on `/app/npm/<package>`, and pays no gas:
+
+1. **Sign in with GitHub.** We check that they can push to the package's repository.
+2. **Choose a receiving wallet** in MetaMask. Intercepta screens it before any money moves.
+3. **Open the pull request.** It adds a `FUNDING.json` with that wallet; nothing else changes.
+4. **Merge, verify, receive.** Once the file is on the default branch, End Credits records the claim
+   on chain (`setClaim`) and releases every reserve for the package (`claim`).
+
+![Maintainer claim: sign in with GitHub, choose a wallet, open the pull request, merge and receive](docs/assets/maintainer-claim.png)
+
+Claimed on Base Sepolia:
+
+| Package | When | `setClaim` | `claim` |
+|---|---|---|---|
+| `@endcredits-demo/unclaimed-utils` | recorded demo | [`0x74a0…57ec`](https://sepolia.basescan.org/tx/0x74a0153930ff6c611bf1ebbcc836b07f4ce623a649691dfc1c6d79aec71157ec) | [`0x8e72…3408`](https://sepolia.basescan.org/tx/0x8e7232d6def61e6c31a2ea90b06bac83f89d453e666edacb95582602fa093408) |
+| `@endcredits-demo/unclaimed-rehearsal-2` | end-to-end rehearsal | [`0xe727…183c`](https://sepolia.basescan.org/tx/0xe7279aa1aae4c4f36c4cec7550768a26d96b60120ecad591ceb0cd78693e183c) | [`0x636f…2d53`](https://sepolia.basescan.org/tx/0x636f71ff4f381fac8a615909cc7829700b9d0220061d319c3b8b5ba5153d2d53) |
+| `@endcredits-demo/unclaimed-rehearsal-1` | first rehearsal | [`0x9821…fea1`](https://sepolia.basescan.org/tx/0x982155da281f9e271a1d1eb0b7cf719cdaa66385be29d24f31b67688add9fea1) | [`0xf0bc…921d`](https://sepolia.basescan.org/tx/0xf0bce1f17720d8ef505d1cf02d4968ca25026d170ad0dd9bb593b1114456921d) |
+
 ## Intercepta: the moment of decision
 
 - Every payee gets a quick scan, the address-poisoning check and token risks, in parallel, before
