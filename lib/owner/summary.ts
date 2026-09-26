@@ -5,10 +5,13 @@ import { holdReasonText } from "../approve/reasons";
 import { db } from "../db/client";
 import { credits, holds, notifications, packages, sessions } from "../db/schema";
 import { formatUsdc } from "../money";
+import { budgetView, type BudgetChain, type BudgetView } from "./budget";
 import { ownerRow, settingsView, type SettingsView } from "./settings";
 
 export interface SummaryDeps {
   balanceOf(address: Address): Promise<bigint>;
+  /** The budget wallet reads; omitted → `budget: null`. */
+  budget?: BudgetChain;
 }
 
 export interface PendingHold {
@@ -27,6 +30,8 @@ export interface OwnerSummary {
   /** Escrow v2: the owner's approver wallet as stored; the on-chain state is at /api/owner/approver. */
   approver: string | null;
   settings: SettingsView;
+  /** The owner's budget wallet (EndCreditsBudget), same shape as GET /api/owner/budget. */
+  budget: BudgetView | null;
   payer: { address: string; usdcBalance: string | null; error: "rpc_unavailable" | null };
   pendingHolds: PendingHold[];
   notifications: {
@@ -109,15 +114,17 @@ export async function ownerSummary(
 ): Promise<OwnerSummary | null> {
   const owner = await ownerRow(ownerId);
   if (!owner) return null;
-  const [payer, holdsList, notes] = await Promise.all([
+  const [payer, holdsList, notes, budget] = await Promise.all([
     payerBalance(owner.payerAddress, deps),
     pendingHolds(ownerId, now),
     unreadNotifications(ownerId),
+    deps.budget ? budgetView(owner.budgetOwner, deps.budget) : null,
   ]);
   return {
     owner: { id: owner.id, displayName: owner.displayName },
     approver: owner.approverAddress ?? null,
     settings: settingsView(owner),
+    budget,
     payer,
     pendingHolds: holdsList,
     notifications: notes,

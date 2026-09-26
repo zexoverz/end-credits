@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { BudgetWallet } from "@/components/budget/budget-wallet";
 import { SetApprover } from "@/components/approver/set-approver";
 import { useFeedback } from "@/components/product/feedback";
 import { CONTROL as U } from "@/lib/copy/control-room";
@@ -314,11 +315,7 @@ function SignedIn({
             {allowance?.detail && (
               <p className="allowance-server-detail">{allowance.detail}</p>
             )}
-            <p>
-              {allowance?.detail === "coming soon"
-                ? O.allowanceSoon
-                : O.allowancePending}
-            </p>
+            <BudgetWallet />
             <a href="#keys">{O.continueKeys}</a>
           </div>
         </div>

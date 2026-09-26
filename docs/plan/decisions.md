@@ -1244,3 +1244,35 @@ Sepolia, verified on Sourcify (`exact_match`) and Basescan, linked in MultiBaas 
 deployment at `0xd35cb8b89a219df7320eb0e9b47969cc709cc5c5` was built from a stale artifact (21 bytes
 longer, before the redundant check was removed), could not be verified against the final source, and
 is not used.
+
+## Budget integration (26 Sep)
+
+- **Model:** the owner's USDC stays in the owner's wallet (`owners.budget_owner`, a new column rather
+  than `owners.wallet_address`, so the funding wallet can differ from the sign-in wallet). The owner
+  approves USDC to `EndCreditsBudget` and calls `setAllowance(hotKey, perPeriod, period)`. The
+  settler's hot key (the existing payer key, now only a spender) pulls, then pays exactly as before:
+  x402 from the hot key, escrow hold and reserve from the hot key.
+- **Budget B:** `min(session budget, daily limit − spent today, budget.remaining(owner, hotKey))`, read
+  before the split, so a session never plans more than the on-chain cap allows. When the on-chain
+  remaining is the binding zero, every credit is dust with `BUDGET_CAP` instead of `DAILY_LIMIT`.
+- **One pull, after every decision:** settlement now stores every decision first (phase 2), then pulls
+  `need` = the sum of amounts that will move (paid, capped, held, reserved) once, then executes
+  (phase 3). This also changed the no-budget path from decide-and-execute per credit to decide-all
+  then execute-all; AGENTS rule 6 holds more strictly, outcomes are unchanged. Refused credits never
+  count toward `need`.
+- **Pull failure:** a revert (`OverPeriodCap`, `NoAllowance`, a short USDC approval or balance) moves
+  nothing. Each would-be-moving credit keeps its decision and gets `BUDGET_PULL_FAILED` with the
+  decoded revert name; the session still settles and records on chain with zero moved. The pull
+  simulates first in the tx queue, so a revert is normally named before anything is signed.
+- **Error decoding:** the pull call's ABI is `budgetAbi` plus OpenZeppelin's `ERC20InsufficientAllowance`
+  and `ERC20InsufficientBalance` so MockUSDC's errors are named; Circle's USDC reverts with a string,
+  which the queue already reads as the reason.
+- **Same queue:** `pull` goes through the escrow's per-key tx queue (`queueFor`, now exported), so its
+  nonce never collides with the hot key's escrow writes.
+- **Fallback:** without `BUDGET_ADDRESS`, or for an owner with no `budget_owner`, nothing changes: the
+  hot key pays from its own balance. Existing tests and the live demo keep working.
+- **Leftover:** a pulled amount whose execution then fails (an x402 or escrow error after the pull)
+  stays on the hot key. It is not returned to the owner automatically; the next session's spend is
+  still pulled in full. Acceptable for the hackathon; a sweep back is the follow-up.
+- **Onboarding:** `spend_allowance` is done when the allowance has something left this period and the
+  USDC approval to the budget contract covers at least `perPeriod`.

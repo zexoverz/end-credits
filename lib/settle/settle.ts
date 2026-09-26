@@ -2,8 +2,9 @@
 // tested against a real Postgres with fakes; `deps.ts` wires the real registry, resolver,
 // Intercepta, escrow and x402 client.
 //
-// Order per credit: resolve the payee (phase 1, all credits), then screen, decide, store the
-// decision, and only then sign or send anything (phase 2, amount desc). AGENTS rules 6 and 7.
+// Order: resolve every payee (phase 1), screen, decide and store every decision (phase 2), pull the
+// session's spend from the owner's budget wallet once when one is set, and only then sign or send
+// anything (phase 3, amount desc). AGENTS rules 6 and 7.
 import { keccak256, stringToBytes, type Address, type Hash, type Hex } from "viem";
 import type { HoldArgs, SessionTotals } from "../chain/escrow";
 import { TxRevertedError } from "../chain/txqueue";
@@ -45,6 +46,14 @@ export type SettleDeps = {
     recordSession(s: SessionTotals): Promise<Hash>;
   };
   payCredit(credit: ClientCredit): Promise<{ tx: string; receipt: unknown }>;
+  /** EndCreditsBudget, when BUDGET_ADDRESS is set: the hot key pulls each session's spend from the
+   *  owner's own wallet (`owners.budget_owner`) before anything moves. Omitted → the hot key pays
+   *  from its own balance. */
+  budget?: {
+    /** What the hot key can still pull from `owner` this period. */
+    remaining(owner: Address): Promise<bigint>;
+    pull(owner: Address, amount: bigint): Promise<Hash>;
+  };
   now?: () => Date;
   concurrency?: number;
   log?: (line: string) => void;
@@ -67,6 +76,7 @@ type Work = {
   lookupError?: string;
   // filled in phase 2
   outcome?: string;
+  decision?: Decision;
   tx?: string | null;
 };
 
@@ -81,7 +91,14 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
 
   const spent = await store.spentToday(database, owner.id, now());
   const left = owner.dailyLimitMicro - spent;
-  const budget = left < owner.sessionBudgetMicro ? left : owner.sessionBudgetMicro;
+  let budget = left < owner.sessionBudgetMicro ? left : owner.sessionBudgetMicro;
+  // Never plan more than the on-chain allowance lets the hot key pull this period.
+  const budgetOwner = deps.budget && owner.budgetOwner ? (owner.budgetOwner as Address) : null;
+  let chainCapped = false;
+  if (budgetOwner) {
+    const onchain = await deps.budget!.remaining(budgetOwner);
+    if (onchain < budget) [budget, chainCapped] = [onchain, true];
+  }
 
   const scored = scoreUsage(ctx.usage);
   const versions = new Map(ctx.usage.map((u) => [u.packageName, u.version ?? undefined]));
@@ -89,7 +106,7 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
   const sessionKey = session.sessionKey as Hex;
 
   if (budget <= BigInt(0)) {
-    const reason = policy("DAILY_LIMIT");
+    const reason = policy(chainCapped ? "BUDGET_CAP" : "DAILY_LIMIT");
     await store.insertCredits(
       database,
       scored.map((p) => ({
@@ -147,7 +164,12 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
 
   const limit = deps.concurrency ?? 3;
   await mapLimit(work, limit, (w) => lookup(w, deps, now()));
-  await mapLimit(work, limit, (w) => decideAndExecute(w, work, { ...deps, now }, sessionKey, owner.holdTtlSeconds));
+  const full = { ...deps, now };
+  // Every decision is stored before anything is signed or sent (AGENTS rule 6).
+  await mapLimit(work, limit, (w) => decideOne(w, work, full));
+  const pull = budgetOwner ? await pullOnce(budgetOwner, work, full) : { tx: null, error: null };
+  if (pull.error) await markPullFailed(work, pull.error, full);
+  else await mapLimit(work, limit, (w) => executeOne(w, full, sessionKey, owner.holdTtlSeconds));
 
   const manifest = manifestOf(
     work.map((w) => ({
@@ -170,7 +192,41 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
     refused: sum((w) => w.outcome === "refused"),
     manifestHash: manifest.hash,
   });
-  await store.finishSession(database, sessionId, { budgetMicro: budget, manifestHash: manifest.hash, recordTx });
+  await store.finishSession(database, sessionId, {
+    budgetMicro: budget,
+    manifestHash: manifest.hash,
+    recordTx,
+    budgetPullTx: pull.tx,
+  });
+}
+
+const MOVING = new Set(["paid", "capped", "held", "reserved"]);
+const moves = (w: Work) => !!w.outcome && MOVING.has(w.outcome);
+
+// One pull of exactly what will move (x402 payments, escrow holds and reserves, all from the hot
+// key), before any of it moves. A revert leaves every decision in place and moves nothing.
+async function pullOnce(
+  owner: Address,
+  work: Work[],
+  deps: SettleDeps,
+): Promise<{ tx: string | null; error: string | null }> {
+  const need = work.filter(moves).reduce((a, w) => a + w.amount, BigInt(0));
+  if (need === BigInt(0)) return { tx: null, error: null };
+  try {
+    return { tx: await deps.budget!.pull(owner, need), error: null };
+  } catch (err) {
+    const error = err instanceof TxRevertedError ? err.errorName : errorLabel(err);
+    deps.log?.(`settle: budget pull of ${need} from ${owner} failed: ${error}`);
+    return { tx: err instanceof TxRevertedError ? (err.hash ?? null) : null, error };
+  }
+}
+
+async function markPullFailed(work: Work[], error: string, deps: SettleDeps): Promise<void> {
+  const text = msg("BUDGET_PULL_FAILED", { error });
+  for (const w of work.filter(moves)) {
+    w.tx = null;
+    await store.appendReason(deps.database, w.creditId, { source: "policy", code: "BUDGET_PULL_FAILED", text });
+  }
 }
 
 // Phase 1: registry, payee, change detection. Tried twice; a second failure refuses the credit
@@ -233,14 +289,8 @@ function changeOf(w: Work, address: Address, source: string, deps: SettleDeps, n
   return recentlyChanged(deps.observations, w.packageId, address, { now, pushedAt });
 }
 
-// Phase 2: screen, decide, store the decision, then execute.
-async function decideAndExecute(
-  w: Work,
-  all: Work[],
-  deps: SettleDeps & { now: () => Date },
-  sessionKey: Hex,
-  ttlSeconds: number,
-): Promise<void> {
+// Phase 2: screen, decide, store the decision. Nothing is signed here.
+async function decideOne(w: Work, all: Work[], deps: SettleDeps & { now: () => Date }): Promise<void> {
   const { database } = deps;
   if (w.lookupError || !w.resolution) {
     w.outcome = "refused";
@@ -272,13 +322,25 @@ async function decideAndExecute(
   const screenIds = [...(screen?.screenIds ?? []), ...(sim?.screenId ? [sim.screenId] : [])];
   const reasons = [...decision.reasons, ...payeeReason(w.resolution), ...declaredReason(w)];
   w.outcome = decision.outcome;
+  w.decision = decision;
   await store.recordDecision(
     database,
     w.creditId,
     { outcome: decision.outcome, reasons, screenIds },
     deps.now(),
   );
+}
 
+// Phase 3: execute a stored decision. A failure keeps the decision and records why.
+async function executeOne(
+  w: Work,
+  deps: SettleDeps & { now: () => Date },
+  sessionKey: Hex,
+  ttlSeconds: number,
+): Promise<void> {
+  const { database } = deps;
+  const decision = w.decision;
+  if (!decision) return; // refused before a decision (lookup failed): nothing to send
   try {
     w.tx = await execute(w, decision, deps, sessionKey, ttlSeconds);
   } catch (err) {

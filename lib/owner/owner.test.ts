@@ -298,4 +298,124 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
       expect(chain.sent).toHaveLength(0);
     });
   });
+  describe("budget wallet", () => {
+    const BUDGET = "0x1429498c0e6f2f474a5bd3230e79a838e3590b36";
+    const SPENDER = "0x00000000000000000000000000000000000000aa";
+    const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+    const FUNDER = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+    const FUNDER_SUM = "0xABcdEFABcdEFabcdEfAbCdefabcdeFABcDEFabCD";
+
+    function fakeBudgetChain(o: { address?: string | null; fail?: boolean; allowance?: boolean } = {}) {
+      const asked: string[] = [];
+      const read = <T>(v: T) => async (owner: string) => {
+        asked.push(owner);
+        if (o.fail) throw new Error("fetch failed https://rpc.example/secret-key");
+        return v;
+      };
+      const chain: import("./budget").BudgetChain = {
+        address: () => (o.address === undefined ? BUDGET : o.address) as `0x${string}` | null,
+        spender: () => SPENDER,
+        usdc: () => USDC,
+        usdcBalance: read(BigInt(12_500_000)),
+        usdcAllowanceToBudget: read(BigInt(20_000_000)),
+        allowanceOf: read(
+          o.allowance === false
+            ? null
+            : { perPeriod: BigInt(20_000_000), period: BigInt(86400), periodStart: BigInt(1_790_000_000), spentInPeriod: BigInt(1_500_000) },
+        ),
+        remaining: read(BigInt(18_500_000)),
+      };
+      return { chain, asked };
+    }
+
+    const post = (body: unknown, c = cookie) =>
+      req("/api/owner/budget", { method: "POST", body: JSON.stringify(body), cookie: c });
+
+    it("401 without an owner session", async () => {
+      const { chain } = fakeBudgetChain();
+      expect((await h.handleGetBudget(req("/api/owner/budget"), chain)).status).toBe(401);
+      expect((await h.handleSetBudget(post({ address: FUNDER }, ""), chain)).status).toBe(401);
+    });
+
+    it("reads no chain state before a budget wallet is set", async () => {
+      const owner = await makeOwner(db, s);
+      const c = await signInCookie(owner);
+      const { chain, asked } = fakeBudgetChain();
+      const res = await h.handleGetBudget(req("/api/owner/budget", { cookie: c }), chain);
+      expect(await res.json()).toEqual({
+        budgetAddress: BUDGET,
+        usdc: USDC,
+        budgetOwner: null,
+        spender: SPENDER,
+        usdcBalance: null,
+        usdcAllowanceToBudget: null,
+        allowance: null,
+        error: null,
+      });
+      expect(asked).toEqual([]);
+    });
+
+    it("stores the wallet checksummed and answers with its on-chain allowance in USDC", async () => {
+      const owner = await makeOwner(db, s);
+      const c = await signInCookie(owner);
+      const { chain, asked } = fakeBudgetChain();
+      const res = await h.handleSetBudget(post({ address: FUNDER }, c), chain);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({
+        budgetAddress: BUDGET,
+        usdc: USDC,
+        budgetOwner: FUNDER_SUM,
+        spender: SPENDER,
+        usdcBalance: "12.5",
+        usdcAllowanceToBudget: "20",
+        allowance: {
+          perPeriod: "20",
+          period: 86400,
+          periodStart: new Date(1_790_000_000_000).toISOString(),
+          spentInPeriod: "1.5",
+          remaining: "18.5",
+        },
+        error: null,
+      });
+      expect(new Set(asked)).toEqual(new Set([FUNDER_SUM]));
+      const [row] = await db.select().from(s.owners).where(eq(s.owners.id, owner));
+      expect(row.budgetOwner).toBe(FUNDER_SUM);
+      const again = await h.handleGetBudget(req("/api/owner/budget", { cookie: c }), chain);
+      expect(await again.json()).toEqual(body);
+    });
+
+    it("allowance is null when none is set, and the summary carries the same view", async () => {
+      const owner = await makeOwner(db, s);
+      const c = await signInCookie(owner);
+      const { chain } = fakeBudgetChain({ allowance: false });
+      await h.handleSetBudget(post({ address: FUNDER }, c), chain);
+      const res = await h.handleSummary(req("/api/owner", { cookie: c }), { balanceOf: async () => BigInt(0), budget: chain });
+      const body = await res.json();
+      expect(body.budget).toMatchObject({ budgetOwner: FUNDER_SUM, allowance: null, usdcBalance: "12.5" });
+      const without = await h.handleSummary(req("/api/owner", { cookie: c }), { balanceOf: async () => BigInt(0) });
+      expect((await without.json()).budget).toBeNull();
+    });
+
+    it("says rpc_unavailable without the RPC error text, and budgetAddress null when unset", async () => {
+      const owner = await makeOwner(db, s);
+      const c = await signInCookie(owner);
+      const failing = fakeBudgetChain({ fail: true });
+      const res = await h.handleSetBudget(post({ address: FUNDER }, c), failing.chain);
+      const body = await res.json();
+      expect(body).toMatchObject({ budgetOwner: FUNDER_SUM, usdcBalance: null, allowance: null, error: "rpc_unavailable" });
+      expect(JSON.stringify(body)).not.toContain("secret-key");
+      const unset = fakeBudgetChain({ address: null });
+      const view = await (await h.handleGetBudget(req("/api/owner/budget", { cookie: c }), unset.chain)).json();
+      expect(view).toMatchObject({ budgetAddress: null, budgetOwner: FUNDER_SUM, allowance: null, error: null });
+      expect(unset.asked).toEqual([]);
+    });
+
+    it("400 on a bad address", async () => {
+      const { chain } = fakeBudgetChain();
+      for (const address of ["0x12", "", 5, undefined]) {
+        expect((await h.handleSetBudget(post({ address }), chain)).status).toBe(400);
+      }
+    });
+  });
 });
