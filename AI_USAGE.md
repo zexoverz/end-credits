@@ -149,3 +149,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | docs how it works diagram | docs/assets/how-it-works.png, README.md | Diagram drawn by Codex for the pitch deck; Claude Code placed it under How it works. Human review pending. |
 
 | docs maintainer claim section | README.md, docs/assets/maintainer-claim.png | Claude Code wrote the section from the claim code and the on-chain claims; screenshot of the claim page. Human review pending. |
+
+| docs partner logos | README.md, docs/assets/{intercepta,curvegrid}.svg | Official logos from the partners sites (via the pitch assets); Intercepta recoloured dark with its wordmark for a light page, Curvegrid CSS variables replaced by their colours. Human review pending. |
