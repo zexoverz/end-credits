@@ -25,6 +25,8 @@ export interface RawCall {
   to: Address;
   data: Hex;
   functionName: string;
+  /** Wei sent with the call (a gas top-up). */
+  value?: bigint;
 }
 
 export type TxCall = ContractCall | RawCall;
@@ -186,7 +188,7 @@ export function viemIo(
     pendingNonce: (from) => publicClient.getTransactionCount({ address: from, blockTag: "pending" }),
     async simulate(from, call, blockNumber) {
       if (isRaw(call)) {
-        await publicClient.call({ account: from, to: call.to, data: call.data, blockNumber });
+        await publicClient.call({ account: from, to: call.to, data: call.data, value: call.value, blockNumber });
         return;
       }
       await publicClient.simulateContract({ ...call, account: signer(from).account, blockNumber });
@@ -194,7 +196,7 @@ export function viemIo(
     write: (from, call, nonce) => {
       const s = signer(from);
       if (isRaw(call)) {
-        return s.sendTransaction({ account: s.account, chain: s.chain, to: call.to, data: call.data, nonce });
+        return s.sendTransaction({ account: s.account, chain: s.chain, to: call.to, data: call.data, value: call.value, nonce });
       }
       return s.writeContract({ ...call, account: s.account, chain: s.chain, nonce });
     },
