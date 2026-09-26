@@ -631,7 +631,7 @@ checks the boot set and throws `Missing required env: <NAME>` on the first read 
 | Web boot | `APP_URL`, `DATABASE_URL`, `SESSION_SECRET` |
 | Worker boot | `APP_URL`, `DATABASE_URL`, `INTERCEPTA_API_KEY`, `INTERCEPTA_BASE`, `BASE_SEPOLIA_RPC`, `USDC_ADDRESS`, `ESCROW_ADDRESS`, `PAYER_PRIVATE_KEY`, `RECORDER_PRIVATE_KEY`, `X402_FACILITATOR_URL` |
 | x402 resource | `RECEIPT_SIGNING_KEY` |
-| Owner login | `OWNER_DEV_TOKEN` |
+| Owner login | wallet sign-in builds the chain client, so the web service also needs `BASE_SEPOLIA_RPC`, `USDC_ADDRESS`, `ESCROW_ADDRESS`, `PAYER_PRIVATE_KEY`, `RECORDER_PRIVATE_KEY`; `OWNER_DEV_TOKEN` (optional, scripts only) |
 | Budget wallet (optional) | `BUDGET_ADDRESS` |
 | Escrow v2 seed | `APPROVER_ADDRESS` (the owner's approver wallet, named by the payer on first seed) |
 | Optional World ID (off unless `WORLD_REQUIRED=true`) | `WORLD_REQUIRED`, `APPROVE_METHOD`, `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
@@ -649,6 +649,22 @@ pnpm seed                     # demo owner; --write-config also writes a dev age
 pnpm dev                      # web
 pnpm worker                   # settler every 2 s, expirer every 30 s
 ```
+
+### Owner setup
+
+The owner signs in with their wallet: Sign-In with Ethereum (EIP-4361) on Base Sepolia, chain
+`84532`, on the fixed `APP_URL` host ([`lib/auth/wallet.ts`](lib/auth/wallet.ts),
+[`app/api/auth/wallet/nonce/route.ts`](app/api/auth/wallet/nonce/route.ts),
+[`app/api/auth/wallet/route.ts`](app/api/auth/wallet/route.ts)). Nonces expire after 10 minutes and
+are single use: a used nonce is stored, so replaying an old cookie fails. The first sign-in binds the
+wallet only if it is the owner's on-chain approver (or none is set yet); later sign-ins must be that
+wallet. EOAs, ERC-1271 and not-yet-deployed passkey wallets (ERC-6492) all verify.
+
+`GET /api/owner/onboarding` ([`lib/owner/onboarding.ts`](lib/owner/onboarding.ts)) returns the
+checklist in order with the next step to do: signed in, wallet bound, budget set, approver set, spend
+allowance on `EndCreditsBudget`, agent key, first session.
+
+`OWNER_DEV_TOKEN` (`POST /api/auth/dev`) remains for scripts and local runs.
 
 ### CLI
 
