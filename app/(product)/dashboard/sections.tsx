@@ -119,7 +119,8 @@ export function RecentEvents({
         <span className="studio-live-dot" />
       </header>
       {rows.length === 0 ? (
-        <div className="studio-small-empty">
+        <div className="studio-small-empty desk-receipt-empty">
+          <StudioArtwork kind="press" />
           <h3>{S.noActivity}</h3>
           <p>{S.noActivityBody}</p>
         </div>
@@ -192,7 +193,7 @@ export function EscrowPanel({ data }: { data: Dashboard }) {
         )}
       </section>
       <section className="studio-vault">
-        <StudioArtwork kind="vault" />
+        <StudioArtwork kind="press" />
         <h2>{S.escrow}</h2>
         <p>{S.escrowBody}</p>
         {total > 0 && (
@@ -220,7 +221,7 @@ export function EscrowPanel({ data }: { data: Dashboard }) {
             </div>
           ))}
         </dl>
-        <Link href="/app/history?outcome=refused">
+        <Link href="/app?view=decisions&outcome=refused">
           {fill(S.refused, { count: data.cards.refused.count })} ↗
         </Link>
       </section>

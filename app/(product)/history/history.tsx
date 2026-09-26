@@ -100,7 +100,7 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
       )}
       {state.items?.length === 0 && (
         <div className="studio-history-empty">
-          <StudioArtwork kind="cast" />
+          <StudioArtwork kind="screen" />
           <h2>{S.decisionEmptyTitle}</h2>
           <p>{S.decisionEmptyBody}</p>
         </div>

@@ -1,10 +1,9 @@
 import { Page } from "@/components/ui";
-import { STUDIO as S } from "@/lib/copy/studio";
-import { Sessions } from "./sessions";
+import { DashboardView } from "../../dashboard/dashboard-view";
 export default function SessionsPage() {
   return (
-    <Page title={S.sessionsTitle}>
-      <Sessions />
+    <Page>
+      <DashboardView view="sessions" />
     </Page>
   );
 }

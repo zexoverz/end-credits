@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
-import { STUDIO as S } from "@/lib/copy/studio";
 import { Page } from "@/components/ui";
-import { DASHBOARD as C } from "@/lib/copy/dashboard";
+import { DESK as D } from "@/lib/copy/desk";
 import { DashboardView } from "./dashboard-view";
-
-export const metadata: Metadata = { title: `${C.TITLE} · End Credits` };
-
-export default function DashboardPage() {
+export const metadata: Metadata = { title: `${D.activity} · End Credits` };
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { view, outcome } = await searchParams;
   return (
-    <Page title={S.title}>
-      <DashboardView />
+    <Page>
+      <DashboardView
+        view={typeof view === "string" ? view : "sessions"}
+        outcome={typeof outcome === "string" ? outcome : ""}
+      />
     </Page>
   );
 }

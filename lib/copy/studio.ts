@@ -104,7 +104,7 @@ export const STUDIO = {
     "Sessions found in the latest 200 decisions. Uploaded sessions without decisions can be opened by ID.",
   sessionsEmpty: "Ready for your first roll?",
   sessionsEmptyBody:
-    "Your agent’s work will leave a trail here once package decisions are recorded. Already have a session link? Open it below.",
+    "Sessions appear after their first package decision. You can also open any uploaded session using its link or ID.",
   sessionCount: "{count} package decisions",
   sessionCredits: "View credits",
   sessionSearch: "Search by session ID or package",
@@ -128,7 +128,7 @@ export const STUDIO = {
   decisionEmptyBody:
     "Your agent’s first credits will appear here, with a reason for every decision.",
   resetFilters: "Clear filters",
-  settingsTitle: "Make it your own.",
+  settingsTitle: "You set the boundaries.",
   settingsBody: "Your budget, your agent, your approval rules.",
   settingsNav: [
     ["budget", "Budget & wallet"],

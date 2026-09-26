@@ -8,7 +8,7 @@ import { SessionOpen } from "@/components/product/session-open";
 import { STUDIO as S } from "@/lib/copy/studio";
 import { fill } from "@/lib/client/roll";
 import type { HistoryItem } from "@/lib/history/history";
-export function Sessions() {
+export function Sessions({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -53,7 +53,7 @@ export function Sessions() {
       {!items && !error && <p role="status">{S.sessionLoading}</p>}
       {items?.length === 0 && (
         <section className="studio-sessions-empty">
-          <StudioArtwork />
+          <StudioArtwork kind="session" />
           <div>
             <h2>{S.sessionsEmpty}</h2>
             <p>{S.sessionsEmptyBody}</p>
@@ -108,10 +108,12 @@ export function Sessions() {
           {shown.length === 0 && <p>{S.sessionNoMatches}</p>}
         </>
       )}
-      <div className="studio-session-lookup">
-        <h2>{S.openSession}</h2>
-        <SessionOpen />
-      </div>
+      {!embedded && (
+        <div className="studio-session-lookup">
+          <h2>{S.openSession}</h2>
+          <SessionOpen />
+        </div>
+      )}
       <p className="studio-scope-note">{S.sessionScope}</p>
     </div>
   );

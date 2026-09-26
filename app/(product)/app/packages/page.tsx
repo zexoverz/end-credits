@@ -30,7 +30,7 @@ export default function Packages() {
         ))}
       </div>
       <aside className="studio-maintainer">
-        <StudioArtwork kind="vault" />
+        <StudioArtwork kind="claim" />
         <div>
           <p className="studio-kicker">{S.maintainerTag}</p>
           <h2>{S.maintainerTitle}</h2>

@@ -1,6 +1,7 @@
 import { ProductShell } from "@/components/product/shell";
 import "./product.css";
 import "./studio.css";
+import "./desk.css";
 export default function ProductLayout({
   children,
 }: {

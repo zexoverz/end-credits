@@ -3,7 +3,10 @@
 // with the error: nothing on this page is ever a placeholder or a stale guess.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { STUDIO as S } from "@/lib/copy/studio";
+import { DESK as D } from "@/lib/copy/desk";
+import { Sessions } from "../app/sessions/sessions";
+import { History } from "../history/history";
+import { SessionOpen } from "@/components/product/session-open";
 import { StudioArtwork } from "@/components/product/artwork";
 import { SetupGuide } from "@/components/product/setup-guide";
 import { ErrorBox } from "@/components/ui";
@@ -30,7 +33,14 @@ type State =
   | { phase: "data"; data: Dashboard; at: number }
   | { phase: "error"; error: DashboardError };
 
-export function DashboardView() {
+export function DashboardView({
+  view = "sessions",
+  outcome = "",
+}: {
+  view?: string;
+  outcome?: string;
+}) {
+  const selected = D.views.some(([key]) => key === view) ? view : "sessions";
   const [state, setState] = useState<State>({ phase: "loading" });
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -77,13 +87,33 @@ export function DashboardView() {
     };
   }, [load]);
 
-  const established =
-    state.phase === "data" &&
-    (state.data.sessions.count > 0 || state.data.packages.length > 0);
   return (
-    <div className="space-y-6">
-      <div className="studio-overview-intro">
-        <p>{S.subtitle}</p>
+    <div className="session-desk">
+      <header className="desk-intro">
+        <div>
+          <p className="desk-eyebrow">{D.eyebrow}</p>
+          <h1>{D.title}</h1>
+          <p className="desk-description">{D.subtitle}</p>
+          <div className="desk-intro-actions">
+            <SetupGuide />
+            <Link href="/app/owner?section=budget">{D.controls} ↗</Link>
+          </div>
+        </div>
+        <figure className="desk-process">
+          <figcaption>{D.guideLabel}</figcaption>
+          <StudioArtwork kind="signals" />
+          <ol>
+            {D.steps.map((step, i) => (
+              <li key={step}>
+                <span>0{i + 1}</span>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </figure>
+      </header>
+      <div className="desk-overview-bar">
+        <p>{D.scope}</p>
         <div className="studio-sync">
           {state.phase === "data" && (
             <span>
@@ -110,49 +140,76 @@ export function DashboardView() {
           </button>
         </div>
       </div>
-      <section
-        className={`studio-welcome ${established ? "is-established" : ""}`}
-      >
-        <div>
-          <p className="studio-kicker">{S.greeting}</p>
-          <h2>{established ? S.activeTitle : S.welcome}</h2>
-          <p>{established ? S.activeBody : S.welcomeBody}</p>
-          <div className="studio-actions">
-            {established ? (
-              <Link className="studio-primary" href="/app/sessions">
-                {S.activeAction} ↗
-              </Link>
-            ) : (
-              <SetupGuide />
-            )}
-            <Link href={established ? "/app/history" : "/app/sessions"}>
-              {established ? S.inspect : S.openSession}
-              <span>↗</span>
-            </Link>
-          </div>
-        </div>
-        <div className="studio-welcome-art">
-          <StudioArtwork />
-        </div>
-      </section>
       {state.phase === "loading" && (
-        <p className="text-sm text-muted">{C.LOADING}</p>
+        <p role="status" className="desk-loading">
+          {C.LOADING}
+        </p>
       )}
       {state.phase === "error" && <ErrorPanel error={state.error} />}
+      {state.phase === "data" && <Cards data={state.data} />}
+      <div className="desk-work-area">
+        <section className="desk-records" aria-label={D.activity}>
+          <nav className="desk-view-nav" aria-label={D.viewsLabel}>
+            {D.views.map(([key, label]) => (
+              <Link
+                key={key}
+                href={`/app?view=${key}`}
+                scroll={false}
+                aria-current={selected === key ? "page" : undefined}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <div className="desk-record-content">
+            {selected === "sessions" && <Sessions embedded />}
+            {selected === "decisions" && (
+              <History key={outcome} initialOutcome={outcome} />
+            )}
+            {selected === "chain" &&
+              (state.phase === "data" ? (
+                <RecentEvents
+                  rows={state.data.recent}
+                  packages={state.data.packages}
+                  now={now}
+                />
+              ) : state.phase === "loading" ? (
+                <p role="status">{C.LOADING}</p>
+              ) : (
+                <ErrorPanel error={state.error} />
+              ))}
+          </div>
+          <details className="desk-lookup">
+            <summary>
+              {D.lookup}
+              <span aria-hidden="true">↗</span>
+            </summary>
+            <SessionOpen />
+          </details>
+        </section>
+        <div className="desk-ledger">
+          <header>
+            <p className="desk-eyebrow">{D.ledger}</p>
+            <p>{D.ledgerBody}</p>
+          </header>
+          {state.phase === "data" ? (
+            <EscrowPanel data={state.data} />
+          ) : state.phase === "loading" ? (
+            <p role="status">{C.LOADING}</p>
+          ) : (
+            <ErrorPanel error={state.error} />
+          )}
+        </div>
+      </div>
       {state.phase === "data" && (
         <>
-          <Cards data={state.data} />
-          <div className="studio-dashboard-columns">
-            <div className="studio-main-column">
-              <PackageTable rows={state.data.packages} now={now} />
-              <RecentEvents
-                rows={state.data.recent}
-                packages={state.data.packages}
-                now={now}
-              />
-            </div>
-            <EscrowPanel data={state.data} />
-          </div>
+          <details className="desk-cast">
+            <summary>
+              <span>{D.cast}</span>
+              <span>{D.castHint} ↗</span>
+            </summary>
+            <PackageTable rows={state.data.packages} now={now} />
+          </details>
           <Footer data={state.data} />
         </>
       )}
