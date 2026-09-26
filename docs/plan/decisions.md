@@ -1389,5 +1389,6 @@ only bound that first owner. Anyone else (a judge, a second user) could not beco
 - **Signing.** Settlement, returns to the owner's wallet, the approver route and the budget views all
   use the session owner's payer. All keys share one tx queue per RPC client, so the recorder and each
   payer keep one nonce sequence each.
-- **Limit:** the MultiBaas `paid_totals` query still filters USDC transfers from the master payer, so
-  the dashboard's Paid card counts only the first owner's payments until it filters every payer.
+- **Dashboard.** `paid_totals` filters USDC transfers from every owner's payer with one OR node
+  (MultiBaas accepted `{ rule: "or", children }`, checked live on a throwaway query). The worker saves
+  the query again whenever the set of payers changes, so a new owner's payments show on the Paid card.
