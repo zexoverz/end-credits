@@ -249,6 +249,15 @@ verbatim:
 
 The release is covered in [Held money](#held-money-the-owner-signs-the-release-on-chain).
 
+### Live results: the rest of the loop, 26 Sep 2026
+
+| What | Tx |
+|---|---|
+| A real Claude Code session on the demo app, which asked for its own settlement through the End Credits MCP tools. Session `71993633-1b5b-47bc-b7de-4a3779b8fbfa`: `zod` capped and paid over x402, `@endcredits-demo/moved-payout` held, `@endcredits-demo/left-padder-pro` refused, `date-fns`, `next` and `@endcredits-demo/unclaimed-utils` reserved ([roll](https://end-credits.up.railway.app/credits/71993633-1b5b-47bc-b7de-4a3779b8fbfa)) | `recordSession` [`0x4db2b554…`](https://sepolia.basescan.org/tx/0x4db2b5542e0104d35f9b61b71700bcee6cfe10c759254fd464b8a4379a6bafaf) |
+| Rehearsal claim of `@endcredits-demo/unclaimed-rehearsal-1`: GitHub sign-in, wallet, PR, merge, then the reserved 0.25 USDC to the claimed wallet (our deployer key standing in as the maintainer) | `setClaim` [`0x982155da…`](https://sepolia.basescan.org/tx/0x982155da281f9e271a1d1eb0b7cf719cdaa66385be29d24f31b67688add9fea1), `claim` [`0xf0bce1f1…`](https://sepolia.basescan.org/tx/0xf0bce1f17720d8ef505d1cf02d4968ca25026d170ad0dd9bb593b1114456921d) |
+| A hold denied by the owner: 0.25 USDC back to the payer, `Refunded(expired=false)` | [`0x4e4cf415…`](https://sepolia.basescan.org/tx/0x4e4cf4155f12abbad590d2bcbf82f470f348e38d3a0189ef1b945d7e22b4afd4) |
+| A hold nobody decided, refunded by the expirer worker after its TTL: 0.25 USDC back, `Refunded(expired=true)` | [`0x46c64706…`](https://sepolia.basescan.org/tx/0x46c64706b12d799ff151048034890f45be351ca9b3230fb43230919161ba13dd) |
+
 TODO(live): the final judged demo session id and its roll link.
 
 ### What we learned from the docs
