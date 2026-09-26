@@ -46,7 +46,7 @@ export const MESSAGES = {
   UNKNOWN_STATE: "This verification is not for a pending approval. Nothing was released.",
   VERIFY_FAILED: "The verification could not be checked. Nothing was released.",
   APPROVE_SENTENCE: "Release {amount} USDC to {address} for {package}.",
-  CLAIM_HEADLINE: "Agents set aside {amount} USDC for {package} from {sessions} sessions.",
+  CLAIM_HEADLINE: "Agents set aside {amount} USDC for {package} from {sessions}.",
   NO_PERMISSION: "You need push or admin access to {repo} to claim for {package}.",
   PR_OPENED:
     "Pull request #{number} opened. Merge it to claim; merging is the proof that you control this repository.",
@@ -63,7 +63,7 @@ export const MESSAGES = {
   ROLL_TITLE: "This session was made possible by",
   ACTION_APPROVE: "Approve or deny {amount} USDC held for {package}.",
   ACTION_EXPIRING: "{amount} USDC for {package} expires at {time}. Not approved by then, it returns to you.",
-  ACTION_RESERVE: "{amount} USDC reserved for {package} from {sessions} sessions, waiting for the maintainer to claim.",
+  ACTION_RESERVE: "{amount} USDC reserved for {package} from {sessions}, waiting for the maintainer to claim.",
 } as const;
 
 export type MessageCode = keyof typeof MESSAGES;
@@ -114,3 +114,6 @@ export function msg(code: MessageCode, vars: Vars = {}): string {
 export function cliMsg(code: CliMessageCode, vars: Vars = {}): string {
   return format(CLI_MESSAGES[code], code, vars);
 }
+
+/** "1 session" / "2 sessions", for the {sessions} placeholders. */
+export const sessionsLabel = (n: number): string => `${n} ${n === 1 ? "session" : "sessions"}`;
