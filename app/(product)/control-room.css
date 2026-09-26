@@ -1757,3 +1757,28 @@
   cursor: pointer;
   font-size: 12px;
 }
+
+.reason-evidence > li[data-evidence-tone="held"] {
+  border-color: #aa863e;
+  background: #ad843c0a;
+}
+.reason-evidence > li[data-evidence-tone="refused"] {
+  border-color: #b56c62;
+  background: #b56c620a;
+}
+.reason-evidence > li[data-evidence-tone="checked"] {
+  border-color: #61985f;
+  background: #61985f0a;
+}
+.reason-evidence > li[data-evidence-tone="held"] small {
+  color: #806229;
+}
+.reason-evidence > li[data-evidence-tone="refused"] small {
+  color: #944a40;
+}
+.credits-film .reason-evidence > li[data-evidence-tone="held"] small {
+  color: #e7c585;
+}
+.credits-film .reason-evidence > li[data-evidence-tone="refused"] small {
+  color: #edafa5;
+}

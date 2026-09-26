@@ -30,7 +30,19 @@ export function ReasonEvidence({
   return (
     <ul className="reason-evidence">
       {rows.map((r, i) => (
-        <li key={`${r.code}-${i}`} data-reason-code={r.code}>
+        <li
+          key={`${r.code}-${i}`}
+          data-reason-code={r.code}
+          data-evidence-tone={
+            r.code === "SIMULATED"
+              ? "checked"
+              : r.code.includes("REFUSED")
+                ? "refused"
+                : r.code.includes("HELD") || r.code.includes("UNAVAILABLE")
+                  ? "held"
+                  : "neutral"
+          }
+        >
           <small>
             {r.code.startsWith("PAYER_")
               ? C.reasonKind.payer
