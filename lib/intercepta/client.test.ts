@@ -207,6 +207,18 @@ describe("screenPayee", () => {
     expect(s.impersonation).toEqual({ original: "0xabcd00000000000000000000000000000000abcd" });
   });
 
+  it("marks a no-history payee and does not fall back to simulation", async () => {
+    const f = router({
+      "/quick-scan": () => json(NO_HISTORY_BODY, 404),
+      "/check-address/": () => json(notPoisoned),
+      "/risks": () => json(tokenOk),
+    });
+    const s = await client(f).c.screenPayee(PAYEE, opts);
+    expect(s).toMatchObject({ toxicScore: 0, traits: [], noHistory: true });
+    expect(s.error).toBeUndefined();
+    expect(f.mock.calls.some(([u]) => String(u).includes("/simulation/"))).toBe(false);
+  });
+
   it("falls back to simulation when quick scan fails, keeping its detectors", async () => {
     const f = router({
       "/quick-scan": () => json({}, 502),

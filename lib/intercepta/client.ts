@@ -146,10 +146,14 @@ export function createIntercepta(cfg: InterceptaConfig) {
     ]);
     const screenIds = [scan.screenId, imp.screenId, token.screenId];
 
-    let address: { toxicScore: number; traits: Screen["traits"] } | undefined;
+    let address: { toxicScore: number; traits: Screen["traits"]; noHistory?: true } | undefined;
     let error: ScreenError | undefined;
     if (scan.ok) {
-      address = { toxicScore: scan.data.toxicScore, traits: scan.data.traits.map(nameAndDescription) };
+      address = {
+        toxicScore: scan.data.toxicScore,
+        traits: scan.data.traits.map(nameAndDescription),
+        ...(scan.data.noHistory ? { noHistory: true as const } : {}),
+      };
     } else {
       const sim = await simulateTransfer({ from: opts.from, to: payee, amount: opts.amount });
       screenIds.push(sim.screenId);
@@ -171,6 +175,7 @@ export function createIntercepta(cfg: InterceptaConfig) {
       impersonation:
         imp.ok && imp.data.isAddressPoisoned ? { original: imp.data.originalAddress ?? "" } : null,
       ...(error ? { error } : {}),
+      ...(address?.noHistory ? { noHistory: true } : {}),
       screenIds,
     };
   }
