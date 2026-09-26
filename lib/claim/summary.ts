@@ -140,7 +140,9 @@ export async function packageSummary(req: Request, slug: string[], deps: ClaimDe
     payeeRefused: refusal ? msg("PAYEE_REFUSED", { package: name, description: refusal }) : null,
     claimed: done ? { wallet: done.walletAddress, setClaimTx: done.setClaimTx, claimTxs: done.claimTxs } : null,
     cooling: onChain?.cooling ? { until: onChain.cooling, message: msg("COOLING", { time: onChain.cooling }) } : null,
-    maintainer: maintainer ? { login: maintainer.githubLogin } : null,
+    // Signed in only while we hold their GitHub token: it is dropped once a claim finishes, and
+    // every next step (wallet, PR) needs it, so without it the page must offer sign-in again.
+    maintainer: maintainer?.tokenEnc ? { login: maintainer.githubLogin } : null,
     claim: claimRow && pkg.repoFullName ? claimView(pkg.repoFullName, claimRow) : null,
     payeeRisk,
     errors,
