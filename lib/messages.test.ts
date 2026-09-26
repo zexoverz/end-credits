@@ -17,7 +17,7 @@ describe("msg", () => {
   });
 
   it("has every code from DESIGN §11 plus the ones added during the build (decisions.md)", () => {
-    expect(Object.keys(MESSAGES)).toHaveLength(60);
+    expect(Object.keys(MESSAGES)).toHaveLength(62);
   });
 
   it("names the repo and package in SPOOF_REPO", () => {
