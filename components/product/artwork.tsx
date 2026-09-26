@@ -1,3 +1,4 @@
+import { PackageMark } from "./desk-assets";
 import type { ReactNode } from "react";
 
 // End Credits field notes: eight original editorial drawings, each tied to a product task.
@@ -249,71 +250,5 @@ export function StudioArtwork({ kind = "press" }: { kind?: ArtKind }) {
   }
 }
 export function PackageGlyph({ name }: { name: string }) {
-  const known: Record<string, number> = {
-    zod: 0,
-    "date-fns": 1,
-    chalk: 2,
-    prettier: 3,
-    vitest: 4,
-    pnpm: 5,
-  };
-  const hash = Array.from(name).reduce(
-    (n, c) => (n * 31 + c.charCodeAt(0)) >>> 0,
-    7,
-  );
-  const variant = known[name.toLowerCase()] ?? hash % 6;
-  const colors = [
-    "#c4e8da",
-    "#efd9b5",
-    "#d8cef0",
-    "#efccd0",
-    "#dfeab6",
-    "#c9e1ee",
-  ];
-  return (
-    <span
-      className="package-glyph"
-      style={{ background: colors[variant] }}
-      aria-hidden="true"
-    >
-      <svg
-        viewBox="0 0 40 40"
-        fill="none"
-        stroke="#28332a"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      >
-        {variant === 0 ? (
-          <>
-            <path d="m8 14 12-7 12 7v13l-12 7-12-7Zm0 0 12 8 12-8M20 22v12M14 11l12 7" />
-          </>
-        ) : variant === 1 ? (
-          <>
-            <circle cx="20" cy="21" r="12" />
-            <path d="M20 13v9l6 3M16 5h8M20 5v4M31 9l-3 4" />
-          </>
-        ) : variant === 2 ? (
-          <>
-            <path d="m9 29 3-10L26 5l9 9-14 14-12 4Zm3-10 9 9m2-20 9 9M9 32h24" />
-            <path d="m13 28 3 3" />
-          </>
-        ) : variant === 3 ? (
-          <>
-            <path d="M7 10h17m5 0h4M7 16h7m5 0h14M7 22h18m4 0h4M7 28h7m5 0h14M7 34h17" />
-          </>
-        ) : variant === 4 ? (
-          <>
-            <path d="m22 5-13 17h10l-2 14 15-20H21Z" />
-            <path d="m6 9 3 3m23 17 3 3" />
-          </>
-        ) : (
-          <>
-            <path d="M6 7h10v10H6Zm18 0h10v10H24ZM6 25h10v10H6Zm18 0h10v10H24Z" />
-            <path d="M16 12h8M11 17v8m18-8v8M16 30h8" />
-          </>
-        )}
-      </svg>
-    </span>
-  );
+  return <PackageMark name={name} />;
 }
