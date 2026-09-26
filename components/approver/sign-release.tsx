@@ -6,10 +6,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, ErrorBox } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import { fill } from "@/lib/client/approve";
 import { APPROVER_COPY as C } from "@/lib/copy/approver";
-import { connectWallet, errorName, signTypedData } from "./connect-wallet";
+import { connectWallet, errorName, signTypedData, walletKindFor } from "./connect-wallet";
 
 type Prepared = { approvalId: string; approver: string; typedData: unknown };
 
@@ -38,7 +38,7 @@ export function SignRelease({
     return (
       <div className="flex flex-col gap-2 text-sm">
         <p>{C.NO_APPROVER}</p>
-        <Link href="/owner" className="underline">
+        <Link href="/app/owner" className="underline">
           {C.NO_APPROVER_LINK}
         </Link>
       </div>
@@ -52,14 +52,15 @@ export function SignRelease({
     try {
       const p = await api<Prepared>(`${base}/prepare`, { method: "POST" });
       if (!p.ok) throw new Error(p.error);
-      const address = await connectWallet();
+      const kind = await walletKindFor(p.data.approver);
+      const address = await connectWallet(kind);
       if (!address) throw new Error("no account");
       if (!same(address, p.data.approver)) {
         setError(fill(C.WRONG_WALLET, { approver: p.data.approver, address }));
         return;
       }
       setStep("sign");
-      const signature = await signTypedData(address, p.data.typedData);
+      const signature = await signTypedData(address, p.data.typedData, kind);
       const s = await api(`${base}/signature`, {
         method: "POST",
         body: JSON.stringify({ approvalId: p.data.approvalId, signature }),

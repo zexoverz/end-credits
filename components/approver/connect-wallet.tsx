@@ -12,26 +12,79 @@ import { fill } from "@/lib/client/approve";
 import { firstAccount } from "@/lib/client/claim";
 import { APPROVER_COPY as C } from "@/lib/copy/approver";
 
-let provider: ProviderInterface | null = null;
+/** "base": Base Account passkey wallet. "injected": a browser extension wallet (MetaMask, Rabby…). */
+export type WalletKind = "base" | "injected";
 
-async function walletProvider(): Promise<ProviderInterface> {
-  if (!provider) {
-    const { createBaseAccountSDK } = await import("@base-org/account/browser");
-    provider = createBaseAccountSDK({ appName: "End Credits", appChainIds: [baseSepolia.id] }).getProvider();
+type Eip1193 = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
+
+let baseProvider: ProviderInterface | null = null;
+
+const injected = (): Eip1193 | null =>
+  typeof window !== "undefined" ? ((window as unknown as { ethereum?: Eip1193 }).ethereum ?? null) : null;
+
+export const hasInjectedWallet = () => injected() !== null;
+
+async function walletProvider(kind: WalletKind): Promise<Eip1193> {
+  if (kind === "injected") {
+    const p = injected();
+    if (!p) throw new Error("no browser wallet");
+    return p;
   }
-  return provider;
+  if (!baseProvider) {
+    const { createBaseAccountSDK } = await import("@base-org/account/browser");
+    baseProvider = createBaseAccountSDK({ appName: "End Credits", appChainIds: [baseSepolia.id] }).getProvider();
+  }
+  return baseProvider as unknown as Eip1193;
+}
+
+/** The wallet holding `approver`: a browser wallet that already lists it (no prompt), else Base Account. */
+export async function walletKindFor(approver: string): Promise<WalletKind> {
+  const p = injected();
+  if (!p) return "base";
+  try {
+    const accounts = await p.request({ method: "eth_accounts" });
+    const list = Array.isArray(accounts) ? accounts.map((a) => String(a).toLowerCase()) : [];
+    return list.includes(approver.toLowerCase()) ? "injected" : "base";
+  } catch {
+    return "base";
+  }
 }
 
 /** Asks the wallet for its account; null when it returns none. */
-export async function connectWallet(): Promise<string | null> {
-  const p = await walletProvider();
+export async function connectWallet(kind: WalletKind = "base"): Promise<string | null> {
+  const p = await walletProvider(kind);
   return firstAccount(await p.request({ method: "eth_requestAccounts" }));
 }
 
+const CHAIN_HEX = `0x${baseSepolia.id.toString(16)}`;
+
+/** Browser wallets refuse typed data whose chainId is not the active chain; switch (or add) first. */
+async function onBaseSepolia(p: Eip1193): Promise<void> {
+  try {
+    await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
+  } catch {
+    await p.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: CHAIN_HEX,
+          chainName: baseSepolia.name,
+          nativeCurrency: baseSepolia.nativeCurrency,
+          rpcUrls: baseSepolia.rpcUrls.default.http,
+          blockExplorerUrls: [baseSepolia.blockExplorers.default.url],
+        },
+      ],
+    });
+  }
+}
+
 /** EIP-712 signature from `address` over the JSON typed data the server prepared. */
-export async function signTypedData(address: string, typedData: unknown): Promise<string> {
-  const p = await walletProvider();
-  const sig = await p.request({ method: "eth_signTypedData_v4", params: [address, typedData] });
+export async function signTypedData(address: string, typedData: unknown, kind: WalletKind = "base"): Promise<string> {
+  const p = await walletProvider(kind);
+  if (kind === "injected") await onBaseSepolia(p);
+  // Extension wallets take the typed data as a JSON string; the Base Account SDK takes the object.
+  const payload = kind === "injected" ? JSON.stringify(typedData) : typedData;
+  const sig = await p.request({ method: "eth_signTypedData_v4", params: [address, payload] });
   if (typeof sig !== "string" || !sig.startsWith("0x")) throw new Error("no signature");
   return sig;
 }
@@ -44,11 +97,11 @@ export function ConnectWallet({ onConnected }: { onConnected: (address: string) 
   const [address, setAddress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function connect() {
+  async function connect(kind: WalletKind) {
     setBusy(true);
     setError(null);
     try {
-      const a = await connectWallet();
+      const a = await connectWallet(kind);
       if (!a) throw new Error("no account");
       setAddress(a);
       onConnected(a);
@@ -67,9 +120,16 @@ export function ConnectWallet({ onConnected }: { onConnected: (address: string) 
           <Mono>{address}</Mono>
         </span>
       ) : (
-        <Button type="button" disabled={busy} onClick={connect}>
-          {busy ? C.CONNECTING : C.CONNECT}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" disabled={busy} onClick={() => connect("base")}>
+            {busy ? C.CONNECTING : C.CONNECT}
+          </Button>
+          {hasInjectedWallet() && (
+            <Button type="button" disabled={busy} onClick={() => connect("injected")}>
+              {busy ? C.CONNECTING : C.CONNECT_BROWSER}
+            </Button>
+          )}
+        </div>
       )}
       {error && <ErrorBox>{error}</ErrorBox>}
     </div>

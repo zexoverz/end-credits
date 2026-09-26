@@ -1,7 +1,8 @@
 // Copy for `/history` (AGENTS.md rule 14). SCREENED_AS comes from the API (lib/messages.ts).
 export const HISTORY_COPY = {
-  TITLE: "History",
-  INTRO: "Every credit decided, newest first, with the reasons and the screens it was decided on.",
+  TITLE: "Every decision, explained.",
+  INTRO:
+    "The latest 200 decisions, newest first. Inspect the attribution, screening, and transaction behind each credit.",
   REFRESH: "Refresh",
   LOADING: "Loading…",
   EMPTY: "No credits decided yet.",
@@ -17,7 +18,7 @@ export const HISTORY_COPY = {
     tx: "Tx",
   },
   CAPPED: "capped",
-  SESSION_LINK: "roll",
+  SESSION_LINK: "View session ↗",
   SCREEN_LINE: "{kind} · HTTP {status} · {latency} ms",
   NO_SCREENS: "none",
   HOLD_LINE: "{status}, expires {expiresAt}",

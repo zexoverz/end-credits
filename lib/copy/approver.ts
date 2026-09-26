@@ -2,6 +2,7 @@
 export const APPROVER_COPY = {
   // connect-wallet
   CONNECT: "Connect wallet",
+  CONNECT_BROWSER: "Use browser wallet",
   CONNECTING: "Opening wallet…",
   CONNECTED: "Wallet",
   CONNECT_FAILED: "Could not connect the wallet ({error}).",
