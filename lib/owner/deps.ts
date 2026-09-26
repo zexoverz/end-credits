@@ -3,6 +3,8 @@
 import * as budget from "../chain/budget";
 import { approverOf, approverState, setApprover, usdcBalance } from "../chain/escrow";
 import { chain } from "../chain/keys";
+import { chainForOwner } from "../chain/payers";
+import { ownerRow } from "./settings";
 import type { ApproverChain } from "./approver";
 import type { BudgetChain } from "./budget";
 import type { SummaryDeps } from "./summary";
@@ -11,16 +13,24 @@ export function defaultSummaryDeps(): SummaryDeps {
   return { balanceOf: (address) => usdcBalance(address), budget: defaultBudgetChain() };
 }
 
-export function defaultApproverChain(): ApproverChain {
+/** The approver calls as `owner`'s payer key (the master key without an owner). */
+export function defaultApproverChain(owner?: { id: string; payerAddress: string }): ApproverChain {
+  const ctx = () => (owner ? chainForOwner(owner) : chain());
   return {
-    payer: () => chain().payer.account.address,
+    payer: () => ctx().payer.account.address,
     approverOf: (payer) => approverOf(payer),
     approverState: (payer) => approverState(payer),
-    setApprover: (address) => setApprover(address),
+    setApprover: (address) => setApprover(address, ctx()),
   };
 }
 
-/** EndCreditsBudget on Base Sepolia (BUDGET_ADDRESS); the spender is our payer (hot) key. */
+/** The approver chain for the signed-in owner. */
+export async function ownerApproverChain(ownerId: string): Promise<ApproverChain> {
+  const row = await ownerRow(ownerId);
+  return defaultApproverChain(row ?? undefined);
+}
+
+/** EndCreditsBudget on Base Sepolia (BUDGET_ADDRESS); views pass the owner's payer as the spender. */
 export function defaultBudgetChain(): BudgetChain {
   const at = () => budget.budgetAddress() ?? undefined;
   return {
