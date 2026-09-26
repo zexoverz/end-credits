@@ -3,6 +3,7 @@
 import type { Address, Hash, Hex } from "viem";
 import type { Resolution } from "../payee/resolve";
 import type { NpmPackageWithDownloads } from "../registry/npm";
+import type { RiskProfile } from "../risk/profile";
 import type { ClaimStore, PackageRow } from "./store";
 
 export type ClaimOnChain = { payee: Address; changedAt: bigint; changed: boolean };
@@ -32,5 +33,7 @@ export type ClaimDeps = {
   loadPackage(name: string): Promise<NpmPackageWithDownloads>;
   // `observe: false` for page reads, so a page view writes no payee_observations row.
   payeeOf(pkg: PackageRow, opts?: { observe?: boolean }): Promise<Resolution>;
+  // Counterparty risk profile from our DB (lib/risk/profile.ts), for the summary's `payeeRisk`.
+  riskOf?(address: string): Promise<RiskProfile>;
   now?: () => Date;
 };
