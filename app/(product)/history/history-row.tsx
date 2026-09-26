@@ -1,3 +1,4 @@
+import { PackageGlyph } from "@/components/product/artwork";
 import Link from "next/link";
 import { Badge, Mono } from "@/components/ui";
 import { txUrl, usdc } from "@/lib/client/format";
@@ -36,9 +37,7 @@ export function HistoryRow({ item }: { item: HistoryItem }) {
     <article className="decision-card">
       <div className="decision-top">
         <div className="decision-package">
-          <span className="decision-monogram" aria-hidden="true">
-            {item.package.replace(/^@/, "")[0]}
-          </span>
+          <PackageGlyph name={item.package} />
           <div>
             <strong>{item.package}</strong>
             <small>{time(item.decidedAt)}</small>

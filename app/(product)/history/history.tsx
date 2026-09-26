@@ -1,4 +1,6 @@
 "use client";
+import { STUDIO as S } from "@/lib/copy/studio";
+import { StudioArtwork } from "@/components/product/artwork";
 import { useCallback, useEffect, useState } from "react";
 import { Button, ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
@@ -12,14 +14,18 @@ type State = {
   error: string | null;
   loading: boolean;
 };
-export function History() {
+export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
   const [state, setState] = useState<State>({
     items: null,
     error: null,
     loading: true,
   });
   const [query, setQuery] = useState("");
-  const [outcome, setOutcome] = useState("");
+  const [outcome, setOutcome] = useState<string>(
+    E.outcomes.includes(initialOutcome as (typeof E.outcomes)[number])
+      ? initialOutcome
+      : "",
+  );
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {
@@ -56,7 +62,7 @@ export function History() {
     <div className="space-y-5">
       <div className="dashboard-toolbar">
         <div>
-          <p className="text-sm text-muted">{C.INTRO}</p>
+          <p className="text-sm text-muted">{S.decisionsBody}</p>
           <p className="mt-2 text-xs text-muted">{E.allocationNote}</p>
         </div>
         <Button onClick={() => void load()} disabled={state.loading}>
@@ -93,10 +99,24 @@ export function History() {
         <ErrorBox>{fill(C.ERROR, { error: state.error })}</ErrorBox>
       )}
       {state.items?.length === 0 && (
-        <div className="product-card text-sm text-muted">{C.EMPTY}</div>
+        <div className="studio-history-empty">
+          <StudioArtwork kind="cast" />
+          <h2>{S.decisionEmptyTitle}</h2>
+          <p>{S.decisionEmptyBody}</p>
+        </div>
       )}
       {!!state.items?.length && items.length === 0 && (
-        <p className="text-sm text-muted">{E.noMatches}</p>
+        <div className="studio-small-empty">
+          <p>{E.noMatches}</p>
+          <Button
+            onClick={() => {
+              setQuery("");
+              setOutcome("");
+            }}
+          >
+            {S.resetFilters}
+          </Button>
+        </div>
       )}
       <div className="history-list">
         {items.map((item) => (

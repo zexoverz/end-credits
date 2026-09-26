@@ -1,27 +1,42 @@
 import Link from "next/link";
-import { Page, Card } from "@/components/ui";
+import { Page } from "@/components/ui";
 import { PackageSearch } from "@/components/product/package-search";
+import { StudioArtwork, PackageGlyph } from "@/components/product/artwork";
 import { EXPERIENCE as C } from "@/lib/copy/experience";
+import { STUDIO as S } from "@/lib/copy/studio";
 export default function Packages() {
   return (
-    <Page title={C.packagePage}>
-      <div className="package-lookup">
-        <p className="page-intro">{C.packageIntro}</p>
-        <Card>
-          <PackageSearch />
-        </Card>
-        <div className="package-examples">
-          {C.packages.map((p) => (
-            <Link href={`/app/npm/${p.name.toLowerCase()}`} key={p.name}>
-              <span>{p.mark}</span>
-              <strong>{p.name}</strong>
-              <small>{p.role}</small>
-              <i aria-hidden="true">↗</i>
-            </Link>
-          ))}
-        </div>
-        <p className="text-xs text-muted">{C.packageNote}</p>
+    <Page title={S.packagesTitle}>
+      <p className="studio-page-subtitle">{S.packagesBody}</p>
+      <div className="studio-package-search">
+        <PackageSearch />
+        <StudioArtwork kind="cast" />
       </div>
+      <div className="studio-collection-heading">
+        <h2>{S.packageCollection}</h2>
+        <p>{C.packageNote}</p>
+      </div>
+      <div className="studio-project-grid">
+        {C.packages.map((p) => (
+          <Link href={`/app/npm/${p.name.toLowerCase()}`} key={p.name}>
+            <PackageGlyph name={p.name} />
+            <span aria-hidden="true" className="project-open">
+              ↗
+            </span>
+            <h3>{p.name}</h3>
+            <p>{p.role}</p>
+            <span className="project-explore">{S.explorePackage} ↗</span>
+          </Link>
+        ))}
+      </div>
+      <aside className="studio-maintainer">
+        <StudioArtwork kind="vault" />
+        <div>
+          <p className="studio-kicker">{S.maintainerTag}</p>
+          <h2>{S.maintainerTitle}</h2>
+          <p>{S.maintainerBody}</p>
+        </div>
+      </aside>
     </Page>
   );
 }
