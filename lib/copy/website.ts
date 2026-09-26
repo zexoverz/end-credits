@@ -19,7 +19,7 @@ export const WEBSITE = {
   steps: [
     { title: "Make it yours.", body: "Choose a session budget and a per-package limit. Connect an agent key and install the Claude Code hook.", label: "01 / SET UP", tab: "Set up", terminal: ["$ endcredits init", "✓ Claude Code hooks installed", "$ endcredits key <your-agent-key>", "✓ Ready for your next session"] },
     { title: "Build something good.", body: "The hook records package reads, imports, and installs. Your code and repository paths stay on your machine.", label: "02 / BUILD", tab: "Build", terminal: ["$ claude", "> Build a report with date formatting", "→ package signals recorded locally", "→ zod · date-fns · chalk"] },
-    { title: "Leave a little credit.", body: "Your budget is split by usage. Payees are screened before signing, and each decision has a reason you can inspect.", label: "03 / GIVE BACK", tab: "Give back", terminal: ["$ endcredits settle", "→ attribute package contributions", "→ screen payees before signing", "→ open your session’s credits"] },
+    { title: "Leave a little credit.", body: "Your budget is split by usage. Payees are screened before signing, and each decision has a reason you can inspect.", label: "03 / GIVE BACK", tab: "Give back", terminal: ["$ endcredits settle --session <id>", "→ attribute package contributions", "→ screen payees before signing", "→ open your session’s credits"] },
   ],
   workflowLabel: "How End Credits works", workflowExample: "WORKFLOW PREVIEW · EXAMPLE OUTPUT", automation: "Less admin. More making.",
   privacy: "Your code stays yours.", privacyBody: "Package signals leave the session. Your source code and repo paths don’t.",
