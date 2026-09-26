@@ -65,7 +65,7 @@ function fakeFacilitator(opts: { valid?: boolean; settled?: boolean } = {}) {
 const cleanPayer: PayerScreen = { ok: true, data: { toxicScore: 0, traits: [] }, screenId: "payer-screen" };
 
 function deps(repo: CreditRepo, facilitator = fakeFacilitator(), payer: PayerScreen = cleanPayer) {
-  const screenPayer = vi.fn(async (_address: string) => payer);
+  const screenPayer = vi.fn(async () => payer);
   return { repo, facilitator, usdc: USDC, receiptSigner, now: () => NOW, screenPayer };
 }
 
