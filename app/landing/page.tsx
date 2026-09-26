@@ -2,11 +2,8 @@ import Link from "next/link";
 import { EXPERIENCE as C } from "@/lib/copy/experience";
 import { WEBSITE as W } from "@/lib/copy/website";
 import { Arrow, BrandMark } from "@/components/landing/artwork";
-import {
-  Header,
-  Workflow,
-  SetupCommands,
-} from "@/components/landing/experience";
+import { Header, SetupCommands } from "@/components/landing/experience";
+import { TechnicalFlow } from "@/components/landing/technical-flow";
 import s from "./landing.module.css";
 
 function LineArt({ kind }: { kind: string }) {
@@ -200,20 +197,7 @@ export default function Landing() {
               </article>
             </div>
           </section>
-          <section className={s.flowSection} id="how">
-            <div className={s.sectionHeading}>
-              <div>
-                <p className={s.eyebrow}>{C.flowLabel}</p>
-                <h2>
-                  {C.flowTitle.map((t) => (
-                    <span key={t}>{t}</span>
-                  ))}
-                </h2>
-              </div>
-              <p>{C.flowIntro}</p>
-            </div>
-            <Workflow />
-          </section>
+          <TechnicalFlow />
           <section className={s.controls}>
             <p className={s.eyebrow}>{C.controlsLabel}</p>
             <h2>{C.controlsTitle}</h2>
