@@ -140,7 +140,7 @@ contract EndCreditsEscrow is EIP712 {
         if (amount == 0) revert ZeroAmount();
         if (payee == address(0)) revert ZeroPayee();
         if (ttl < MIN_TTL || ttl > MAX_TTL) revert TtlOutOfRange(ttl);
-        _promote(msg.sender);
+        // A pending change only exists once `current` is set, so `current` alone decides this.
         if (approvers[msg.sender].current == address(0)) revert NoApprover(msg.sender);
 
         uint64 expiresAt = uint64(block.timestamp) + ttl;
