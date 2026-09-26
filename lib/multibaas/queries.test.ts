@@ -41,9 +41,9 @@ describe("saved event queries", () => {
     }
   });
 
-  it("filters paid_totals on the checksummed payer as Transfer.from", () => {
+  it("filters paid_totals on the lowercase payer as Transfer.from (MultiBaas compares case-sensitively)", () => {
     const f = all.paid_totals.events[0].filter;
-    expect(f).toEqual({ fieldType: "input", inputIndex: 0, operator: "equal", value: PAYER });
+    expect(f).toEqual({ fieldType: "input", inputIndex: 0, operator: "equal", value: PAYER.toLowerCase() });
   });
 
   it("reserved_by_package adds Reserved and subtracts Claimed", () => {
