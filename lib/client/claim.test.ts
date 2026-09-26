@@ -37,6 +37,7 @@ function summary(over: Partial<PackageSummary> = {}): PackageSummary {
     cooling: null,
     maintainer: null,
     claim: null,
+    payeeRisk: null,
     errors: [],
     ...over,
   };

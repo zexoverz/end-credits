@@ -12,6 +12,7 @@ import { drizzleScreenRepo } from "../intercepta/repo";
 import { dbObservations } from "../payee/observe";
 import { resolvePayee } from "../payee/resolve";
 import { loadPackage } from "../registry/npm";
+import { riskProfile } from "../risk/profile";
 import type { ClaimChain, ClaimDeps, WalletScreen } from "./deps";
 import { claimStore } from "./store";
 import { quickScanWallet } from "./wallet-screen";
@@ -47,6 +48,7 @@ export function claimDepsFromEnv(): ClaimDeps {
     chain: claimChain,
     screen: (address: Address): Promise<WalletScreen> => quickScanWallet(interceptaFromEnv(drizzleScreenRepo()), address),
     loadPackage: (name) => loadPackage(name),
+    riskOf: (address) => riskProfile(address),
     payeeOf: async (pkg, opts) =>
       resolvePayee(
         {
