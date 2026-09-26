@@ -7,7 +7,7 @@ export interface StoredReason {
   text: string;
 }
 
-const HOLD_CODES = new Set<string>(["HELD_CHANGED", "HELD_MEDIUM", "HELD_NO_CODE", "SCREEN_UNAVAILABLE"]);
+const HOLD_CODES = new Set<string>(["HELD_CHANGED", "HELD_MEDIUM", "HELD_NO_CODE", "HELD_NO_HISTORY", "SCREEN_UNAVAILABLE"]);
 
 function isReason(r: unknown): r is StoredReason {
   return typeof r === "object" && r !== null && typeof (r as StoredReason).text === "string";

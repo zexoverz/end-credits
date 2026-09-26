@@ -94,6 +94,12 @@ export function decide(i: DecideInput): Decision {
     return withNote({ outcome: "held", holdReason: "MEDIUM", reasons: [{ source: "intercepta", code: "HELD_MEDIUM", text }] });
   }
 
+  // 6b. No mainnet history: Intercepta answered, but had nothing to judge. Hold, never pay unscreened.
+  if (s.noHistory) {
+    const text = msg("HELD_NO_HISTORY", { address: i.payee });
+    return withNote({ outcome: "held", holdReason: "MEDIUM", reasons: [{ source: "intercepta", code: "HELD_NO_HISTORY", text }] });
+  }
+
   // 7. A contract that exists on Ethereum but not on Base.
   if (i.noCodeOnBase) {
     return withNote({ outcome: "held", holdReason: "NO_CODE", reasons: [policy("HELD_NO_CODE", { address: i.payee })] });

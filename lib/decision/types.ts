@@ -19,6 +19,8 @@ export type Screen = {
   // Intercepta's address-impersonation check (decisions.md, E4). null when clean.
   impersonation?: { original: string } | null;
   error?: ScreenError;
+  // Intercepta has never seen this address on mainnet (the no-history 404): nothing to judge.
+  noHistory?: boolean;
   // `screens` rows this screen was built from, for credits.screen_ids.
   screenIds?: string[];
 };

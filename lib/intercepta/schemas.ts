@@ -15,6 +15,8 @@ export const QuickScan = z.object({
       txsCount: z.number().optional(),
     }),
   ),
+  // Set by the client, never by Intercepta: the no-history 404 (./no-history.ts).
+  noHistory: z.literal(true).optional(),
 });
 
 // GET /api/public/v2/extension/token-intelligence/token/{address}/risks -> TokenRiskAnalysisV2Response

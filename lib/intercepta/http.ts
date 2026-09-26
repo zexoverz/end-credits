@@ -4,7 +4,8 @@ import type { ScreenError } from "../decision/types";
 
 export type HttpOutcome =
   | { ok: true; status: number; body: unknown }
-  | { ok: false; status: number; error: ScreenError; body: unknown };
+  // `raw` is the error body parsed as JSON, when it is JSON (the no-history 404 needs it).
+  | { ok: false; status: number; error: ScreenError; body: unknown; raw?: unknown };
 
 const TIMED_OUT = Symbol("timeout");
 
@@ -38,11 +39,19 @@ async function readJson(fetchFn: typeof fetch, url: string, init: RequestInit): 
   const res = await fetchFn(url, init);
   const text = await res.text();
   if (!res.ok) {
-    return { ok: false, status: res.status, error: "HTTP", body: { error: "HTTP", detail: text.slice(0, 500) } };
+    return { ok: false, status: res.status, error: "HTTP", body: { error: "HTTP", detail: text.slice(0, 500) }, raw: parseOrUndefined(text) };
   }
   try {
     return { ok: true, status: res.status, body: JSON.parse(text) };
   } catch {
     return { ok: false, status: res.status, error: "PARSE", body: { error: "PARSE", detail: text.slice(0, 500) } };
+  }
+}
+
+function parseOrUndefined(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
   }
 }

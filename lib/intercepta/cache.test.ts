@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ADDRESS_TTL_MS, CACHE_TTL_MS, freshScreen } from "./cache";
 import { SCREEN_MAX_AGE_MS } from "../x402/constants";
 import { memoryRepo } from "./__fixtures__/memory-repo";
+import { NO_HISTORY_BODY } from "./no-history";
 
 const key = { kind: "address" as const, subject: "0xabc", chainId: null };
 const row = { ...key, mappedFrom: null, response: { toxicScore: 0, traits: [] }, latencyMs: 5 };
@@ -51,5 +52,19 @@ describe("address screens stay payable", () => {
     expect(await freshScreen(repo, key, new Date(t0.getTime() + ADDRESS_TTL_MS))).toBeNull();
     const token = { ...key, kind: "token" as const };
     expect(await freshScreen({ ...repo, latestOk: async () => ({ ...token, id: "t", mappedFrom: null, response: {}, status: 200, latencyMs: 1, fetchedAt: t0 }) }, token, new Date(t0.getTime() + ADDRESS_TTL_MS))).not.toBeNull();
+  });
+});
+
+describe("no-history screens", () => {
+  it("reuses a fresh no-history 404 row", async () => {
+    const { repo } = memoryRepo();
+    const id = await repo.insert({ ...row, response: NO_HISTORY_BODY, status: 404 });
+    expect((await freshScreen(repo, key, new Date()))?.id).toBe(id);
+  });
+
+  it("never reuses any other 404", async () => {
+    const { repo } = memoryRepo();
+    await repo.insert({ ...row, response: { error: "HTTP", detail: "Not Found" }, status: 404 });
+    expect(await freshScreen(repo, key, new Date())).toBeNull();
   });
 });

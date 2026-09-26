@@ -128,6 +128,18 @@ describe("decide: one test per step", () => {
     expect(codes(d)).toContain("HELD_MEDIUM");
   });
 
+  it("6b. no mainnet history -> held HELD_NO_HISTORY, never paid unscreened", () => {
+    const d = decide(input({}, { noHistory: true }));
+    expect(d.outcome).toBe("held");
+    expect(d.holdReason).toBe("MEDIUM");
+    expect(codes(d)).toEqual(["HELD_NO_HISTORY", "SCREENED_AS"]);
+    expect(d.reasons[0]).toEqual({
+      source: "intercepta",
+      code: "HELD_NO_HISTORY",
+      text: `Held: ${PAYEE} has no history on mainnet, so Intercepta has nothing to judge. Waiting for the owner.`,
+    });
+  });
+
   it("7. contract on Ethereum with no code on Base -> held HELD_NO_CODE", () => {
     const d = decide(input({ noCodeOnBase: true }));
     expect(d.outcome).toBe("held");
@@ -178,6 +190,21 @@ describe("decide: order (DESIGN §17)", () => {
     const d = decide(input({ noCodeOnBase: true, capped: true }, { toxicScore: 30 }));
     expect(d.holdReason).toBe("MEDIUM");
     expect(decide(input({ noCodeOnBase: true, capped: true })).outcome).toBe("held");
+  });
+
+  it("a changed address with no history -> HELD_CHANGED, the real reason", () => {
+    const d = decide(input({ change: { changed: true, days: 1 } }, { noHistory: true }));
+    expect(d.holdReason).toBe("ADDRESS_CHANGED");
+    expect(codes(d)).toContain("HELD_CHANGED");
+    expect(codes(d)).not.toContain("HELD_NO_HISTORY");
+  });
+
+  it("no history: refusals and medium risk still win; it beats no-code and capped", () => {
+    expect(decide(input({}, { noHistory: true, impersonation: { original: "0xabc" } })).outcome).toBe("refused");
+    expect(codes(decide(input({}, { noHistory: true, tokenAction: "warn" })))).toContain("HELD_MEDIUM");
+    const d = decide(input({ noCodeOnBase: true, capped: true }, { noHistory: true }));
+    expect(d.outcome).toBe("held");
+    expect(codes(d)).toContain("HELD_NO_HISTORY");
   });
 
   it("every outcome after a screen carries SCREENED_AS", () => {
