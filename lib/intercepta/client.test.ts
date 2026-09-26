@@ -28,7 +28,13 @@ function router(routes: Record<string, () => Promise<Response> | Response>) {
 
 const hanging = () => new Promise<Response>(() => {});
 
-function client(fetchSpy: ReturnType<typeof router>, timeoutMs = 8000) {
+// Answers in order, one per call; the last answer repeats.
+function sequence(...answers: Array<() => Promise<Response> | Response>) {
+  let i = 0;
+  return () => answers[Math.min(i++, answers.length - 1)]();
+}
+
+function client(fetchSpy: ReturnType<typeof router>, timeoutMs = 8000, retryDelayMs = 0) {
   const { repo, rows } = memoryRepo();
   let t = 0;
   const c = createIntercepta({
@@ -37,6 +43,7 @@ function client(fetchSpy: ReturnType<typeof router>, timeoutMs = 8000) {
     fetch: fetchSpy as unknown as typeof fetch,
     repo,
     timeoutMs,
+    retryDelayMs,
     clock: () => (t += 7),
   });
   return { c, rows };
@@ -258,5 +265,109 @@ describe("screenPayee", () => {
       "/risks": () => json(tokenOk),
     });
     expect((await client(f).c.screenPayee(PAYEE, opts)).error).toBe("HTTP");
+  });
+});
+
+describe("retry once on a transient failure", () => {
+  it("timeout then 200 succeeds and stores both attempts", async () => {
+    const f = router({ "/quick-scan": sequence(hanging, () => json(clean)) });
+    const { c, rows } = client(f, 20);
+    const r = await c.quickScan(PAYEE);
+    expect(r).toMatchObject({ ok: true, data: { toxicScore: 0 } });
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ kind: "address", status: 0, response: { error: "TIMEOUT" } });
+    expect(rows[1]).toMatchObject({ kind: "address", status: 200 });
+    expect(r.screenId).toBe(rows[1].id);
+  });
+
+  it("503 then 200 succeeds", async () => {
+    const f = router({ "/check-address/": sequence(() => json({}, 503), () => json(notPoisoned)) });
+    const { c, rows } = client(f);
+    expect(await c.checkImpersonation(PAYEE)).toMatchObject({ ok: true, data: { isAddressPoisoned: false } });
+    expect(rows.map((r) => r.status)).toEqual([503, 200]);
+  });
+
+  it("429 then 200 succeeds", async () => {
+    const f = router({ "/risks": sequence(() => json({}, 429), () => json(tokenOk)) });
+    expect(await client(f).c.tokenRisks(BASE_USDC, 8453)).toMatchObject({ ok: true });
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("a network error then 200 succeeds", async () => {
+    const f = router({
+      "/simulation/transaction": sequence(
+        () => Promise.reject(new TypeError("fetch failed")),
+        () => json({ detectors: [], assetsMovement: { send: [], receive: [] } }),
+      ),
+    });
+    expect(await client(f).c.simulateTransfer({ from: PAYER, to: PAYEE, amount: BigInt(1) })).toMatchObject({ ok: true });
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry the no-history 404", async () => {
+    const f = router({ "/quick-scan": () => json(NO_HISTORY_BODY, 404) });
+    expect(await client(f).c.quickScan(PAYEE)).toMatchObject({ ok: true, data: { noHistory: true } });
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry another 4xx", async () => {
+    const f = router({ "/check-address/": () => json(NO_HISTORY_BODY, 404) });
+    expect(await client(f).c.checkImpersonation(PAYEE)).toMatchObject({ ok: false, error: "HTTP" });
+    const g = router({ "/quick-scan": () => json({ message: "Forbidden" }, 403) });
+    await client(g).c.quickScan(PAYEE);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(g).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a parse error", async () => {
+    const f = router({ "/quick-scan": () => json({ score: "high" }) });
+    expect(await client(f).c.quickScan(PAYEE)).toMatchObject({ ok: false, error: "PARSE" });
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("timeout twice stays TIMEOUT after exactly one retry", async () => {
+    const f = router({ "/quick-scan": hanging });
+    const { c, rows } = client(f, 20);
+    const r = await c.quickScan(PAYEE);
+    expect(r).toMatchObject({ ok: false, error: "TIMEOUT" });
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(rows).toHaveLength(2);
+    expect(r.screenId).toBe(rows[1].id);
+  });
+
+  it("a server error that persists is tried exactly twice", async () => {
+    const f = router({ "/risks": () => json({}, 500) });
+    expect(await client(f).c.tokenRisks(BASE_USDC, 8453)).toMatchObject({ ok: false, error: "HTTP" });
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits the retry delay before the second attempt", async () => {
+    const at: number[] = [];
+    const f = router({ "/quick-scan": () => (at.push(Date.now()), json({}, 503)) });
+    await client(f, 8000, 60).c.quickScan(PAYEE);
+    expect(at).toHaveLength(2);
+    expect(at[1] - at[0]).toBeGreaterThanOrEqual(50);
+  });
+
+  it("screenPayee: an impersonation timeout then 200 is a clean screen, not held", async () => {
+    const f = router({
+      "/quick-scan": () => json(clean),
+      "/check-address/": sequence(hanging, () => json(notPoisoned)),
+      "/risks": () => json(tokenOk),
+    });
+    const s = await client(f, 20).c.screenPayee(PAYEE, { from: PAYER, amount: BigInt(250000) });
+    expect(s.error).toBeUndefined();
+    expect(s.impersonation).toBeNull();
+  });
+
+  it("screenPayee: an impersonation that times out twice still sets error (held)", async () => {
+    const f = router({
+      "/quick-scan": () => json(clean),
+      "/check-address/": hanging,
+      "/risks": () => json(tokenOk),
+    });
+    const s = await client(f, 20).c.screenPayee(PAYEE, { from: PAYER, amount: BigInt(250000) });
+    expect(s.error).toBe("TIMEOUT");
   });
 });
