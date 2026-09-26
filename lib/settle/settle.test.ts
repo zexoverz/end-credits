@@ -493,7 +493,15 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
     const sanctioned: Screen = { ...clean, toxicScore: 100, traits: [{ name: "sanction_address", description: "OFAC SDN" }] };
 
     // Four credits: paid (capped), held, reserved move money; refused does not.
-    async function fourWay(o: { remaining?: bigint; pull?: (owner: Address, amount: bigint) => Promise<Hash>; budgetOwner?: Address | null } = {}) {
+    const RETURN_TX = `0x${"06".repeat(32)}` as Hash;
+    type FourWay = {
+      remaining?: bigint;
+      pull?: (owner: Address, amount: bigint) => Promise<Hash>;
+      budgetOwner?: Address | null;
+      payFails?: boolean;
+      returnFails?: boolean;
+    };
+    async function fourWay(o: FourWay = {}) {
       const n = { paid: `bp-${suffix()}`, held: `bh-${suffix()}`, reserved: `br-${suffix()}`, refused: `bx-${suffix()}` };
       const a = { paid: randomAddress(), held: randomAddress(), refused: randomAddress() };
       const budgetOwner = o.budgetOwner === null ? undefined : (o.budgetOwner ?? randomAddress());
@@ -505,7 +513,14 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
         { [n.paid]: a.paid, [n.held]: a.held, [n.refused]: a.refused, [n.reserved]: null },
         { [a.held]: "throw", [a.refused]: sanctioned },
       );
+      if (o.payFails) {
+        deps.payCredit = async () => {
+          calls.order.push("pay");
+          throw new Error("facilitator down");
+        };
+      }
       const pulls: [Address, bigint][] = [];
+      const returned: [Address, bigint][] = [];
       const remainingAsked: Address[] = [];
       const undecidedAtPull: string[] = [];
       deps.budget = {
@@ -520,6 +535,12 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
           pulls.push([owner, amount]);
           return (o.pull ?? (async () => PULL_TX))(owner, amount);
         },
+        returnToOwner: async (owner, amount) => {
+          calls.order.push("return");
+          if (o.returnFails) throw new Error("rpc down");
+          returned.push([owner, amount]);
+          return RETURN_TX;
+        },
       };
       await mod.settleSession(id, deps);
       const rows = await database
@@ -529,7 +550,7 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
         .where(eq(s.credits.sessionId, id));
       const by = Object.fromEntries(Object.entries(n).map(([k, name]) => [k, rows.find((r) => r.name === name)!.c]));
       const [session] = await database.select().from(s.sessions).where(eq(s.sessions.id, id));
-      return { by, calls, pulls, remainingAsked, undecidedAtPull, session, budgetOwner };
+      return { by, calls, pulls, returned, remainingAsked, undecidedAtPull, session, budgetOwner };
     }
 
     it("pulls exactly what will move, once, after every decision and before any payment", async () => {
@@ -547,6 +568,43 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
       expect([...calls.order].sort()).toEqual(["hold", "pay", "pull", "reserve"]);
       expect(session.budgetPullTx).toBe(PULL_TX);
       expect(session.status).toBe("settled");
+    });
+
+    it("returns nothing when everything pulled moved", async () => {
+      const { returned, session } = await fourWay();
+      expect(returned).toEqual([]);
+      expect(session.leftoverMicro).toBe(BigInt(0));
+      expect(session.returnTx).toBeNull();
+    });
+
+    it("returns exactly the share of a failed payment to the owner's wallet, after execution", async () => {
+      const { by, calls, pulls, returned, session, budgetOwner } = await fourWay({ payFails: true });
+      expect(by.paid.txHash).toBeNull();
+      const need = by.paid.amountMicro + by.held.amountMicro + by.reserved.amountMicro;
+      expect(pulls).toEqual([[budgetOwner, need]]);
+      expect(returned).toEqual([[budgetOwner, by.paid.amountMicro]]);
+      expect(calls.order.at(-1)).toBe("return");
+      expect(session.leftoverMicro).toBe(by.paid.amountMicro);
+      expect(session.returnTx).toBe(RETURN_TX);
+      expect(session.status).toBe("settled");
+    });
+
+    it("records the leftover for the expirer when the return fails", async () => {
+      const { by, session } = await fourWay({ payFails: true, returnFails: true });
+      expect(session.status).toBe("settled");
+      expect(session.leftoverMicro).toBe(by.paid.amountMicro);
+      expect(session.returnTx).toBeNull();
+    });
+
+    it("returns nothing when the pull reverted", async () => {
+      const { returned, session } = await fourWay({
+        payFails: true,
+        pull: async () => {
+          throw new TxRevertedError("pull", "OverPeriodCap");
+        },
+      });
+      expect(returned).toEqual([]);
+      expect(session.leftoverMicro).toBeNull();
     });
 
     it("moves nothing when the pull reverts, keeps the decisions and says why", async () => {
