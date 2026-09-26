@@ -123,7 +123,10 @@ export function DashboardView({
             </span>
           )}
           <button
-            onClick={() => void load()}
+            onClick={() => {
+              void load();
+              window.dispatchEvent(new Event("endcredits:refresh-records"));
+            }}
             disabled={busy}
             aria-label={busy ? C.REFRESHING : C.REFRESH}
           >

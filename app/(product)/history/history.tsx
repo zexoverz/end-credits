@@ -58,6 +58,10 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
   }, []);
   useEffect(() => {
     void load();
+    const refresh = () => void load();
+    window.addEventListener("endcredits:refresh-records", refresh);
+    return () =>
+      window.removeEventListener("endcredits:refresh-records", refresh);
   }, [load]);
   const search = query.trim().toLowerCase();
   const items =

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/components/product/request";
 import { ErrorBox, Button, Badge } from "@/components/ui";
@@ -15,13 +15,19 @@ export function Sessions({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  async function load() {
+  const load = useCallback(async () => {
     const r = await api<{ items: HistoryItem[] }>("/api/history");
     if (r.ok) {
       setError(null);
       setItems(r.data.items);
     } else setError(r.error);
-  }
+  }, []);
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener("endcredits:refresh-records", refresh);
+    return () =>
+      window.removeEventListener("endcredits:refresh-records", refresh);
+  }, [load]);
   useEffect(() => {
     let active = true;
     api<{ items: HistoryItem[] }>("/api/history").then((r) => {
