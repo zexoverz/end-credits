@@ -1392,3 +1392,9 @@ only bound that first owner. Anyone else (a judge, a second user) could not beco
 - **Dashboard.** `paid_totals` filters USDC transfers from every owner's payer with one OR node
   (MultiBaas accepted `{ rule: "or", children }`, checked live on a throwaway query). The worker saves
   the query again whenever the set of payers changes, so a new owner's payments show on the Paid card.
+
+## Hold actions name their agent wallet (27 Sep)
+
+The dashboard is public and lists every pending hold, but only the account behind a hold can sign its
+release. Each hold action now carries `payer`, the owning account's Agent wallet (already public on
+chain as `Held.payer`), so the page can offer "Review & sign" only for the signed-in account's holds.
