@@ -19,7 +19,7 @@ import type {
 import type { Onboarding } from "@/lib/owner/onboarding";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
 import { ONBOARDING as O } from "@/lib/copy/onboarding";
-import { AgentKeys } from "./agent-keys";
+import { AgentKeys, CopyButton } from "./agent-keys";
 import { LiveHolds, Notifications } from "./holds";
 import { SettingsForm } from "./settings-form";
 import { SignIn } from "./sign-in";
@@ -501,6 +501,12 @@ function SignedIn({
             <div className="setup-terminal">
               <SetupArt kind="agent" />
               <ol>
+                <li>
+                  <span>{O.installLabel}</span>
+                  <code>{O.installCommand}</code>
+                  <CopyButton text={O.installCommand} />
+                  <p>{O.installHint}</p>
+                </li>
                 <li>
                   <span>{O.commandOne}</span>
                   <code>{O.keyCommand}</code>
