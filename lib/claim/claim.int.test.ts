@@ -239,6 +239,8 @@ describe.skipIf(!DB_URL)("claim flow (integration)", () => {
 
       const r = await call("status", "GET");
       expect(r.body).toMatchObject({ status: "claimed", code: "CLAIMED", claimedAmount: "0.75" });
+      expect((r.body as { claimTxs: string[] }).claimTxs).toHaveLength(2);
+      expect((r.body as { setClaimTx: string | null }).setClaimTx).toMatch(/^0x/);
       expect(r.body.message).toBe(msg("CLAIMED", { amount: "0.75", address: WALLET }));
       const mergeSha = gh.repos[repo].pulls[0].mergeSha!;
       const evidence = keccak256(stringToBytes(repo + mergeSha));
