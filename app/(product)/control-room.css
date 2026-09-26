@@ -1174,7 +1174,7 @@
 .risk-observations ol li > span {
   font-size: 9px;
   display: block;
-  color: #6e7e5e;
+  color: #526345;
 }
 .risk-observations ol small {
   display: block;
@@ -1781,4 +1781,114 @@
 }
 .credits-film .reason-evidence > li[data-evidence-tone="refused"] small {
   color: #edafa5;
+}
+
+/* Full addresses and proof hashes remain readable on the approval phone view. */
+.approval-page {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.approval-page .product-card,
+.approval-page .release-execution,
+.approval-page .action-notice,
+.approval-page .product-error,
+.approval-page .execution-steps,
+.approval-page .product-button {
+  min-width: 0;
+  max-width: 100%;
+}
+.approval-page .font-mono,
+.approval-page code,
+.approval-page a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.approval-page .product-button {
+  white-space: normal;
+}
+.package-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 24px 0;
+  font-size: 14px;
+}
+.package-section-nav a {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+.risk-address {
+  margin: 20px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.risk-observations article header > a {
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+.public-claim {
+  border: 1px solid #cadbc0;
+  border-radius: 20px;
+  background: #edf4e8;
+  padding: 28px;
+  margin: 24px 0;
+  overflow-wrap: anywhere;
+}
+.public-claim > header {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.public-claim-mark {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #263722;
+  color: #fff;
+  font-size: 24px;
+}
+.public-claim h2 {
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+.public-claim p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4e6342;
+  margin-top: 8px;
+}
+.public-claim-wallet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 22px 0;
+  font-size: 13px;
+}
+.public-claim-wallet a {
+  font-family: var(--font-geist-mono);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.public-claim .claim-transaction {
+  background: #fff;
+}
+#payee-risk,
+#maintainer-claim {
+  scroll-margin-top: 24px;
+}
+@media (max-width: 600px) {
+  .public-claim {
+    padding: 20px;
+  }
+  .public-claim h2 {
+    font-size: 22px;
+  }
 }

@@ -45,7 +45,7 @@ export function ClaimReceipt({ claim }: { claim: ClaimView }) {
     </section>
   );
 }
-function Transaction({ label, hash }: { label: string; hash: string }) {
+export function Transaction({ label, hash }: { label: string; hash: string }) {
   return (
     <a
       className="claim-transaction"
