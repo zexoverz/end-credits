@@ -68,7 +68,7 @@ export function revertName(err: unknown): string | undefined {
 /** The node already has a tx at this nonce: too low, a pending one (underpriced), or ours (known). */
 function isNonceTaken(err: unknown): boolean {
   if (err instanceof BaseError && err.walk((e) => e instanceof NonceTooLowError)) return true;
-  return err instanceof Error && /nonce too low|replacement transaction underpriced|already known/i.test(err.message);
+  return err instanceof Error && /nonce too low|replacement transaction underpriced/i.test(err.message);
 }
 
 const SEND_ATTEMPTS = 3;
