@@ -103,32 +103,62 @@ addresses maintainers published, so their **mainnet** reputation is what gets sc
 
 The order, per credit, in [`lib/settle/settle.ts`](lib/settle/settle.ts):
 
-1. Screen the payee ([`#L248-L249`](lib/settle/settle.ts#L248-L249)). A screen that throws becomes
-   `error: "HTTP"` ([`#L330-L337`](lib/settle/settle.ts#L330-L337)), which holds.
-2. `decide` runs the matrix on the screen ([`#L250-L261`](lib/settle/settle.ts#L250-L261)).
+1. Screen the payee ([`#L302-L303`](lib/settle/settle.ts#L302-L303)). A screen that throws becomes
+   `error: "HTTP"` ([`#L403-L410`](lib/settle/settle.ts#L403-L410)), which holds.
+2. `decide` runs the matrix on the screen ([`#L304-L315`](lib/settle/settle.ts#L304-L315)).
 3. The decision and its reasons are stored, with the ids of the screens that produced it
-   ([`#L262-L269`](lib/settle/settle.ts#L262-L269)).
-4. Only then is anything signed or sent ([`#L271-L327`](lib/settle/settle.ts#L271-L327)): x402 for
-   `paid` / `capped`, `hold` or `reserve` on the escrow, nothing for `refused`.
+   ([`#L322-L331`](lib/settle/settle.ts#L322-L331)), for every credit of the session.
+4. Only then is money pulled from the owner's budget and anything signed or sent
+   ([`#L168-L172`](lib/settle/settle.ts#L168-L172), [`#L355-L401`](lib/settle/settle.ts#L355-L401)):
+   x402 for `paid` / `capped`, `hold` or `reserve` on the escrow, nothing for `refused`.
 5. At signing time the x402 client checks the 402 challenge against the screened payee and the
    stored decision ([`lib/x402/client.ts#L39-L68`](lib/x402/client.ts#L39-L68)), and the resource
    refuses to quote a credit whose payee has no successful screen from the last 10 minutes
-   ([`lib/x402/server.ts#L72-L78`](lib/x402/server.ts#L72-L78)).
+   ([`lib/x402/server.ts#L82-L90`](lib/x402/server.ts#L82-L90)).
 
-Timeout or error from Intercepta means hold, never pay.
+Timeout or error from Intercepta means hold, never pay. Every call is retried once, 500 ms later, on
+a timeout, a network error, a 5xx or a 429, and both attempts are stored
+([`lib/intercepta/http.ts#L51-L56`](lib/intercepta/http.ts#L51-L56),
+[`lib/intercepta/client.ts#L76-L81`](lib/intercepta/client.ts#L76-L81)). In production one
+impersonation check timed out at 8 s while the quick scan for the same address answered clean in
+about 1 s, and a clean payee held as `SCREEN_UNAVAILABLE`. One slow request should not decide a
+payee. A second failure still holds.
+
+### The paid side: our x402 route screens who pays
+
+Our resource `GET /api/x402/credit/{creditId}` is a paid service too, so it screens the payer. After
+the signed payment matches the challenge and before the facilitator's `verify` and `settle`, it
+quick-scans `payload.authorization.from`
+([`lib/x402/server.ts#L126-L145`](lib/x402/server.ts#L126-L145), called at
+[`#L162-L163`](lib/x402/server.ts#L162-L163)). A critical trait or `toxicScore > 50` answers 403
+`PAYER_REFUSED` with Intercepta's description; a failed screen answers 503
+`PAYER_SCREEN_UNAVAILABLE`. Neither reaches the facilitator. A payer with no mainnet history passes,
+since fresh wallets are normal, and the screen id joins the credit's `screen_ids`.
+
+### Counterparty risk profile
+
+`GET /api/risk/<address>` ([`lib/risk/profile.ts`](lib/risk/profile.ts),
+[`app/api/risk/[address]/route.ts`](app/api/risk/%5Baddress%5D/route.ts)) shows what we know about
+an address: the latest quick-scan and impersonation verdicts, simulation detectors, every package
+that ever named it, and how its credits ended. It reads only our stored screens, so a page view costs
+no Intercepta quota. The package page gets the same profile for its current payee as `payeeRisk` in
+`GET /api/npm/<name>` ([`lib/claim/summary.ts`](lib/claim/summary.ts)).
 
 ### Where the API is called
 
 | File | What |
 |---|---|
-| [`lib/intercepta/client.ts#L53-L92`](lib/intercepta/client.ts#L53-L92) | the one HTTP path: `X-API-KEY`, 8 s deadline, every call stored in `screens` with status, body and latency |
-| [`lib/intercepta/client.ts#L96-L105`](lib/intercepta/client.ts#L96-L105) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` |
-| [`lib/intercepta/client.ts#L107-L113`](lib/intercepta/client.ts#L107-L113) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
-| [`lib/intercepta/client.ts#L115-L122`](lib/intercepta/client.ts#L115-L122) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
-| [`lib/intercepta/client.ts#L124-L137`](lib/intercepta/client.ts#L124-L137) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, only when the quick scan fails |
-| [`lib/intercepta/client.ts#L141-L181`](lib/intercepta/client.ts#L141-L181) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure left sets `Screen.error` |
-| [`lib/decision/matrix.ts#L50-L101`](lib/decision/matrix.ts#L50-L101) | how the screen decides: token block, screen error, traits, score, impersonation, medium, no history |
-| [`lib/claim/wallet-screen.ts`](lib/claim/wallet-screen.ts), called from [`lib/claim/env.ts#L48`](lib/claim/env.ts#L48) | a maintainer's claim wallet is quick-scanned before `setClaim` |
+| [`lib/intercepta/client.ts#L61-L112`](lib/intercepta/client.ts#L61-L112) | the one HTTP path: `X-API-KEY`, 8 s deadline, one retry on a transient failure, every attempt stored in `screens` with status, body and latency |
+| [`lib/intercepta/client.ts#L117-L126`](lib/intercepta/client.ts#L117-L126) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` (payees, claim wallets, x402 payers) |
+| [`lib/intercepta/client.ts#L128-L134`](lib/intercepta/client.ts#L128-L134) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
+| [`lib/intercepta/client.ts#L136-L143`](lib/intercepta/client.ts#L136-L143) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
+| [`lib/intercepta/client.ts#L145-L153`](lib/intercepta/client.ts#L145-L153) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, only when the quick scan fails |
+| [`lib/intercepta/client.ts#L158-L168`](lib/intercepta/client.ts#L158-L168) | `simulatePayment`: the same endpoint for the exact payment, off unless `SIMULATE_PAYMENTS=true` (see the feedback below) |
+| [`lib/intercepta/client.ts#L172-L212`](lib/intercepta/client.ts#L172-L212) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure left sets `Screen.error` |
+| [`lib/decision/matrix.ts#L37-L113`](lib/decision/matrix.ts#L37-L113) | how the screen decides: token block, screen error, traits, score, impersonation, medium, no history |
+| [`lib/x402/server.ts#L126-L145`](lib/x402/server.ts#L126-L145) | the payer screen on our paid x402 route |
+| [`lib/claim/wallet-screen.ts`](lib/claim/wallet-screen.ts), called from [`lib/claim/env.ts#L49`](lib/claim/env.ts#L49) | a maintainer's claim wallet is quick-scanned before `setClaim` |
+| [`lib/risk/profile.ts`](lib/risk/profile.ts) | the counterparty risk profile, from stored screens only |
 | [`lib/intercepta/cache.ts`](lib/intercepta/cache.ts) | reuse: address screens 5 min, token screens 1 h, only rows that parsed |
 | [`scripts/probe-intercepta.ts`](scripts/probe-intercepta.ts) | the probe behind [`docs/intercepta-probe.md`](docs/intercepta-probe.md) (10 real responses, verbatim) |
 
@@ -229,22 +259,20 @@ TODO(live): the final judged demo session id and its roll link.
   address-poisoning payee is refused on Intercepta's word, before our own lookalike rule runs.
 - No endpoint takes a testnet chain id, hence the mapping above.
 - `/quick-scan` and `/toxic-score` return the same `{toxicScore, traits}` shape and take no chain id.
-- Signature analysis covers the Permit family, not EIP-3009 `TransferWithAuthorization`, which is
-  what x402 signs. We screen the payee and the token instead of the signature.
 
 ### Feedback on the API
 
-- **Time to first call:** minutes once the key arrived. The key took several hours to arrive by
-  email; meanwhile we built the client against `llms.txt` and the OpenAPI pages via `.md`, which were
-  enough to have it ready before the first request.
+- **Time to first call:** minutes once the key arrived (it took several hours by email); `llms.txt`
+  and the OpenAPI pages via `.md` had the client ready before the first request.
 - **What confused us:** an address Intercepta has never seen returns HTTP 404 with an error body, not
-  a 200 "no history" verdict. A client naturally reads that as an outage. We had to special-case it;
-  before that, our simulation fallback could have paid on a clean simulation of a plain transfer.
-- **What was missing:** testnet chain ids (we map Base Sepolia to Base 8453 and say so on every
-  screen), and signature analysis for EIP-3009 `TransferWithAuthorization`, which is what x402
-  `exact` payments sign. The Permit family is covered.
-- **What worked well:** the impersonation (poisoning) endpoint exists and is fast (about 350 ms in
-  the probe), and the trait descriptions are clear enough to show an owner verbatim.
+  a 200 "no history" verdict, which a client reads as an outage. We special-case it.
+- **What was missing for an agent paying on testnet:** testnet chain ids; simulation needs the
+  sender's mainnet balance, so a testnet agent's payment cannot be simulated (a substituted funded
+  mainnet sender got `WALLET_DRAINER` on a plain transfer to a clean payee, a signal about that
+  sender, so payment simulation is off by default); and signature analysis covers Permit but not
+  EIP-3009 `TransferWithAuthorization`, the message x402 signs.
+- **What worked well:** the impersonation endpoint is fast (about 350 ms in the probe), and the trait
+  descriptions are clear enough to show an owner verbatim.
 
 ## x402
 
@@ -596,7 +624,7 @@ checks the boot set and throws `Missing required env: <NAME>` on the first read 
 | Optional World ID (off unless `WORLD_REQUIRED=true`) | `WORLD_REQUIRED`, `APPROVE_METHOD`, `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
 | MultiBaas | `MULTIBAAS_URL`, `MULTIBAAS_API_KEY`, `MULTIBAAS_WEBHOOK_SECRET`, `PAYER_ADDRESS` (optional) |
 | GitHub claim | `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_TOKEN_READ` (optional, rate limit) |
-| Optional | `ETH_MAINNET_RPC`, `BASE_MAINNET_RPC`, `CHECK_NO_CODE` |
+| Optional | `ETH_MAINNET_RPC`, `BASE_MAINNET_RPC`, `CHECK_NO_CODE`, `SIMULATE_PAYMENTS` (mainnet payer only) |
 | CLI | `ENDCREDITS_HOME`, `ENDCREDITS_NO_OPEN` |
 | Tests | `TEST_DATABASE_URL`, `LIVE`, `OFFLINE` |
 
