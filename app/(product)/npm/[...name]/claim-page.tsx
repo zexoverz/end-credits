@@ -38,6 +38,7 @@ export function ClaimPage({
 }) {
   const checking = useRef(false);
   const [checkingNow, setCheckingNow] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<Notice | null>(null);
   const [lastCheck, setLastCheck] = useState<string | null>(null);
   const [summary, setSummary] = useState<PackageSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -88,7 +89,15 @@ export function ClaimPage({
         if (r.data.status === "claimed") {
           // Refresh package evidence without replacing the confirmed receipt if a later read fails.
           const refreshed = await api<PackageSummary>(summaryPath(name));
-          if (refreshed.ok) setSummary(refreshed.data);
+          if (refreshed.ok) {
+            setSummary(refreshed.data);
+            setRefreshNotice(null);
+          } else
+            setRefreshNotice({
+              tone: "error",
+              code: "load",
+              text: claimCopy("LOAD_FAILED", { error: refreshed.error }),
+            });
         }
       } finally {
         checking.current = false;
@@ -186,6 +195,7 @@ export function ClaimPage({
   return (
     <Page>
       <Header s={summary} />
+      <NoticeLine notice={refreshNotice} />
       {stop && stop !== "ALREADY_PAYABLE" && stop !== "NO_REPO" && (
         <NoticeLine
           notice={{
