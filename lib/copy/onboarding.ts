@@ -126,12 +126,17 @@ export const ONBOARDING = {
     "The spending-limit control is not available in this build yet. Refresh the checklist to see the server’s latest status.",
   continueKeys: "Continue to agent setup ↓",
   keysLabel: "04 / LOCAL CONNECTION",
-  keysTitle: "Two commands. Then build.",
+  keysTitle: "Three commands. Then build.",
   keysBody:
-    "With the End Credits CLI installed, create a key for this machine and run these commands in order.",
+    "Install the End Credits CLI once, create a key for this machine, then run these commands in order.",
+  installLabel: "Once, on your machine",
+  installCommand:
+    "git clone https://github.com/zexoverz/end-credits && cd end-credits && pnpm install && pnpm --filter endcredits build && cd cli && npm link",
+  installHint:
+    "Needs Node 20+ and pnpm. Puts endcredits on your PATH so the Claude Code hooks can call it.",
   keyCommand: "endcredits key <token>",
   initCommand: "endcredits init",
-  commandOne: "On your machine",
+  commandOne: "Then, with your new key",
   commandTwo: "Inside your project",
   keyPlaceholder:
     "Replace <token> with the key you just created. Never share it.",
