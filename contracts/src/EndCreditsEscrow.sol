@@ -92,6 +92,7 @@ contract EndCreditsEscrow {
     error NothingReserved(bytes32 packageKey);
     error ClaimCoolingDown(bytes32 packageKey, uint64 until);
     error ZeroApprover();
+    error NoApprover(address payer);
 
     modifier onlyRecorder() {
         if (msg.sender != recorder) revert NotRecorder();
@@ -132,6 +133,8 @@ contract EndCreditsEscrow {
         if (amount == 0) revert ZeroAmount();
         if (payee == address(0)) revert ZeroPayee();
         if (ttl < MIN_TTL || ttl > MAX_TTL) revert TtlOutOfRange(ttl);
+        _promote(msg.sender);
+        if (approvers[msg.sender].current == address(0)) revert NoApprover(msg.sender);
 
         uint64 expiresAt = uint64(block.timestamp) + ttl;
         tips[tipId] = Tip({
