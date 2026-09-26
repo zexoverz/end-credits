@@ -4,6 +4,7 @@ import { z } from "zod";
 import { withOwner } from "../auth/owner";
 import { getApprover, setOwnerApprover, type ApproverChain } from "./approver";
 import { createKey, keyInput, listKeys, revokeKey } from "./keys";
+import { ownerOnboarding, type OnboardingDeps } from "./onboarding";
 import { ownerRow, settingsInput, settingsView, updateSettings } from "./settings";
 import { ownerSummary, type SummaryDeps } from "./summary";
 
@@ -82,5 +83,13 @@ export function handleSetApprover(req: Request, chain: ApproverChain): Promise<R
     const parsed = approverInput.safeParse(await body(req));
     if (!parsed.success) return invalid(z.flattenError(parsed.error).fieldErrors);
     return result(await setOwnerApprover(ownerId, parsed.data.address as Address, chain));
+  });
+}
+
+/** GET /api/owner/onboarding → { steps: [{ id, done, detail, href }], next }. */
+export function handleOnboarding(req: Request, deps: OnboardingDeps): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => {
+    const onboarding = await ownerOnboarding(ownerId, deps);
+    return onboarding ? Response.json(onboarding, { headers: noStore }) : notFound();
   });
 }
