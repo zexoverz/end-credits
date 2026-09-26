@@ -3,6 +3,7 @@
 // /approve: the approve button for escrow v2. prepare → the approver wallet signs the release
 // (eth_signTypedData_v4) → the server checks and stores the signature → `onSigned(approvalId)`,
 // which calls the page's existing approve action (POST /start) with that id.
+import { MetaMaskIcon } from "@/components/approver/metamask-icon";
 import { ActionNotice, ExecutionSteps } from "@/components/product/feedback";
 import { CONTROL as U } from "@/lib/copy/control-room";
 import Link from "next/link";
@@ -139,7 +140,10 @@ export function SignRelease({
         disabled={disabled || step !== null}
         onClick={run}
       >
-        {label}
+        <span className="inline-flex items-center justify-center gap-2">
+          <MetaMaskIcon />
+          {label}
+        </span>
       </Button>
       {error && <ErrorBox>{error}</ErrorBox>}
     </div>

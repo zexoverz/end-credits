@@ -1,4 +1,5 @@
 "use client";
+import { MetaMaskIcon } from "@/components/approver/metamask-icon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
@@ -122,7 +123,7 @@ export function SignIn({
             }}
           >
             <span className="wallet-choice-icon" aria-hidden="true">
-              ↗
+              <MetaMaskIcon size={32} />
             </span>
             <span>
               <strong>{O.metamask}</strong>

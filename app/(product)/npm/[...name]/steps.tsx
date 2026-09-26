@@ -1,6 +1,7 @@
 // The four claim steps. Each renders from the step state; actions come in from claim-page.tsx.
 "use client";
 
+import { MetaMaskIcon } from "@/components/approver/metamask-icon";
 import { type ReactNode } from "react";
 import { Button, Mono } from "@/components/ui";
 import {
@@ -144,7 +145,12 @@ export function WalletStep({
     <>
       <p className="text-muted">{claimCopy("WALLET_WHY")}</p>
       <Button onClick={onConnect} disabled={busy}>
-        {waiting ? claimCopy("WALLET_CONNECTING") : claimCopy("WALLET_BUTTON")}
+        <span className="inline-flex items-center justify-center gap-2">
+          <MetaMaskIcon />
+          {waiting
+            ? claimCopy("WALLET_CONNECTING")
+            : claimCopy("WALLET_BUTTON")}
+        </span>
       </Button>
       {busy && <p role="status">{claimCopy("SAVING_WALLET")}</p>}
       <NoticeLine notice={notice} />

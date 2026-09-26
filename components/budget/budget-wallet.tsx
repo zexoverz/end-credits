@@ -4,6 +4,7 @@
 // wallet; from that wallet they approve USDC to the budget contract and give our agent key an
 // allowance per period. Every transaction here is sent from the owner's wallet, never the server.
 // Wallet calls remain explicit: approve USDC, then set or revoke the agent allowance.
+import { MetaMaskIcon } from "@/components/approver/metamask-icon";
 import { useCallback, useEffect, useState } from "react";
 import { encodeFunctionData, parseAbi, type Hex } from "viem";
 import { ActionNotice, useFeedback } from "@/components/product/feedback";
@@ -239,7 +240,10 @@ export function BudgetWallet() {
               disabled={!!busy}
               onClick={() => connect("injected")}
             >
-              {C.CONNECT}
+              <span className="inline-flex items-center justify-center gap-2">
+                <MetaMaskIcon />
+                {C.CONNECT}
+              </span>
             </Button>
           </div>
         )}
