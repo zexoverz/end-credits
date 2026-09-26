@@ -74,6 +74,39 @@ describe("owner wallet sign-in", () => {
     expect(mocks.connect).not.toHaveBeenCalled();
     expect(mocks.sign).not.toHaveBeenCalled();
   });
+  it("does not open a wallet after cancelling the nonce request", async () => {
+    const stage = vi.fn();
+    expect(await signInWithWallet("injected", stage, () => false)).toBe(false);
+    expect(stage.mock.calls.flat()).toEqual(["nonce"]);
+    expect(mocks.connect).not.toHaveBeenCalled();
+    expect(mocks.sign).not.toHaveBeenCalled();
+  });
+  it("does not sign after cancelling account selection", async () => {
+    let current = true;
+    mocks.connect.mockImplementation(async () => {
+      current = false;
+      return address;
+    });
+    expect(await signInWithWallet("injected", vi.fn(), () => current)).toBe(
+      false,
+    );
+    expect(mocks.sign).not.toHaveBeenCalled();
+    expect(mocks.api).toHaveBeenCalledTimes(1);
+  });
+  it("ignores a completed request after the view was unmounted", async () => {
+    let current = true;
+    mocks.api
+      .mockReset()
+      .mockResolvedValueOnce({ ok: true, data: { nonce: "freshNonce123" } })
+      .mockImplementationOnce(async () => {
+        current = false;
+        return { ok: true, data: { ownerId: "owner" } };
+      });
+    expect(await signInWithWallet("injected", vi.fn(), () => current)).toBe(
+      false,
+    );
+    expect(mocks.api).toHaveBeenCalledTimes(2);
+  });
   it("does not submit a cancelled wallet prompt", async () => {
     let current = true;
     mocks.sign.mockImplementation(async () => {
