@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { mergeHooks, runInit } from "./init";
+import { MCP_ENTRY, mergeHooks, runInit, runMcpInit } from "./init";
 
 const prior = {
   model: "opus",
@@ -69,11 +69,44 @@ describe("runInit", () => {
     ]);
   });
 
-  it("leaves an unparseable file alone", () => {
+  it("leaves an unparseable settings file alone", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "ec-init-"));
     const file = path.join(dir, "settings.json");
     writeFileSync(file, "{ not json");
     expect(runInit(file)).toBe("invalid");
     expect(readFileSync(file, "utf8")).toBe("{ not json");
+  });
+});
+
+describe("runMcpInit", () => {
+  const other = { type: "stdio", command: "npx", args: ["-y", "@example/server"], env: { K: "v" } };
+
+  it("adds end-credits next to an existing server and never overwrites it", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "ec-mcp-"));
+    const file = path.join(dir, ".mcp.json");
+    writeFileSync(file, JSON.stringify({ mcpServers: { example: other } }));
+    expect(runMcpInit(file)).toBe("added");
+    expect(runMcpInit(file)).toBe("unchanged");
+    const saved = JSON.parse(readFileSync(file, "utf8"));
+    expect(saved.mcpServers).toEqual({ example: other, "end-credits": MCP_ENTRY });
+  });
+
+  it("keeps a user's own end-credits entry as it is", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "ec-mcp-"));
+    const file = path.join(dir, ".mcp.json");
+    const mine = JSON.stringify({ mcpServers: { "end-credits": { command: "/opt/bin/endcredits", args: ["mcp"] } } });
+    writeFileSync(file, mine);
+    expect(runMcpInit(file)).toBe("unchanged");
+    expect(readFileSync(file, "utf8")).toBe(mine);
+  });
+
+  it("creates the file when missing and leaves an unparseable one alone", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "ec-mcp-"));
+    const file = path.join(dir, ".mcp.json");
+    expect(runMcpInit(file)).toBe("added");
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ mcpServers: { "end-credits": MCP_ENTRY } });
+    writeFileSync(file, "{ nope");
+    expect(runMcpInit(file)).toBe("invalid");
+    expect(readFileSync(file, "utf8")).toBe("{ nope");
   });
 });

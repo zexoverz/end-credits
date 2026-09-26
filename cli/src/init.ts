@@ -63,3 +63,33 @@ export function runInit(settingsPath: string): InitResult {
   writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + "\n");
   return "added";
 }
+
+// MCP registration (decisions.md "MCP server"): project scope is `.mcp.json` at the project root,
+// `{"mcpServers": {name: {type, command, args, env}}}`. An existing entry is never replaced.
+export const MCP_NAME = "end-credits";
+export const MCP_ENTRY = { type: "stdio", command: "endcredits", args: ["mcp"], env: {} };
+export const MCP_ADD_GLOBAL = `claude mcp add --scope user ${MCP_NAME} -- endcredits mcp`;
+
+export function mergeMcp(input: Record<string, unknown>): Record<string, unknown> {
+  const raw = input.mcpServers;
+  const servers = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  if (MCP_NAME in servers) return input;
+  return { ...input, mcpServers: { ...servers, [MCP_NAME]: structuredClone(MCP_ENTRY) } };
+}
+
+export function runMcpInit(mcpJsonPath: string): InitResult {
+  let current: Record<string, unknown> = {};
+  if (existsSync(mcpJsonPath)) {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(mcpJsonPath, "utf8"));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "invalid";
+      current = parsed as Record<string, unknown>;
+    } catch {
+      return "invalid";
+    }
+  }
+  const merged = mergeMcp(current);
+  if (merged === current) return "unchanged";
+  writeFileSync(mcpJsonPath, JSON.stringify(merged, null, 2) + "\n");
+  return "added";
+}
