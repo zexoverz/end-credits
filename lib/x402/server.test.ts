@@ -7,7 +7,7 @@ import {
   encodePaymentSignatureHeader,
 } from "@x402/core/http";
 import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
-import { handleCreditRequest, type CreditRepo, type PayableCredit } from "./server";
+import { handleCreditRequest, type CreditRepo, type PayableCredit, type PayerScreen } from "./server";
 import { verifyReceipt, type Receipt } from "./receipt";
 
 const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -15,6 +15,7 @@ const PAYEE = getAddress("0x00000000000000000000000000000000000000aa");
 const NOW = new Date("2026-09-26T12:00:00Z");
 const URL_ = "https://end-credits.up.railway.app/api/x402/credit/c1";
 const receiptSigner = privateKeyToAccount(generatePrivateKey());
+const PAYER = getAddress("0x00000000000000000000000000000000000000bb");
 
 function credit(over: Partial<PayableCredit> = {}): PayableCredit {
   return {
@@ -33,14 +34,18 @@ function credit(over: Partial<PayableCredit> = {}): PayableCredit {
 // In-memory repository, tests only. Screens are keyed by lowercase address.
 function memoryRepo(c: PayableCredit | null, screens: Record<string, Date> = {}) {
   const saved: { id: string; tx: string; receipt: Receipt }[] = [];
+  const screenIds: string[] = [];
   const repo: CreditRepo = {
     loadCredit: async (id) => (c && c.id === id ? c : null),
     latestAddressScreenAt: async (address) => screens[address.toLowerCase()] ?? null,
     saveSettlement: async (id, tx, receipt) => {
       saved.push({ id, tx, receipt });
     },
+    addScreenId: async (_id, screenId) => {
+      screenIds.push(screenId);
+    },
   };
-  return { repo, saved };
+  return { repo, saved, screenIds };
 }
 
 const fresh = { [PAYEE.toLowerCase()]: new Date(NOW.getTime() - 60_000) };
@@ -57,8 +62,11 @@ function fakeFacilitator(opts: { valid?: boolean; settled?: boolean } = {}) {
   };
 }
 
-function deps(repo: CreditRepo, facilitator = fakeFacilitator()) {
-  return { repo, facilitator, usdc: USDC, receiptSigner, now: () => NOW };
+const cleanPayer: PayerScreen = { ok: true, data: { toxicScore: 0, traits: [] }, screenId: "payer-screen" };
+
+function deps(repo: CreditRepo, facilitator = fakeFacilitator(), payer: PayerScreen = cleanPayer) {
+  const screenPayer = vi.fn(async (_address: string) => payer);
+  return { repo, facilitator, usdc: USDC, receiptSigner, now: () => NOW, screenPayer };
 }
 
 function request(paymentHeader: string | null = null) {
@@ -71,7 +79,7 @@ function paymentFor(accepted: PaymentRequirements): string {
     accepted,
     payload: {
       signature: "0x01",
-      authorization: { from: "0xbb", to: accepted.payTo, value: accepted.amount },
+      authorization: { from: PAYER, to: accepted.payTo, value: accepted.amount },
     },
   };
   return encodePaymentSignatureHeader(payload);
@@ -235,5 +243,70 @@ describe("x402 credit resource: settlement", () => {
     const res = await handleCreditRequest(request("not-base64-json"), deps(repo));
     expect(res.status).toBe(402);
     expect((await challengeOf(res)).error).toBe("INVALID_PAYMENT");
+  });
+});
+
+describe("x402 credit resource: screens the paying wallet", () => {
+  async function pay(payer: PayerScreen) {
+    const { repo, saved, screenIds } = memoryRepo(credit(), fresh);
+    const facilitator = fakeFacilitator();
+    const d = deps(repo, facilitator, payer);
+    const challenge = await challengeOf(await handleCreditRequest(request(), d));
+    const res = await handleCreditRequest(request(paymentFor(challenge.accepts[0])), d);
+    return { res, facilitator, saved, screenIds, screenPayer: d.screenPayer };
+  }
+
+  it("refuses a sanctioned payer with 403 and never settles", async () => {
+    const sanctioned: PayerScreen = {
+      ok: true,
+      data: { toxicScore: 100, traits: [{ name: "sanction_address", description: "The address is officially listed as sanctioned." }] },
+      screenId: "s-sanctioned",
+    };
+    const { res, facilitator, saved, screenIds, screenPayer } = await pay(sanctioned);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      code: "PAYER_REFUSED",
+      message: "Refused: Intercepta flags the paying wallet. The address is officially listed as sanctioned.",
+    });
+    expect(screenPayer).toHaveBeenCalledWith(PAYER);
+    expect(facilitator.verify).not.toHaveBeenCalled();
+    expect(facilitator.settle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+    expect(screenIds).toEqual(["s-sanctioned"]);
+  });
+
+  it("refuses a payer scored above 50 with no critical trait", async () => {
+    const toxic: PayerScreen = { ok: true, data: { toxicScore: 60, traits: [] }, screenId: "s-toxic" };
+    const { res, facilitator } = await pay(toxic);
+    expect(res.status).toBe(403);
+    expect((await res.json()).message).toBe("Refused: Intercepta flags the paying wallet. Toxic score 60.");
+    expect(facilitator.settle).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 when the payer screen fails and never settles", async () => {
+    const { res, facilitator, saved } = await pay({ ok: false, error: "TIMEOUT", screenId: "s-timeout" });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      code: "PAYER_SCREEN_UNAVAILABLE",
+      message: "Not settled: the paying wallet could not be screened (TIMEOUT). Nothing was settled.",
+    });
+    expect(facilitator.verify).not.toHaveBeenCalled();
+    expect(facilitator.settle).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+  });
+
+  it("settles for a clean payer and records its screen", async () => {
+    const { res, facilitator, saved, screenIds } = await pay(cleanPayer);
+    expect(res.status).toBe(200);
+    expect(facilitator.settle).toHaveBeenCalledTimes(1);
+    expect(saved).toHaveLength(1);
+    expect(screenIds).toEqual(["payer-screen"]);
+  });
+
+  it("settles for a payer with no mainnet history", async () => {
+    const fresh: PayerScreen = { ok: true, data: { toxicScore: 0, traits: [], noHistory: true }, screenId: "s-new" };
+    const { res, facilitator } = await pay(fresh);
+    expect(res.status).toBe(200);
+    expect(facilitator.settle).toHaveBeenCalledTimes(1);
   });
 });
