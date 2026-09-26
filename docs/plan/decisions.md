@@ -1064,3 +1064,10 @@ reserve twice). It throws; the settler records an execution error and nothing mo
   all resolved, so no hold actions), `reserved_by_package` 3 packages at 0.25 USDC each (3
   `reserve_waiting` actions), `paid_totals` 0 rows on v2. Timeline hour 10:00 UTC: held 0.75,
   released 0.25, refunded 0.5, reserved 0.75, matching the raw rows. The dashboard build made 6 calls.
+
+## MultiBaas address filters are case-sensitive (26 Sep)
+
+`paid_totals` returned 0 rows although the x402 payments were indexed: MultiBaas stores event
+address inputs in lowercase and compares filter values as strings. Filtering on the checksummed
+payer matched nothing; the lowercase payer matches. The saved query is re-saved by
+`scripts/multibaas-setup.ts`.
