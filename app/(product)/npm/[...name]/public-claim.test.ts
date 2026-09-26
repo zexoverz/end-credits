@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect } from "vitest";
+import type { PackageSummary } from "@/lib/client/claim";
+import { Header } from "./header";
 import { PublicClaim } from "./public-claim";
 const setClaimTx = `0x${"a".repeat(64)}`;
 const claimTxs = [`0x${"b".repeat(64)}`, `0x${"c".repeat(64)}`];
@@ -32,4 +34,28 @@ describe("public repository claim", () => {
     );
     expect(html).not.toContain("/tx/");
   });
+});
+
+it("never calls a refused payee payable, even if old data has both messages", () => {
+  const s: PackageSummary = {
+    package: "@endcredits-demo/refused",
+    repo: null,
+    state: "refused",
+    reserved: "0",
+    sessions: 0,
+    headline: null,
+    alsoAccepts: [],
+    payee: null,
+    alreadyPayable: "STALE PAYABLE",
+    payeeRefused: "Agents refuse to pay: recorded refusal.",
+    claimed: null,
+    cooling: null,
+    maintainer: null,
+    claim: null,
+    payeeRisk: null,
+    errors: [],
+  };
+  const html = renderToStaticMarkup(createElement(Header, { s }));
+  expect(html).toContain("Agents refuse to pay: recorded refusal.");
+  expect(html).not.toContain("STALE PAYABLE");
 });
