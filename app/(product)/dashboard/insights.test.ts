@@ -16,6 +16,7 @@ describe("dashboard action destinations", () => {
     const actions: Action[] = [
       {
         kind: "approve_hold",
+        payer: "0xabc",
         title: "Review the hold",
         detail: null,
         href: "/app/approve/0xabc",
@@ -38,10 +39,74 @@ describe("dashboard action destinations", () => {
         sessions: 1,
       },
     ];
-    const html = renderToStaticMarkup(createElement(ActionQueue, { actions }));
+    const html = renderToStaticMarkup(
+      createElement(ActionQueue, { actions, agentWallet: "0xAbC" }),
+    );
     expect(html).toContain('href="/app/approve/0xabc"');
     expect(html).toContain('href="/app/npm/@endcredits-demo/unclaimed"');
     expect(html).toContain("Review &amp; sign");
     expect(html).toContain("View claim");
   });
+});
+
+const payer = "0x1111111111111111111111111111111111111111";
+const other = "0x2222222222222222222222222222222222222222";
+it.each(["approve_hold", "hold_expiring"] as const)(
+  "only offers %s signing to its account",
+  (kind) => {
+    const hold: Action = {
+      kind,
+      payer,
+      title: "Approve this hold",
+      detail: null,
+      href: "/app/approve/owned",
+      tipId: "owned",
+      source: "multibaas",
+      amount: { micro: "1", usdc: "0.000001" },
+    };
+    for (const [agentWallet, actionPayer] of [
+      [null, payer],
+      [other, payer],
+      [payer, null],
+      [payer, undefined],
+    ] as const) {
+      const html = renderToStaticMarkup(
+        createElement(ActionQueue, {
+          actions: [{ ...hold, payer: actionPayer }],
+          agentWallet,
+        }),
+      );
+      expect(html).not.toContain("Review &amp; sign");
+      expect(html).not.toContain('href="/app/approve/owned"');
+      expect(html).not.toContain("Approve this hold");
+      expect(html).toContain("Awaiting account approval");
+      expect(html).not.toContain("A signature from you");
+    }
+    const html = renderToStaticMarkup(
+      createElement(ActionQueue, { actions: [hold], agentWallet: payer }),
+    );
+    expect(html).toContain('href="/app/approve/owned"');
+    expect(html).toContain("Review &amp; sign");
+  },
+);
+it("keeps maintainer claim links visible without an account", () => {
+  const html = renderToStaticMarkup(
+    createElement(ActionQueue, {
+      actions: [
+        {
+          kind: "reserve_waiting",
+          payer,
+          title: "Waiting for maintainer",
+          detail: null,
+          href: "/app/npm/date-fns",
+          package: "date-fns",
+          source: "multibaas",
+          amount: { micro: "1", usdc: "0.000001" },
+        },
+      ],
+    }),
+  );
+  expect(html).toContain('href="/app/npm/date-fns"');
+  expect(html).toContain("View claim");
+  expect(html).not.toContain("Review &amp; sign");
 });
