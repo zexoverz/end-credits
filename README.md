@@ -213,9 +213,7 @@ verbatim:
   Approved by the owner. Released 0.25 USDC to 0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551.
 ```
 
-The released row also went through escrow v2's signature check on chain: in a separate run with a
-throwaway payer, a release signed by the wrong key reverted `BadApproval`, and the approver-signed
-release [`0xd8c70875…`](https://sepolia.basescan.org/tx/0xd8c7087528872b003879e215d7b515e46b20d6728ec26a28f28d9684c648d95d) paid.
+The release is covered in [Held money](#held-money-the-owner-signs-the-release-on-chain).
 
 TODO(live): the final judged demo session id and its roll link.
 
