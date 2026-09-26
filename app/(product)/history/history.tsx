@@ -1,69 +1,108 @@
 "use client";
-// Loads GET /api/history on mount and on Refresh; shows loading, error, empty or the table.
 import { useCallback, useEffect, useState } from "react";
 import { Button, ErrorBox } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import { fill } from "@/lib/client/roll";
-import { HISTORY_COPY } from "@/lib/copy/history";
+import { HISTORY_COPY as C } from "@/lib/copy/history";
+import { EXPERIENCE as E } from "@/lib/copy/experience";
 import type { HistoryItem } from "@/lib/history/history";
 import { HistoryRow } from "./history-row";
-
-type State = { items: HistoryItem[] | null; error: string | null; loading: boolean };
-
-function Table({ items }: { items: HistoryItem[] }) {
-  const cols = HISTORY_COPY.COLS;
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs uppercase tracking-wide text-muted">
-          <tr>
-            {[cols.time, cols.package, cols.outcome, cols.amount, cols.reasons, cols.screens, cols.hold, cols.tx].map(
-              (c) => (
-                <th key={c} className="pb-2 pr-3 font-medium">
-                  {c}
-                </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <HistoryRow key={item.creditId} item={item} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
+type State = {
+  items: HistoryItem[] | null;
+  error: string | null;
+  loading: boolean;
+};
 export function History() {
-  const [state, setState] = useState<State>({ items: null, error: null, loading: true });
-
+  const [state, setState] = useState<State>({
+    items: null,
+    error: null,
+    loading: true,
+  });
+  const [query, setQuery] = useState("");
+  const [outcome, setOutcome] = useState("");
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {
-      const res = await api<{ items: HistoryItem[] }>("/api/history", { cache: "no-store" });
-      setState(res.ok ? { items: res.data.items, error: null, loading: false } : (s) => ({ ...s, error: res.error, loading: false }));
+      const res = await api<{ items: HistoryItem[] }>("/api/history", {
+        cache: "no-store",
+      });
+      setState(
+        res.ok
+          ? { items: res.data.items, error: null, loading: false }
+          : (s) => ({ ...s, error: res.error, loading: false }),
+      );
     } catch (e) {
-      setState((s) => ({ ...s, error: e instanceof Error ? e.message : String(e), loading: false }));
+      setState((s) => ({
+        ...s,
+        error: e instanceof Error ? e.message : String(e),
+        loading: false,
+      }));
     }
   }, []);
-
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
-
+  const search = query.trim().toLowerCase();
+  const items =
+    state.items?.filter(
+      (item) =>
+        (!outcome || item.outcome === outcome) &&
+        (!search ||
+          `${item.package} ${item.reasons.map((r) => r.text).join(" ")}`
+            .toLowerCase()
+            .includes(search)),
+    ) ?? [];
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted">{HISTORY_COPY.INTRO}</p>
-        <Button onClick={load} disabled={state.loading}>
-          {state.loading ? HISTORY_COPY.LOADING : HISTORY_COPY.REFRESH}
+    <div className="space-y-5">
+      <div className="dashboard-toolbar">
+        <div>
+          <p className="text-sm text-muted">{C.INTRO}</p>
+          <p className="mt-2 text-xs text-muted">{E.allocationNote}</p>
+        </div>
+        <Button onClick={() => void load()} disabled={state.loading}>
+          {state.loading ? C.LOADING : C.REFRESH}
         </Button>
       </div>
-      {state.error && <ErrorBox>{fill(HISTORY_COPY.ERROR, { error: state.error })}</ErrorBox>}
-      {state.items?.length === 0 && <p className="text-muted">{HISTORY_COPY.EMPTY}</p>}
-      {state.items && state.items.length > 0 && <Table items={state.items} />}
+      <div className="history-toolbar">
+        <input
+          type="search"
+          aria-label={E.decisionSearch}
+          placeholder={E.decisionSearch}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <select
+          aria-label={C.COLS.outcome}
+          value={outcome}
+          onChange={(e) => setOutcome(e.target.value)}
+        >
+          <option value="">{E.all}</option>
+          {E.outcomes.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+        {state.items && (
+          <span aria-live="polite">
+            {fill(E.resultCount, { count: items.length })}
+          </span>
+        )}
+      </div>
+      {state.error && (
+        <ErrorBox>{fill(C.ERROR, { error: state.error })}</ErrorBox>
+      )}
+      {state.items?.length === 0 && (
+        <div className="product-card text-sm text-muted">{C.EMPTY}</div>
+      )}
+      {!!state.items?.length && items.length === 0 && (
+        <p className="text-sm text-muted">{E.noMatches}</p>
+      )}
+      <div className="history-list">
+        {items.map((item) => (
+          <HistoryRow key={item.creditId} item={item} />
+        ))}
+      </div>
     </div>
   );
 }
