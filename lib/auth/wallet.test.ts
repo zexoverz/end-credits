@@ -1,5 +1,5 @@
 // Integration: real Postgres and real SIWE signatures from local keys. Skipped without TEST_DATABASE_URL.
-import { eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { verifyMessage, zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
@@ -36,7 +36,10 @@ describe.skipIf(!TEST_DB)("wallet sign-in (integration)", () => {
   });
   beforeEach(async () => {
     approver = zeroAddress;
-    await db.delete(s.owners).where(ne(s.owners.id, ownerId));
+    // Owners these tests created (the new-owner path); other suites' owners stay.
+    await db
+      .delete(s.owners)
+      .where(and(ne(s.owners.id, ownerId), inArray(s.owners.walletAddress, [OWNER_KEY.address, OTHER_KEY.address])));
     await db.update(s.owners).set({ walletAddress: null });
   });
   afterEach(() => {
