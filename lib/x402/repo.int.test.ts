@@ -47,3 +47,34 @@ describe.skipIf(!DB_URL)("latestAddressScreenAt (integration)", () => {
     expect(await repo.latestAddressScreenAt(b)).toEqual(t1);
   });
 });
+
+describe.skipIf(!DB_URL)("addScreenId (integration)", () => {
+  it("appends the payer screen once", async () => {
+    process.env.DATABASE_URL = DB_URL;
+    const { db } = await import("../db/client");
+    const s = await import("../db/schema");
+    const { eq } = await import("drizzle-orm");
+    const repo = (await import("./repo")).drizzleCreditRepo(db());
+    const id = crypto.randomUUID();
+    const [owner] = await db()
+      .insert(s.owners)
+      .values({ displayName: "t", payerAddress: "0x01", sessionBudgetMicro: BigInt(1), packageCapMicro: BigInt(1), dailyLimitMicro: BigInt(1), holdTtlSeconds: 60, settleMode: "on_open" })
+      .returning();
+    const [key] = await db().insert(s.agentKeys).values({ ownerId: owner.id, label: "k", tokenHash: id, boundVia: "dev" }).returning();
+    const [session] = await db()
+      .insert(s.sessions)
+      .values({ ownerId: owner.id, agentKeyId: key.id, claudeSessionId: id, sessionKey: "0x00" })
+      .returning();
+    const [pkg] = await db().insert(s.packages).values({ name: `payer-${id}`, packageKey: `0x${id}` }).returning();
+    const earlier = crypto.randomUUID();
+    const [c] = await db()
+      .insert(s.credits)
+      .values({ sessionId: session.id, packageId: pkg.id, score: 1, amountMicro: BigInt(1), role: "thanks", screenIds: [earlier] })
+      .returning();
+    const payerScreen = crypto.randomUUID();
+    await repo.addScreenId(c.id, payerScreen);
+    await repo.addScreenId(c.id, payerScreen);
+    const [row] = await db().select().from(s.credits).where(eq(s.credits.id, c.id));
+    expect(row.screenIds).toEqual([earlier, payerScreen]);
+  });
+});
