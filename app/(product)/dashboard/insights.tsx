@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { DeskAsset, PackageMark } from "@/components/product/desk-assets";
 import { Pager } from "@/components/product/pager";
-import { inboxItems } from "@/components/product/action-inbox";
+import { inboxItems, isAccountHold } from "@/components/product/action-inbox";
 import { WORKSPACE as W } from "@/lib/copy/workspace";
 import { useState, type CSSProperties } from "react";
 import type {
@@ -28,7 +28,13 @@ const hour = (iso: string) =>
     minute: "2-digit",
     hour12: false,
   });
-export function ActionQueue({ actions }: { actions?: Action[] }) {
+export function ActionQueue({
+  actions,
+  agentWallet = null,
+}: {
+  actions?: Action[];
+  agentWallet?: string | null;
+}) {
   const [filter, setFilter] = useState("all"),
     [page, setPage] = useState(0);
   const grouped = inboxItems(actions ?? []);
@@ -92,7 +98,16 @@ export function ActionQueue({ actions }: { actions?: Action[] }) {
                     <div className="inbox-item-heading">
                       <PackageMark name={a.package ?? ""} />
                       <div>
-                        <Link href={a.href}>
+                        <Link
+                          href={
+                            a.kind === "reserve_waiting" ||
+                            isAccountHold(a, agentWallet)
+                              ? a.href
+                              : a.package
+                                ? `/app/npm/${a.package}`
+                                : "/app/packages"
+                          }
+                        >
                           {a.package ??
                             (a.kind === "reserve_waiting"
                               ? W.unknownPackage
@@ -111,7 +126,12 @@ export function ActionQueue({ actions }: { actions?: Action[] }) {
                       <details>
                         <summary>{W.evidence}</summary>
                         {warning && warning !== a && <p>{warning.title}</p>}
-                        <p>{a.title}</p>
+                        <p>
+                          {a.kind === "reserve_waiting" ||
+                          isAccountHold(a, agentWallet)
+                            ? a.title
+                            : C.publicHold}
+                        </p>
                         {a.detail && <p>{a.detail}</p>}
                         <small>
                           {W.source}: {a.source}
@@ -126,13 +146,18 @@ export function ActionQueue({ actions }: { actions?: Action[] }) {
                           )}
                         </small>
                       </details>
-                      <Link href={a.href}>
-                        {a.kind === "reserve_waiting"
-                          ? a.package
-                            ? C.claimReserve
-                            : C.findPackage
-                          : C.reviewHold}
-                      </Link>
+                      {a.kind !== "reserve_waiting" &&
+                      !isAccountHold(a, agentWallet) ? (
+                        <span>{C.accountApproval}</span>
+                      ) : (
+                        <Link href={a.href}>
+                          {a.kind === "reserve_waiting"
+                            ? a.package
+                              ? C.claimReserve
+                              : C.findPackage
+                            : C.reviewHold}
+                        </Link>
+                      )}
                     </div>
                   </li>
                 ))}
