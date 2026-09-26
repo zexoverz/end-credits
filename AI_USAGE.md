@@ -71,3 +71,4 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | frontend base | `app/layout.tsx`, `app/globals.css`, `components/ui.tsx`, `lib/client/api.ts`, `lib/client/format.ts`, `next.config.ts` | pending review |
 | T12.1 | `fixtures/*` (7 packages, `ADDRESSES.md`), `scripts/check-fixtures.ts`, `scripts/publish-fixtures.sh`, `docs/plan/decisions.md` (E12 fixtures); the seven `zexoverz/endcredits-fixture-*` repos and `zexoverz/endcredits-demo-reports` | pending review |
 | T12.5 draft | `README.md` | pending review |
+| escrow v2 contract | `contracts/src/EndCreditsEscrow.sol`, `contracts/test/EndCreditsEscrow.t.sol`, `contracts/test/EndCreditsEscrow.invariant.t.sol`, `contracts/test/mocks/Mock1271Wallet.sol`, `contracts/script/Deploy.s.sol`, `lib/chain/abi.ts` (generated), `docs/plan/decisions.md` (Escrow v2) | pending review |
