@@ -7,6 +7,11 @@ export const BUDGET_COPY = {
   RANGE_MORE: "Increase slider range",
   RANGE_LESS: "Decrease slider range",
   APPROVAL_READY: "USDC approval covers this amount.",
+  APPROVE_DONE: "Done. {approved} USDC is approved to the budget contract.",
+  LIMIT_DONE:
+    "Active. {perPeriod} USDC per {period}, {remaining} left this period.",
+  LIMIT_USED_UP:
+    "This limit is used up: {spent} USDC was already spent this {period}, more than the {perPeriod} USDC limit. It resets {resets}. Raise the limit above {spent} USDC to spend more now.",
   APPROVAL_REQUIRED:
     "Approve this amount first, then wait for confirmation or refresh.",
   STEP_AMOUNT: "{amount} USDC",

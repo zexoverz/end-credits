@@ -5,7 +5,7 @@
 // allowance per period. Every transaction here is sent from the owner's wallet, never the server.
 // Wallet calls remain explicit: approve USDC, then set or revoke the agent allowance.
 import { MetaMaskIcon } from "@/components/approver/metamask-icon";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { encodeFunctionData, parseAbi, type Hex } from "viem";
 import { ActionNotice, useFeedback } from "@/components/product/feedback";
 import { api } from "@/components/product/request";
@@ -25,6 +25,7 @@ import {
   spendingAmount,
   approvalCovers,
   spendingArguments,
+  limitStatus,
 } from "./spending-limit";
 
 export interface BudgetView {
@@ -85,6 +86,8 @@ export function BudgetWallet() {
   const [perPeriod, setPerPeriod] = useState("");
   const [period, setPeriod] = useState(DAY);
   const [sliderMax, setSliderMax] = useState(100);
+  // Once the owner moves the slider, the chain no longer overwrites the selection.
+  const touchedRef = useRef(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{
     kind: "ok" | "error";
@@ -93,8 +96,16 @@ export function BudgetWallet() {
 
   const refresh = useCallback(async () => {
     const r = await api<BudgetView>("/api/owner/budget");
-    if (r.ok) setView(r.data);
-    else
+    if (r.ok) {
+      setView(r.data);
+      // Start from the limit that is set on chain, not the default.
+      const set = r.data.allowance;
+      if (set) {
+        setPerPeriod((v) => (touchedRef.current ? v : set.perPeriod));
+        setPeriod((p) => (touchedRef.current ? p : set.period));
+        setSliderMax((m) => Math.max(m, Math.ceil(Number(set.perPeriod))));
+      }
+    } else
       setNote({ kind: "error", text: fill(C.LOAD_FAILED, { error: r.error }) });
   }, []);
 
@@ -174,9 +185,11 @@ export function BudgetWallet() {
   const approvalReady =
     readable && approvalCovers(view.usdcAllowanceToBudget, perPeriod);
   const selectLimit = (value: string) => {
+    touchedRef.current = true;
     setPerPeriod(value);
     setNote(null);
   };
+  const status = limitStatus(a, perPeriod, period);
 
   return (
     <Card title={C.TITLE}>
@@ -278,7 +291,10 @@ export function BudgetWallet() {
                   id="spend-period"
                   value={period}
                   disabled={!!busy}
-                  onChange={(e) => setPeriod(Number(e.target.value))}
+                  onChange={(e) => {
+                    touchedRef.current = true;
+                    setPeriod(Number(e.target.value));
+                  }}
                 >
                   {PERIOD_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -359,57 +375,92 @@ export function BudgetWallet() {
                 <strong className="spending-step-amount">
                   {fill(C.STEP_AMOUNT, { amount: perPeriod || C.UNKNOWN })}
                 </strong>
-                <Button
-                  type="button"
-                  disabled={!!busy || !readable || !validAmount}
-                  onClick={() =>
-                    sendFromOwner(C.APPROVE, view.usdc, () => {
-                      if (!readable) throw new Error(C.NOT_READY);
-                      return encodeFunctionData({
-                        abi: ABI,
-                        functionName: "approve",
-                        args: [
-                          view.budgetAddress as Hex,
-                          spendingAmount(perPeriod),
-                        ],
-                      });
-                    })
-                  }
-                >
-                  {C.APPROVE}
-                </Button>
+                {approvalReady ? (
+                  <p className="spending-approval-state" role="status">
+                    {fill(C.APPROVE_DONE, {
+                      approved: view.usdcAllowanceToBudget ?? C.UNKNOWN,
+                    })}
+                  </p>
+                ) : (
+                  <Button
+                    type="button"
+                    disabled={!!busy || !readable || !validAmount}
+                    onClick={() =>
+                      sendFromOwner(C.APPROVE, view.usdc, () => {
+                        if (!readable) throw new Error(C.NOT_READY);
+                        return encodeFunctionData({
+                          abi: ABI,
+                          functionName: "approve",
+                          args: [
+                            view.budgetAddress as Hex,
+                            spendingAmount(perPeriod),
+                          ],
+                        });
+                      })
+                    }
+                  >
+                    {C.APPROVE}
+                  </Button>
+                )}
               </div>
               <div className="allowance-control">
                 <h3>{C.ALLOWANCE_STEP}</h3>
                 <p>{C.ALLOWANCE_HELP}</p>
-                <p className="spending-approval-state" role="status">
-                  {approvalReady ? C.APPROVAL_READY : C.APPROVAL_REQUIRED}
-                </p>
-                <Button
-                  type="button"
-                  disabled={!!busy || !approvalReady}
-                  onClick={() =>
-                    sendFromOwner(C.SET_ALLOWANCE, view.budgetAddress, () => {
-                      if (!readable) throw new Error(C.NOT_READY);
-                      const selected = spendingArguments(
-                        perPeriod,
-                        period,
-                        view.usdcAllowanceToBudget,
-                      );
-                      return encodeFunctionData({
-                        abi: ABI,
-                        functionName: "setAllowance",
-                        args: [
-                          view.spender as Hex,
-                          selected.amount,
-                          selected.period,
-                        ],
-                      });
-                    })
-                  }
-                >
-                  {C.SET_ALLOWANCE}
-                </Button>
+                {status === "active" && a ? (
+                  <p className="spending-approval-state" role="status">
+                    {fill(C.LIMIT_DONE, {
+                      perPeriod: a.perPeriod,
+                      period: periodName(a.period),
+                      remaining: a.remaining,
+                    })}
+                  </p>
+                ) : status === "used_up" && a ? (
+                  <p className="spending-approval-state" role="status">
+                    {fill(C.LIMIT_USED_UP, {
+                      perPeriod: a.perPeriod,
+                      spent: a.spentInPeriod,
+                      period: periodName(a.period),
+                      resets: new Date(
+                        new Date(a.periodStart).getTime() + a.period * 1000,
+                      ).toLocaleString(),
+                    })}
+                  </p>
+                ) : (
+                  <>
+                    <p className="spending-approval-state" role="status">
+                      {approvalReady ? C.APPROVAL_READY : C.APPROVAL_REQUIRED}
+                    </p>
+                    <Button
+                      type="button"
+                      disabled={!!busy || !approvalReady}
+                      onClick={() =>
+                        sendFromOwner(
+                          C.SET_ALLOWANCE,
+                          view.budgetAddress,
+                          () => {
+                            if (!readable) throw new Error(C.NOT_READY);
+                            const selected = spendingArguments(
+                              perPeriod,
+                              period,
+                              view.usdcAllowanceToBudget,
+                            );
+                            return encodeFunctionData({
+                              abi: ABI,
+                              functionName: "setAllowance",
+                              args: [
+                                view.spender as Hex,
+                                selected.amount,
+                                selected.period,
+                              ],
+                            });
+                          },
+                        )
+                      }
+                    >
+                      {C.SET_ALLOWANCE}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             {a && (
