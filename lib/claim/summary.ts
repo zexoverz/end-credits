@@ -55,6 +55,10 @@ async function packageRow(name: string, deps: ClaimDeps): Promise<PackageRow | n
     firstPublishedAt: npm.createdAt,
     fundingLinks: npm.fundingLinks,
     fetchedAt: null,
+    declaredRepo: null,
+    declaredDirectory: null,
+    declaredHomepage: null,
+    repoSource: "registry",
   };
 }
 
