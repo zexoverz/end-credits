@@ -166,9 +166,16 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
   };
 }
 
-/** viem-backed io over one public client and the wallet clients allowed to sign. */
-export function viemIo(publicClient: PublicClient, signers: readonly SignerClient[]): TxIo {
-  const byAddress = new Map(signers.map((s) => [s.account.address.toLowerCase(), s]));
+/**
+ * viem-backed io over one public client and the wallet clients allowed to sign. A Map is read live,
+ * so keys registered later (one payer key per owner) share this io and its per-key nonce tracking.
+ */
+export function viemIo(
+  publicClient: PublicClient,
+  signers: readonly SignerClient[] | Map<string, SignerClient>,
+): TxIo {
+  const byAddress =
+    signers instanceof Map ? signers : new Map(signers.map((s) => [s.account.address.toLowerCase(), s]));
   const signer = (from: Address) => {
     const s = byAddress.get(from.toLowerCase());
     if (!s) throw new Error(`No signer for ${from}`);

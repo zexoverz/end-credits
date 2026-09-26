@@ -4,21 +4,26 @@
 // throws TxRevertedError with the custom error name (`TipExists`, `NotPending`, ...).
 import { isErc6492Signature, parseErc6492Signature, type Address, type Hash, type Hex } from "viem";
 import { erc20Abi, escrowAbi } from "./abi";
-import { chain, type ChainContext } from "./keys";
+import { chain, type ChainContext, type SignerClient } from "./keys";
 import { createTxQueue, viemIo, type TxQueue } from "./txqueue";
 
 export { TxRevertedError } from "./txqueue";
 
-const queues = new WeakMap<ChainContext, TxQueue>();
+const queues = new WeakMap<object, { queue: TxQueue; signers: Map<string, SignerClient> }>();
 
-/** The one tx queue per context, shared by every contract the payer and recorder keys write to. */
+/**
+ * The one tx queue per public client, shared by every contract and every context on it: the
+ * recorder and each owner's payer key keep one nonce sequence each, whichever context sends.
+ */
 export function queueFor(ctx: ChainContext): TxQueue {
-  let q = queues.get(ctx);
+  let q = queues.get(ctx.publicClient);
   if (!q) {
-    q = createTxQueue(viemIo(ctx.publicClient, [ctx.payer, ctx.recorder]));
-    queues.set(ctx, q);
+    const signers = new Map<string, SignerClient>();
+    q = { queue: createTxQueue(viemIo(ctx.publicClient, signers)), signers };
+    queues.set(ctx.publicClient, q);
   }
-  return q;
+  for (const s of [ctx.payer, ctx.recorder]) q.signers.set(s.account.address.toLowerCase(), s);
+  return q.queue;
 }
 
 type Signer = "payer" | "recorder";
