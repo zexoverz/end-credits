@@ -410,11 +410,23 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
       const payee = randomAddress();
       const { id } = await seedSession({ [name]: { import: 1 } });
       const { deps, calls } = fakes({ [name]: payee }, {});
-      deps.simulatePayment = (_payee, amount) => sim(amount) as ReturnType<import("./settle").SettleDeps["simulatePayment"]>;
+      deps.simulatePayment = (_payee, amount) => sim(amount) as ReturnType<NonNullable<import("./settle").SettleDeps["simulatePayment"]>>;
       await mod.settleSession(id, deps);
       const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
       return { c, calls, payee };
     }
+
+    it("is skipped when the simulation is off (the default), and the credit is still paid", async () => {
+      const name = `nosim-${suffix()}`;
+      const { id } = await seedSession({ [name]: { import: 1 } });
+      const { deps, calls } = fakes({ [name]: randomAddress() }, {});
+      delete deps.simulatePayment;
+      await mod.settleSession(id, deps);
+      const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
+      expect(c.outcome === "paid" || c.outcome === "capped").toBe(true);
+      expect((c.reasons as { code: string }[]).map((r) => r.code)).not.toContain("SIMULATED");
+      expect(calls.pay.length).toBe(1);
+    });
 
     it("refuses on a malicious detector and never signs", async () => {
       const { c, calls } = await simulated(async (amount) =>
