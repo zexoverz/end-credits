@@ -46,6 +46,14 @@ describe("saved event queries", () => {
     expect(f).toEqual({ fieldType: "input", inputIndex: 0, operator: "equal", value: PAYER.toLowerCase() });
   });
 
+  it("with several owners, paid_totals ORs one lowercase payer leaf each", () => {
+    const other = "0x2bCfcf2c7092044D04Cf6727fef2D28B924dee96";
+    expect(savedQueries([PAYER, other]).paid_totals.events[0].filter).toEqual({
+      rule: "or",
+      children: [PAYER, other].map((p) => ({ fieldType: "input", inputIndex: 0, operator: "equal", value: p.toLowerCase() })),
+    });
+  });
+
   it("reserved_by_package adds Reserved and subtracts Claimed", () => {
     const [reserved, claimed] = all.reserved_by_package.events;
     expect(reserved.eventName).toBe("Reserved");
