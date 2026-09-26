@@ -48,7 +48,7 @@ export const WEBSITE = {
   steps: [
     {
       title: "Make it yours.",
-      body: "Choose a session budget and a per-package limit. Connect an agent key and install the Claude Code hook.",
+      body: "Choose a session budget and a per-package limit. Connect a connection key and install the Claude Code hook.",
       label: "01 / SET UP",
       tab: "Set up",
       terminal: [
@@ -195,12 +195,12 @@ export const WEBSITE = {
     "endcredits key <token> --api https://end-credits.up.railway.app",
   ],
   clone: "Clone the repository first",
-  ownerKey: "Create your agent key",
+  ownerKey: "Create your connection key",
   copy: "Copy commands",
   copied: "Copied!",
   copyError: "Couldn’t copy. Select the commands to copy them manually.",
   setupHint:
-    "Replace <token> with your agent key. Run init inside the project you want to support.",
+    "Replace <token> with your connection key. Run init inside the project you want to support.",
   footer: "For the people behind the packages.",
   footerNote: "Built at ETHGlobal Tokyo 2026. Open source, of course.",
   contract: "Escrow contract",
@@ -208,6 +208,6 @@ export const WEBSITE = {
   productNav: [
     ["/app", "Dashboard"],
     ["/history", "History"],
-    ["/owner", "Owner"],
+    ["/owner", "Your account"],
   ],
 } as const;

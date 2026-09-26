@@ -1,5 +1,5 @@
 export const CONTROL = {
-  eyebrow: "OWNER WORKSPACE",
+  eyebrow: "YOUR ACCOUNT",
   title: "Your control room.",
   subtitle:
     "Set the budget. Connect your agent. Stay in charge of every release.",
@@ -33,15 +33,16 @@ export const CONTROL = {
   minutes: "minutes",
   capPreview: "PACKAGE CAP / SESSION BUDGET",
   capPreviewNote: "A maximum per package, not a promised payment.",
-  walletLabel: "FUNDING WALLET",
-  walletNote: "USDC available to the configured payer on Base Sepolia.",
+  walletLabel: "AGENT WALLET",
+  walletNote:
+    "USDC currently held by your account’s Agent wallet on Base Sepolia.",
   walletUnavailable: "Balance unavailable",
   viewWallet: "View wallet ↗",
   copyAddress: "Copy address",
   copied: "Address copied",
   copyFailed: "Could not copy. Select the address to copy it manually.",
   walletFoot:
-    "Your funding wallet sends contributions. The approver wallet separately authorizes held releases.",
+    "Your wallet supplies the funds. Your account’s Agent wallet sends contributions within your spending limit; your approver wallet signs held releases.",
   reviewTitle: "A clear path to a decision.",
   reviewBody:
     "Read the reason, verify the recipient, then sign or deny. A wallet signature does not itself confirm a transfer.",
@@ -54,7 +55,11 @@ export const CONTROL = {
   keyTitle: "Give your agent a connection.",
   keyBody:
     "Create a key for each device. Install the CLI, add the key locally, and initialize hooks in your project.",
-  keySteps: ["Create an agent key", "Connect the CLI", "Run your next session"],
+  keySteps: [
+    "Create a connection key",
+    "Connect the CLI",
+    "Run your next session",
+  ],
   connectedTitle: "Wallet connected",
   connectedBody: "Connection confirmed. No transaction was sent.",
   approverTitle: "Approver updated",
@@ -75,8 +80,8 @@ export const CONTROL = {
   dismiss: "Dismiss notification",
   success: "Completed",
   working: "In progress",
-  keyCreated: "Agent key created",
-  keyRevoked: "Agent key revoked",
+  keyCreated: "Connection key created",
+  keyRevoked: "Connection key revoked",
   keyRevokeBody: "This key can no longer authenticate new requests.",
   keyCopyFailed: "Copy failed. Select the key or command and copy it manually.",
   approvalTitle: "Review this contribution.",
@@ -126,9 +131,10 @@ export const INSIGHTS = {
   amount: "USDC",
   currentHour: "Current hour",
   missingTimeline: "Hourly activity is not available in this response.",
-  payerScreen: "Payer wallet",
+  payerScreen: "Agent wallet",
   simulationScreen: "Payment simulation",
-  payerNoHistory: "No mainnet history. The payer screen accepts this result.",
+  payerNoHistory:
+    "No mainnet history. The Agent wallet screen accepts this result.",
   screenMapping: "Screening context",
   risk: "Counterparty profile",
   riskLabel: "STORED SCREENING EVIDENCE",
@@ -171,7 +177,7 @@ export const INSIGHTS = {
   reasonTitle: "Decision evidence",
   reasonKind: {
     payment: "Payment simulation",
-    payer: "Payer screening",
+    payer: "Agent wallet screening",
     other: "Decision reason",
   },
   showAll: "All recorded reasons",

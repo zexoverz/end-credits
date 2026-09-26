@@ -16,7 +16,8 @@ export const ROLL_COPY = {
   PROJECT: { one: "project", many: "projects" },
   TOTALS_PAID: "Paid {amount} USDC to {count} {projects}.",
   TOTALS_HELD: "Held {amount} USDC.",
-  TOTALS_RESERVED: "Reserved {amount} USDC for {count} {projects} without a wallet.",
+  TOTALS_RESERVED:
+    "Reserved {amount} USDC for {count} {projects} without a wallet.",
   TOTALS_REFUSED: "Refused {count}.",
   LOADING: "Loading the credits…",
   NOT_FOUND: "No session with this id.",
@@ -30,9 +31,10 @@ export const ROLL_COPY = {
   },
   ROLL_BUTTON: "Roll credits",
   ROLL_REQUESTED: "Rolling requested. The settler picks it up in a moment.",
-  ROLL_SIGN_IN: "Sign in as the owner to roll these credits.",
-  ROLL_SIGN_IN_LINK: "Owner sign-in",
-  ROLL_FORBIDDEN: "Only the owner of this session can roll its credits.",
+  ROLL_SIGN_IN: "Sign in to your account to roll these credits.",
+  ROLL_SIGN_IN_LINK: "Your account sign-in",
+  ROLL_FORBIDDEN:
+    "Sign in to the account that recorded this session to roll its credits.",
   ROLL_CONFLICT: "These credits are already rolling.",
   ROLL_FAILED: "Could not start the roll ({error}).",
   TX_LINK: "tx on Basescan",

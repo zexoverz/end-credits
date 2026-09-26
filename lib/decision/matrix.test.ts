@@ -138,7 +138,7 @@ describe("decide: one test per step", () => {
     expect(d.reasons[0]).toEqual({
       source: "intercepta",
       code: "HELD_NO_HISTORY",
-      text: `Held: ${PAYEE} has no history on mainnet, so Intercepta has nothing to judge. Waiting for the owner.`,
+      text: `Held: ${PAYEE} has no history on mainnet, so Intercepta has nothing to judge. Waiting for your approval.`,
     });
   });
 

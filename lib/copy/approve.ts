@@ -16,24 +16,28 @@ export const APPROVE_COPY = {
   DENY: "Deny",
   WORKING: "Working…",
   REDIRECTING: "Opening World ID…",
-  SIGN_IN: "Sign in as the owner to approve or deny.",
+  SIGN_IN: "Sign in to your account to approve or deny.",
   SIGN_IN_LINK: "Go to sign in",
-  NOT_OWNER: "This tip belongs to a different owner.",
+  NOT_OWNER: "This tip belongs to a different account.",
   RELEASE_TX: "Release transaction",
   REFUND_TX: "Refund transaction",
-  STATUS_PENDING: "Waiting for the owner",
+  STATUS_PENDING: "Waiting for your approval",
   STATUS_APPROVED: "Approved",
   STATUS_DENIED: "Denied",
   STATUS_EXPIRED: "Expired",
-  EXPIRED_REFUND_PENDING: "Not approved in time. The refund to the owner is on its way.",
+  EXPIRED_REFUND_PENDING:
+    "Not approved in time. The refund to your wallet is on its way.",
   LAST_ATTEMPT: "Last attempt failed:",
   // Action errors from POST /start and /deny.
-  ERR_UNAUTHORIZED: "Your owner session has ended. Sign in again.",
+  ERR_UNAUTHORIZED: "Your account session has ended. Sign in again.",
   ERR_WORLD_REQUIRED: "Approval needs World ID on this deployment.",
   ERR_NOT_FOUND: "This tip is not one of yours.",
   ERR_NOT_PENDING: "This tip was already resolved.",
-  ERR_WORLD_NOT_BOUND: "Sign in with World ID on the owner page first, then approve.",
-  ERR_RELEASE_CHAIN: "The release transaction failed ({code}). Nothing was released.",
-  ERR_REFUND_CHAIN: "The refund transaction failed ({code}). Nothing was refunded.",
+  ERR_WORLD_NOT_BOUND:
+    "Sign in with World ID on the account page first, then approve.",
+  ERR_RELEASE_CHAIN:
+    "The release transaction failed ({code}). Nothing was released.",
+  ERR_REFUND_CHAIN:
+    "The refund transaction failed ({code}). Nothing was refunded.",
   ERR_OTHER: "Something went wrong ({error}). Nothing was released.",
 } as const;

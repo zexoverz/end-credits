@@ -13,22 +13,26 @@ export const APPROVER_COPY = {
   STORED: "Approver",
   ONCHAIN: "On chain now",
   PENDING: "Takes over at {time}",
-  PENDING_NOTE: "A change waits 3 days on chain. Until then the current approver signs releases.",
+  PENDING_NOTE:
+    "A change waits 3 days on chain. Until then the current approver signs releases.",
   NONE: "none",
   SET: "Use this wallet as approver",
   SETTING: "Setting…",
   SET_DONE: "Approver set.",
   SET_FAILED: "Could not set the approver ({error}).",
-  PAYER_MISMATCH: "This server's payer key is not this owner's payer, so it cannot name an approver.",
+  PAYER_MISMATCH:
+    "The Agent wallet does not match this account, so it cannot update the approver.",
   LOAD_FAILED: "Could not read the approver ({error}).",
   // sign-release (/approve)
-  NO_APPROVER: "Set an approver wallet on the owner page first, then approve.",
-  NO_APPROVER_LINK: "Go to the owner page",
+  NO_APPROVER:
+    "Set an approver wallet on the account page first, then approve.",
+  NO_APPROVER_LINK: "Go to the account page",
   SIGN: "Sign and approve",
   SIGN_WORLD: "Sign, then approve with World ID",
   PREPARING: "Preparing…",
   SIGNING: "Confirm in your wallet…",
   WRONG_WALLET: "Connect the approver wallet {approver}; this is {address}.",
-  BAD_SIGNATURE: "That signature is not from the approver wallet. Nothing was released.",
+  BAD_SIGNATURE:
+    "That signature is not from the approver wallet. Nothing was released.",
   SIGN_FAILED: "Signing did not finish ({error}). Nothing was released.",
 } as const;

@@ -12,7 +12,7 @@ export const DASHBOARD = {
     "The dashboard could not read MultiBaas, so no numbers are shown.",
   ERROR_STATUS: "HTTP {status}",
 
-  CARD_PAID: "Confirmed payer transfers",
+  CARD_PAID: "Confirmed Agent wallet transfers",
   CARD_PAID_SUB: "{count} payments",
   CARD_PROJECTS: "Projects supported",
   CARD_PROJECTS_SUB: "paid or reserved",
@@ -45,7 +45,7 @@ export const DASHBOARD = {
 
   FOOTER_SOURCE: "Data: MultiBaas event queries",
   FOOTER_ESCROW: "Escrow",
-  FOOTER_PAYER: "Payer",
+  FOOTER_PAYER: "Agent wallet",
   FOOTER_GENERATED: "Generated",
   SESSIONS_SETTLED: "{count} sessions settled on chain.",
 

@@ -71,7 +71,7 @@ describe("worldFailureText", () => {
 
 describe("failureText", () => {
   it("maps hold checks and chain errors", () => {
-    expect(failureText("expired", view())).toBe("Not approved in time. 0.25 USDC returned to the owner.");
+    expect(failureText("expired", view())).toBe("Not approved in time. 0.25 USDC returned to your wallet.");
     expect(failureText("not_pending", view())).toBe("This tip was already resolved.");
     expect(failureText("HoldExpired", view())).toContain("(HoldExpired)");
   });
@@ -87,14 +87,14 @@ describe("outcomeNotice", () => {
   });
   it("falls back to the outcome code when the server has no message", () => {
     expect(outcomeNotice(view({ status: "denied" }), null)?.text).toBe(
-      "Denied. 0.25 USDC returned to the owner.",
+      "Denied. 0.25 USDC returned to your wallet.",
     );
   });
   it("does not claim a refund before the expirer ran", () => {
     expect(outcomeNotice(view({ status: "expired" }), null)?.text).toBe(
-      "Not approved in time. The refund to the owner is on its way.",
+      "Not approved in time. The refund to your wallet is on its way.",
     );
-    expect(outcomeNotice(view({ status: "expired", message: "Not approved in time. 0.25 USDC returned to the owner." }), null)?.text).toContain("returned");
+    expect(outcomeNotice(view({ status: "expired", message: "Not approved in time. 0.25 USDC returned to your wallet." }), null)?.text).toContain("returned");
   });
   it("ignores result=APPROVED while the server still says pending", () => {
     expect(outcomeNotice(view(), "APPROVED")).toBeNull();
@@ -115,7 +115,7 @@ describe("actionErrorText", () => {
     const v = view();
     expect(actionErrorText("approve", 401, { error: "unauthorized" }, v)).toContain("Sign in again");
     expect(actionErrorText("approve", 403, { error: "world_required" }, v)).toContain("World ID");
-    expect(actionErrorText("approve", 409, { error: "world_not_bound" }, v)).toContain("owner page");
+    expect(actionErrorText("approve", 409, { error: "world_not_bound" }, v)).toContain("account page");
     expect(actionErrorText("approve", 404, { error: "not_found" }, v)).toBe("This tip is not one of yours.");
     expect(actionErrorText("deny", 409, { error: "not_pending", holdStatus: "released" }, v)).toBe(
       "This tip was already resolved.",

@@ -167,9 +167,11 @@
   bottom: -95px;
   animation: orbit 45s linear infinite;
 }
-.visual[data-scene="1"],
-.visual[data-scene="4"] {
+.visual[data-scene="1"] {
   background: var(--mint);
+}
+.visual[data-scene="4"] {
+  background: var(--paper);
 }
 .visual[data-scene="3"] {
   background: var(--mint-soft);
@@ -587,7 +589,10 @@
   width: 100%;
 }
 .resolveCard {
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
+  box-shadow:
+    0 12px 0 -5px var(--line),
+    0 22px 36px -26px var(--ink);
   border-radius: 16px;
   background: var(--surface);
   overflow: hidden;

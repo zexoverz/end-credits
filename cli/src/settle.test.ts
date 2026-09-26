@@ -100,7 +100,7 @@ describe("settleSession", () => {
     const { d, said } = deps(fetchSpy);
     expect((await settleSession(fx.home, fx.sid, d)).ok).toBe(false);
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(said).toEqual(["No agent key yet. Run: endcredits key <token>"]);
+    expect(said).toEqual(["No connection key yet. Run: endcredits key <token>"]);
     expect(existsSync(path.join(fx.home, "sessions", `${fx.sid}.jsonl`))).toBe(true);
   });
 

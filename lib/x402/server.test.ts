@@ -246,7 +246,7 @@ describe("x402 credit resource: settlement", () => {
   });
 });
 
-describe("x402 credit resource: screens the paying wallet", () => {
+describe("x402 credit resource: screens the Agent wallet", () => {
   async function pay(payer: PayerScreen) {
     const { repo, saved, screenIds } = memoryRepo(credit(), fresh);
     const facilitator = fakeFacilitator();
@@ -266,7 +266,7 @@ describe("x402 credit resource: screens the paying wallet", () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({
       code: "PAYER_REFUSED",
-      message: "Refused: Intercepta flags the paying wallet. The address is officially listed as sanctioned.",
+      message: "Refused: Intercepta flags the Agent wallet. The address is officially listed as sanctioned.",
     });
     expect(screenPayer).toHaveBeenCalledWith(PAYER);
     expect(facilitator.verify).not.toHaveBeenCalled();
@@ -279,7 +279,7 @@ describe("x402 credit resource: screens the paying wallet", () => {
     const toxic: PayerScreen = { ok: true, data: { toxicScore: 60, traits: [] }, screenId: "s-toxic" };
     const { res, facilitator } = await pay(toxic);
     expect(res.status).toBe(403);
-    expect((await res.json()).message).toBe("Refused: Intercepta flags the paying wallet. Toxic score 60.");
+    expect((await res.json()).message).toBe("Refused: Intercepta flags the Agent wallet. Toxic score 60.");
     expect(facilitator.settle).not.toHaveBeenCalled();
   });
 
@@ -288,7 +288,7 @@ describe("x402 credit resource: screens the paying wallet", () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({
       code: "PAYER_SCREEN_UNAVAILABLE",
-      message: "Not settled: the paying wallet could not be screened (TIMEOUT). Nothing was settled.",
+      message: "Not settled: the Agent wallet could not be screened (TIMEOUT). Nothing was settled.",
     });
     expect(facilitator.verify).not.toHaveBeenCalled();
     expect(facilitator.settle).not.toHaveBeenCalled();

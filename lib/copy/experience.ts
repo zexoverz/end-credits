@@ -157,8 +157,8 @@ export const EXPERIENCE = {
   setupLabel: "READY FOR YOUR NEXT SESSION",
   setupTitle: ["Ship something good.", "Give something back."],
   setupBody:
-    "Build the CLI from source, create an agent key, and install the hook in your project.",
-  setupAction: "Create an agent key",
+    "Build the CLI from source, create a connection key, and install the hook in your project.",
+  setupAction: "Create a connection key",
   terminalTitle: "In your local clone",
   commands: [
     "pnpm install",
@@ -168,7 +168,7 @@ export const EXPERIENCE = {
     "endcredits key <token> --api https://end-credits.up.railway.app",
   ],
   setupHint:
-    "Clone the source first. Run init inside your project and replace <token> with your agent key.",
+    "Clone the source first. Run init inside your project and replace <token> with your connection key.",
   copy: "Copy commands",
   copied: "Copied",
   copyError: "Copy failed. Select the commands and copy them manually.",
@@ -192,7 +192,7 @@ export const EXPERIENCE = {
   overviewIntro: "Follow the open source your agent supports.",
   setupBanner: "Give your next session end credits.",
   setupBannerBody:
-    "Set a budget and connect an agent key to start recording package contributions.",
+    "Set a budget and connect a connection key to start recording package contributions.",
   setupBannerAction: "Connect agent ↗",
   decisionSearch: "Search packages or reasons",
   all: "All outcomes",
@@ -208,7 +208,7 @@ export const EXPERIENCE = {
     "Payment allocation: {paid} USDC. Hold allocation: {held} USDC. Reserve allocation: {reserved} USDC. Refused: {refused}.",
   completed: "Processing complete. Check each credit for its transaction.",
   transferScope:
-    "Confirmed payer transfers exclude escrow deposits and may include transfers outside credited sessions.",
+    "Confirmed Agent wallet transfers exclude escrow deposits and may include transfers outside credited sessions.",
   decisionTotals: "Allocation summary",
   confirmed: "Confirmed payment total",
   reason: "Decision details",
