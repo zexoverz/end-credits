@@ -1304,3 +1304,59 @@ Supersedes the "Leftover" bullet in "Budget integration (26 Sep)".
 - **Limit:** an x402 payment that errors on our side but settles later would already have been counted
   as not moved and returned; the later settlement then spends the hot key's own balance or fails.
   Accepted for the hackathon.
+
+## Agent-to-agent x402: maintainer endpoints (26 Sep)
+
+- **Why:** the settler paid our own route (`app/api/x402/credit/[creditId]`), which settles to the
+  maintainer. That is x402 between two halves of one app. Now the paying agent pays the maintainer's
+  own x402 service when the package names one.
+- **Format (our extension):** a top-level `"x402": {"endpoint": "https://…"}` in `FUNDING.json`, next
+  to `drips.*.ownedBy`. `parseX402Endpoint` (`lib/payee/parse.ts`) keeps it only when it parses as a
+  URL, is `https:`, has no user, password or fragment, and is at most 2048 chars. Anything else is
+  ignored and the payee still resolves.
+- **Trust anchor:** `ownedBy` stays the payee. The endpoint rides only on a `drips` resolution (the
+  same file); a claim or tea.yaml payee never takes it. The endpoint only says where to pay, never
+  whom: the challenge's `payTo` must equal the screened `ownedBy`, same `checkChallenge` as our route
+  (asset, `eip155:84532`, `exact`, amount at most the allocation, `extra {USDC, 2}`, timeout 1 to 120).
+- **Stored:** `packages.x402_endpoint` (last resolution, null when none) and `credits.paid_via`
+  (`maintainer_x402` | `endcredits_x402`, check constraint), migration `0008_maintainer_x402`.
+  Session view and history expose `paidVia`.
+- **Settle:** phase 3 only. `payCredit` gets `endpoint` and `deps.ts` calls `payMaintainer`
+  (`<endpoint>?amount=<micro>&ref=<creditId>`) instead of our route. The tx is the
+  `PAYMENT-RESPONSE` transaction (must be `success`, `eip155:84532`, a 32-byte hash); the receipt
+  column holds `{endpoint, settlement}`. Reason `PAID_VIA_MAINTAINER` "Paid through {host}, the
+  maintainer's own x402 endpoint."
+- **Refusal:** a pre-sign refusal from a maintainer endpoint (`PAYTO_MISMATCH`, `TOKEN_PIN`,
+  `CHALLENGE_MISMATCH`, `ENDPOINT_REFUSED`) turns the credit `refused`: the `PAID`/`CAPPED` line goes,
+  the refusal is added. Nothing was signed, and the share is part of the leftover returned to the
+  owner's budget wallet. Our own route keeps the old behaviour (reason appended, outcome kept).
+- **SSRF rules** (`lib/x402/endpoint.ts`, node `https.request`, not global fetch): https only; an IP
+  literal is checked before connecting; a hostname goes through a `lookup` hook that rejects the
+  connection when any resolved address is blocked, so there is no gap between check and connect.
+  Blocked: IPv4 0/8, 10/8, 100.64/10, 127/8, 169.254/16, 172.16/12, 192.0.0/24, 192.0.2/24,
+  192.88.99/24, 192.168/16, 198.18/15, 198.51.100/24, 203.0.113/24, 224/4, 240/4; IPv6 anything outside
+  2000::/3 (so ::1, ::ffff:0:0/96, 64:ff9b::/96, fc00::/7 incl. fd00:ec2::254, fe80::/10, ff00::/8) plus
+  2001::/32, 2001:db8::/32, 2002::/16. No redirect is followed (3xx is refused), 8 s for the whole
+  exchange, 64 KB body cap. Each refusal is `ENDPOINT_REFUSED` "Refused: the maintainer's x402
+  endpoint {host} {reason}.", the reasons in `ENDPOINT_REASONS`.
+- **Tip jar:** `services/tipjar/` (`pnpm tipjar`, tsx, no Next), Railway service `tipjar`
+  (`7ed5f150-99c5-482b-b86a-b1e64e59aa18`), https://endcredits-tipjar.up.railway.app. `/honest/tip`
+  answers 402 with `payTo = HONEST_PAYTO`, `/clipper/tip` with `CLIPPER_PAYTO`; both verify and settle
+  through https://x402.org/facilitator with their own requirements; amounts 1 to 1,000,000 micro-USDC.
+- **Addresses:** `HONEST_PAYTO` `0x9ebdC8ACc879a8284Ae5B3CecfbD280ec307aFA3` (the builder's dev wallet;
+  Intercepta quick scan 26 Sep: 200, `toxicScore` 0, no traits, so it is not held as no history).
+  `CLIPPER_PAYTO` `0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13`. Both fixtures' `FUNDING.json` name the
+  honest address.
+- **Fixtures:** `@endcredits-demo/tip-jar` (https://github.com/zexoverz/endcredits-fixture-tip-jar,
+  endpoint `/honest/tip`) and `@endcredits-demo/swapped-jar`
+  (https://github.com/zexoverz/endcredits-fixture-swapped-jar, endpoint `/clipper/tip`).
+  `scripts/check-fixtures.ts` now also checks the endpoint resolves.
+- **Live, 26 Sep** (`scripts/a2a-live.ts`, `payMaintainer` through the SSRF guard, no DB): honest jar
+  paid 0.01 USDC, tx `0x2d226affdb3dd15dfaee6fe7e3cca9b8f09204a8bae011976c2fbc6072989514`, block
+  47332067, status success, `Transfer` 10000 from the payer `0xaf4C…9Bb6` to `0x9ebd…aFA3`, one
+  signature. Clipper jar: `PAYTO_MISMATCH` "Refused: the payment request names a different address
+  than the one screened.", zero signatures.
+- **Limits:** the tx hash comes from the maintainer's `PAYMENT-RESPONSE` and is not read back from
+  chain; a lying endpoint could record a wrong hash, but the signed authorization only ever pays the
+  screened `ownedBy`. Both fixture repos were pushed on 26 Sep, so a full settle holds them on first
+  sight (`HELD_CHANGED`, the GitHub push is inside 30 days) before any endpoint is called.
