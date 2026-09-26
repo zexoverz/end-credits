@@ -7,7 +7,7 @@ export function memoryRepo(now: () => Date = () => new Date()) {
     async latestOk(key: ScreenKey) {
       const hits = rows.filter(
         (r) =>
-          r.status === 200 &&
+          (r.status === 200 || r.status === 404) &&
           r.kind === key.kind &&
           r.subject === key.subject &&
           r.chainId === key.chainId,

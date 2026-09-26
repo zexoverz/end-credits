@@ -1,5 +1,5 @@
 // `screens` table access for the Intercepta client (Drizzle).
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/client";
 import { screens } from "../db/schema";
 import type { NewScreen, ScreenKey, ScreenKind, ScreenRepo, StoredScreen } from "./cache";
@@ -15,7 +15,7 @@ export function drizzleScreenRepo(database = db()): ScreenRepo {
             eq(screens.kind, key.kind),
             eq(screens.subject, key.subject),
             key.chainId === null ? isNull(screens.chainId) : eq(screens.chainId, key.chainId),
-            eq(screens.status, 200),
+            inArray(screens.status, [200, 404]),
           ),
         )
         .orderBy(desc(screens.fetchedAt))
