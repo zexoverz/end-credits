@@ -5,14 +5,17 @@
 //   ~/.endcredits/config.json (mode 600). Skipped when that file already holds a live key of the
 //   demo owner. The token is never printed.
 // - When ESCROW_ADDRESS is set: payer approves the escrow for 1000 USDC if the allowance is lower.
+// - When ESCROW_ADDRESS and APPROVER_ADDRESS are set and the payer has no approver on chain yet: the
+//   payer names APPROVER_ADDRESS (escrow v2, first set is immediate) and the owner row stores it. An
+//   existing on-chain approver is never changed here (a change is timelocked; use /owner).
 import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { and, eq, isNull } from "drizzle-orm";
-import { formatUnits, type Hex } from "viem";
+import { formatUnits, getAddress, zeroAddress, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { allowance, approveEscrow } from "../lib/chain/escrow";
+import { allowance, approveEscrow, approverOf, setApprover } from "../lib/chain/escrow";
 import { chainFromEnv } from "../lib/chain/keys";
 import { db } from "../lib/db/client";
 import { agentKeys, owners } from "../lib/db/schema";
@@ -90,10 +93,27 @@ async function ensureAllowance(): Promise<void> {
   console.log(`approve tx ${await approveEscrow(APPROVAL, ctx)}`);
 }
 
+async function ensureApprover(ownerId: string, wanted: string): Promise<void> {
+  const ctx = chainFromEnv();
+  const approver = getAddress(wanted);
+  const onchain = await approverOf(undefined, ctx);
+  if (onchain !== zeroAddress && onchain !== approver) {
+    console.log(`payer already has approver ${onchain} on chain; not changing it (use /owner)`);
+    return;
+  }
+  if (onchain === zeroAddress) console.log(`setApprover tx ${await setApprover(approver, ctx)}`);
+  else console.log(`approver ${approver} already set on chain`);
+  await db().update(owners).set({ approverAddress: approver }).where(eq(owners.id, ownerId));
+  console.log(`owner approver stored: ${approver}`);
+}
+
 async function main() {
   const ownerId = await ensureOwner();
   if (process.argv.includes("--write-config")) await ensureAgentKey(ownerId);
   if (process.env.ESCROW_ADDRESS) await ensureAllowance();
+  if (process.env.ESCROW_ADDRESS && process.env.APPROVER_ADDRESS) {
+    await ensureApprover(ownerId, process.env.APPROVER_ADDRESS);
+  }
   process.exit(0);
 }
 
