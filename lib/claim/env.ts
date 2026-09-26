@@ -14,6 +14,7 @@ import { resolvePayee } from "../payee/resolve";
 import { loadPackage } from "../registry/npm";
 import type { ClaimChain, ClaimDeps, WalletScreen } from "./deps";
 import { claimStore } from "./store";
+import { quickScanWallet } from "./wallet-screen";
 
 export function escrowClaimChain(ctx: () => ChainContext = chainCtx): ClaimChain {
   const read = <T>(functionName: string, args: readonly unknown[] = []) =>
@@ -35,12 +36,6 @@ export function escrowClaimChain(ctx: () => ChainContext = chainCtx): ClaimChain
   };
 }
 
-async function quickScanWallet(address: Address): Promise<WalletScreen> {
-  const r = await interceptaFromEnv(drizzleScreenRepo()).quickScan(address);
-  if (!r.ok) return { ok: false, error: r.error, screenId: r.screenId };
-  return { ok: true, toxicScore: r.data.toxicScore, traits: r.data.traits, screenId: r.screenId };
-}
-
 export function claimDepsFromEnv(): ClaimDeps {
   const readToken = process.env.GITHUB_TOKEN_READ || undefined;
   const claimChain = escrowClaimChain();
@@ -50,7 +45,7 @@ export function claimDepsFromEnv(): ClaimDeps {
     appUrl: readEnv("APP_URL"),
     readToken,
     chain: claimChain,
-    screen: quickScanWallet,
+    screen: (address: Address): Promise<WalletScreen> => quickScanWallet(interceptaFromEnv(drizzleScreenRepo()), address),
     loadPackage: (name) => loadPackage(name),
     payeeOf: async (pkg, opts) =>
       resolvePayee(
