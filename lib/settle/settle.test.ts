@@ -3,12 +3,14 @@
 // (migrated); skipped otherwise.
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import type { Address, Hash, Hex } from "viem";
+import { getAddress, type Address, type Hash, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { encodePaymentRequiredHeader, encodePaymentResponseHeader } from "@x402/core/http";
 import { TxRevertedError } from "../chain/txqueue";
 import type { Screen } from "../decision/types";
-import { msg } from "../messages";
+import { ENDPOINT_REASONS, msg } from "../messages";
+import { payMaintainer, PaymentRefused } from "../x402/client";
 import { packageKey } from "../payee/keys";
 import type { Resolution } from "../payee/resolve";
 import type { NpmPackageWithDownloads } from "../registry/npm";
@@ -500,6 +502,8 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
       budgetOwner?: Address | null;
       payFails?: boolean;
       returnFails?: boolean;
+      /** The paid package lists a maintainer endpoint that swaps payTo: refused before signing. */
+      clipperEndpoint?: boolean;
     };
     async function fourWay(o: FourWay = {}) {
       const n = { paid: `bp-${suffix()}`, held: `bh-${suffix()}`, reserved: `br-${suffix()}`, refused: `bx-${suffix()}` };
@@ -517,6 +521,18 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
         deps.payCredit = async () => {
           calls.order.push("pay");
           throw new Error("facilitator down");
+        };
+      }
+      if (o.clipperEndpoint) {
+        const resolve = deps.resolvePayee;
+        deps.resolvePayee = async (pkg) => {
+          const r = await resolve(pkg);
+          return pkg.name === n.paid && r.address ? { ...r, x402Endpoint: "https://clipper.example.com/tip" } : r;
+        };
+        deps.payCredit = async (credit) => {
+          calls.order.push("pay");
+          if (!credit.endpoint) throw new Error("expected the maintainer endpoint");
+          throw new PaymentRefused("PAYTO_MISMATCH");
         };
       }
       const pulls: [Address, bigint][] = [];
@@ -589,6 +605,15 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
       expect(session.status).toBe("settled");
     });
 
+    it("returns the share a maintainer endpoint was refused for, like any payment that did not move", async () => {
+      const { by, returned, session, budgetOwner } = await fourWay({ clipperEndpoint: true });
+      expect(by.paid.outcome).toBe("refused");
+      expect(by.paid.txHash).toBeNull();
+      expect(returned).toEqual([[budgetOwner, by.paid.amountMicro]]);
+      expect(session.leftoverMicro).toBe(by.paid.amountMicro);
+      expect(session.returnTx).toBe(RETURN_TX);
+    });
+
     it("records the leftover for the expirer when the return fails", async () => {
       const { by, session } = await fourWay({ payFails: true, returnFails: true });
       expect(session.status).toBe("settled");
@@ -658,6 +683,146 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
       expect([...calls.order].sort()).toEqual(["hold", "pay", "reserve"]);
       expect(session.budgetPullTx).toBeNull();
       expect(session.budgetMicro).toBe(BigInt(1_000_000));
+    });
+  });
+
+  describe("the maintainer's own x402 endpoint (FUNDING.json x402.endpoint)", () => {
+    const HONEST_TIP = "https://tipjar.example.com/honest/tip";
+    const SETTLE_TX = `0x${"0a".repeat(32)}`;
+
+    // One paid package whose FUNDING.json lists `endpoint`; `payCredit` is the real x402 client
+    // against a fake maintainer server answering with `payTo`, and a signer that counts calls.
+    async function oneEndpoint(endpoint: string | null, payTo: (payee: Address) => Address) {
+      const name = `ep-${suffix()}`;
+      const payee = randomAddress();
+      const { id } = await seedSession({ [name]: { import: 1 } }, { budget: BigInt(10_000), cap: BigInt(1_000_000) });
+      const { deps, calls, decidedBefore } = fakes({ [name]: payee }, {});
+      const resolve = deps.resolvePayee;
+      deps.resolvePayee = async (pkg) => {
+        const r = await resolve(pkg);
+        return endpoint && r.address ? { ...r, x402Endpoint: endpoint } : r;
+      };
+      const account = privateKeyToAccount(generatePrivateKey());
+      const signTypedData = vi.fn((args: Parameters<typeof account.signTypedData>[0]) => account.signTypedData(args));
+      const signer = { address: account.address, signTypedData };
+      const urls: string[] = [];
+      const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const req = new Request(input, init);
+        urls.push(req.url);
+        if (!req.headers.get("PAYMENT-SIGNATURE")) {
+          const accept = {
+            scheme: "exact",
+            network: "eip155:84532" as const,
+            asset: USDC,
+            amount: new URL(req.url).searchParams.get("amount") ?? "0",
+            payTo: payTo(payee),
+            maxTimeoutSeconds: 120,
+            extra: { name: "USDC", version: "2" },
+          };
+          const challenge = { x402Version: 2, resource: { url: req.url, description: "tip" }, accepts: [accept] };
+          return new Response("{}", { status: 402, headers: { "PAYMENT-REQUIRED": encodePaymentRequiredHeader(challenge) } });
+        }
+        const settle = { success: true, transaction: SETTLE_TX, network: "eip155:84532" as const };
+        return Response.json({ ok: true }, { headers: { "PAYMENT-RESPONSE": encodePaymentResponseHeader(settle) } });
+      };
+      const allowed: boolean[] = [];
+      deps.payCredit = async ({ endpoint: ep, ...credit }) => {
+        assertStored(await creditRow(credit.id));
+        calls.pay.push(credit.id);
+        const gate = {
+          account: signer,
+          usdc: USDC,
+          fetch: fetchImpl,
+          decisionAllowsPay: async (cid: string) => {
+            const ok = await store.decisionAllowsPay(database, cid);
+            allowed.push(ok);
+            return ok;
+          },
+        };
+        return ep
+          ? payMaintainer(credit, { ...gate, endpoint: ep })
+          : { tx: `0x${"04".repeat(32)}`, receipt: { creditId: credit.id } };
+      };
+      await mod.settleSession(id, deps);
+      const [row] = await database
+        .select({ c: s.credits, endpoint: s.packages.x402Endpoint })
+        .from(s.credits)
+        .innerJoin(s.packages, eq(s.packages.id, s.credits.packageId))
+        .where(eq(s.credits.sessionId, id));
+      return { credit: row.c, storedEndpoint: row.endpoint, signTypedData, urls, allowed, calls, decidedBefore };
+    }
+
+    const assertStored = (row: { outcome: string | null; decidedAt: Date | null } | undefined) => {
+      expect(row?.outcome, "decision stored before the maintainer is paid").toBe("paid");
+      expect(row?.decidedAt).toBeInstanceOf(Date);
+    };
+    const codes = (c: { reasons: unknown }) => (c.reasons as { code: string }[]).map((r) => r.code);
+
+    it("pays through the maintainer's endpoint, records the settle tx and paid_via", async () => {
+      const { credit, storedEndpoint, signTypedData, urls, allowed } = await oneEndpoint(HONEST_TIP, (p) => p);
+      expect(urls[0]).toBe(`${HONEST_TIP}?amount=${credit.amountMicro}&ref=${credit.id}`);
+      expect(signTypedData).toHaveBeenCalledTimes(1);
+      expect(allowed).toEqual([true]);
+      expect(credit.outcome).toBe("paid");
+      expect(credit.txHash).toBe(SETTLE_TX);
+      expect(credit.paidVia).toBe("maintainer_x402");
+      expect(credit.receipt).toMatchObject({ endpoint: HONEST_TIP, settlement: { transaction: SETTLE_TX } });
+      expect(credit.reasons).toEqual(
+        expect.arrayContaining([
+          { source: "policy", code: "PAID_VIA_MAINTAINER", text: msg("PAID_VIA_MAINTAINER", { host: "tipjar.example.com" }) },
+        ]),
+      );
+      expect(storedEndpoint).toBe(HONEST_TIP);
+    });
+
+    it("refuses a clipper endpoint whose payTo is not the FUNDING.json payee: signer never called", async () => {
+      const clipper = getAddress("0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13");
+      const { credit, signTypedData, urls, allowed } = await oneEndpoint("https://tipjar.example.com/clipper/tip", () => clipper);
+      expect(allowed).toEqual([true]); // the stored paid decision was read before the challenge check
+      expect(urls).toHaveLength(1); // the 402 only; no payment header was ever sent
+      expect(signTypedData).not.toHaveBeenCalled();
+      expect(credit.outcome).toBe("refused");
+      expect(credit.txHash).toBeNull();
+      expect(credit.paidVia).toBeNull();
+      expect(codes(credit)).toContain("PAYTO_MISMATCH");
+      expect(codes(credit)).not.toContain("PAID");
+      expect(credit.reasons).toEqual(
+        expect.arrayContaining([{ source: "policy", code: "PAYTO_MISMATCH", text: msg("PAYTO_MISMATCH") }]),
+      );
+    });
+
+    it("refuses an endpoint the SSRF guard blocks, with ENDPOINT_REFUSED", async () => {
+      const name = `ep-${suffix()}`;
+      const { id } = await seedSession({ [name]: { import: 1 } });
+      const { deps } = fakes({ [name]: randomAddress() }, {});
+      const resolve = deps.resolvePayee;
+      deps.resolvePayee = async (pkg) => ({ ...(await resolve(pkg)), x402Endpoint: "https://169.254.169.254/tip" }) as Resolution;
+      const account = privateKeyToAccount(generatePrivateKey());
+      const signTypedData = vi.fn((args: Parameters<typeof account.signTypedData>[0]) => account.signTypedData(args));
+      deps.payCredit = ({ endpoint: ep, ...credit }) =>
+        payMaintainer(credit, {
+          account: { address: account.address, signTypedData },
+          endpoint: ep!,
+          usdc: USDC,
+          decisionAllowsPay: (cid) => store.decisionAllowsPay(database, cid),
+        });
+      await mod.settleSession(id, deps);
+      const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
+      expect(c.outcome).toBe("refused");
+      expect(signTypedData).not.toHaveBeenCalled();
+      const text = msg("ENDPOINT_REFUSED", { host: "169.254.169.254", reason: ENDPOINT_REASONS.PRIVATE_ADDRESS });
+      expect(c.reasons).toEqual(expect.arrayContaining([{ source: "policy", code: "ENDPOINT_REFUSED", text }]));
+    });
+
+    it("without an endpoint keeps our own route and says endcredits_x402", async () => {
+      const { credit, signTypedData, urls, storedEndpoint } = await oneEndpoint(null, (p) => p);
+      expect(urls).toEqual([]);
+      expect(signTypedData).not.toHaveBeenCalled();
+      expect(credit.outcome).toBe("paid");
+      expect(credit.txHash).toBe(`0x${"04".repeat(32)}`);
+      expect(credit.paidVia).toBe("endcredits_x402");
+      expect(codes(credit)).not.toContain("PAID_VIA_MAINTAINER");
+      expect(storedEndpoint).toBeNull();
     });
   });
 });
