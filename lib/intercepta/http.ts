@@ -48,6 +48,13 @@ async function readJson(fetchFn: typeof fetch, url: string, init: RequestInit): 
   }
 }
 
+// Worth one more try: a timeout, a network error, a 5xx or a 429. Any other 4xx (including the
+// no-history 404) and a body we cannot parse would answer the same again.
+export function transient(res: HttpOutcome): boolean {
+  if (res.ok || res.error === "PARSE") return false;
+  return res.error === "TIMEOUT" || res.status === 0 || res.status >= 500 || res.status === 429;
+}
+
 function parseOrUndefined(text: string): unknown {
   try {
     return JSON.parse(text);
