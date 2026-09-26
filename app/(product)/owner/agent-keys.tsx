@@ -11,7 +11,7 @@ import { OWNER_COPY as C } from "@/lib/copy/owner";
 
 const when = (iso: string) => new Date(iso).toLocaleString();
 
-function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text }: { text: string }) {
   const [copyError, setCopyError] = useState(false);
   const [copied, setCopied] = useState(false);
   async function copy() {
