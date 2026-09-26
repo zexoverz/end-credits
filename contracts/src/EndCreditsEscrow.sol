@@ -4,12 +4,15 @@ pragma solidity 0.8.28;
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "openzeppelin-contracts/utils/math/SafeCast.sol";
+import {EIP712} from "openzeppelin-contracts/utils/cryptography/EIP712.sol";
+import {SignatureChecker} from "openzeppelin-contracts/utils/cryptography/SignatureChecker.sol";
 
 /// @title EndCreditsEscrow
 /// @notice Holds doubtful tips until the owner approves or they expire, and reserves money for
 /// packages with no claimed payee yet. A held tip can only go to the payee fixed at hold time, or
-/// back to its payer. A reserve can only go to the package's claimed payee.
-contract EndCreditsEscrow {
+/// back to its payer, and a release needs an EIP-712 signature from the payer's approver. A reserve
+/// can only go to the package's claimed payee.
+contract EndCreditsEscrow is EIP712 {
     using SafeERC20 for IERC20;
 
     enum TipStatus {
@@ -46,6 +49,8 @@ contract EndCreditsEscrow {
     uint64 public immutable changeDelay;
     uint64 public constant MIN_TTL = 60;
     uint64 public constant MAX_TTL = 7 days;
+    bytes32 public constant RELEASE_TYPEHASH =
+        keccak256("Release(bytes32 tipId,address payee,uint256 amount,bytes32 approvalRef,uint256 deadline)");
 
     mapping(bytes32 => Tip) public tips;
     mapping(bytes32 => uint256) public reserved;
@@ -93,13 +98,15 @@ contract EndCreditsEscrow {
     error ClaimCoolingDown(bytes32 packageKey, uint64 until);
     error ZeroApprover();
     error NoApprover(address payer);
+    error SignatureExpired(uint256 deadline);
+    error BadApproval();
 
     modifier onlyRecorder() {
         if (msg.sender != recorder) revert NotRecorder();
         _;
     }
 
-    constructor(IERC20 usdc_, address recorder_, uint64 changeDelay_) {
+    constructor(IERC20 usdc_, address recorder_, uint64 changeDelay_) EIP712("EndCreditsEscrow", "2") {
         usdc = usdc_;
         recorder = recorder_;
         changeDelay = changeDelay_;
@@ -151,11 +158,22 @@ contract EndCreditsEscrow {
         usdc.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    /// @notice Send a pending, unexpired tip to the payee fixed at hold time.
-    function release(bytes32 tipId, bytes32 approvalRef) external onlyRecorder {
+    /// @notice Send a pending, unexpired tip to the payee fixed at hold time. `signature` is the
+    /// payer's current approver signing `releaseDigest(tipId, approvalRef, deadline)`.
+    function release(bytes32 tipId, bytes32 approvalRef, uint256 deadline, bytes calldata signature)
+        external
+        onlyRecorder
+    {
         Tip storage tip = tips[tipId];
         if (tip.status != TipStatus.Pending) revert NotPending(tipId);
         if (block.timestamp >= tip.expiresAt) revert TipExpired(tipId);
+        if (block.timestamp > deadline) revert SignatureExpired(deadline);
+
+        _promote(tip.payer);
+        bytes32 digest = releaseDigest(tipId, approvalRef, deadline);
+        if (!SignatureChecker.isValidSignatureNow(approvers[tip.payer].current, digest, signature)) {
+            revert BadApproval();
+        }
 
         uint256 amount = tip.amount;
         address payee = tip.payee;
@@ -247,6 +265,15 @@ contract EndCreditsEscrow {
         Approver memory a = approvers[payer];
         if (a.pending != address(0) && block.timestamp >= a.activeAt) return a.pending;
         return a.current;
+    }
+
+    /// @notice The EIP-712 digest the approver signs to release `tipId`. Binds the stored payee
+    /// and amount, so a signature cannot be reused for a different tip, payee or amount.
+    function releaseDigest(bytes32 tipId, bytes32 approvalRef, uint256 deadline) public view returns (bytes32) {
+        Tip storage tip = tips[tipId];
+        return _hashTypedDataV4(
+            keccak256(abi.encode(RELEASE_TYPEHASH, tipId, tip.payee, uint256(tip.amount), approvalRef, deadline))
+        );
     }
 
     function _promote(address payer) internal {
