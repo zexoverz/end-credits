@@ -79,6 +79,8 @@ export const CLAIM_COPY = {
 
   GITHUB_BUTTON: "Sign in with GitHub",
   GITHUB_AS: "Signed in as {login}.",
+  GITHUB_SIGN_OUT: "Sign out of GitHub",
+  WALLET_CHANGE: "Use a different wallet",
   GITHUB_CANCELLED: "GitHub sign-in was cancelled. Try again when ready.",
   GITHUB_WHY: "We check that you can push to {repo}.",
 
