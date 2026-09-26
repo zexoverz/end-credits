@@ -17,7 +17,7 @@ import { APPROVER_COPY as C } from "@/lib/copy/approver";
 /** "base": Base Account passkey wallet. "injected": a browser extension wallet (MetaMask, Rabby…). */
 export type WalletKind = "base" | "injected";
 
-type Eip1193 = {
+export type Eip1193 = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
@@ -35,7 +35,7 @@ const injected = (): Eip1193 | null => {
 
 export const hasInjectedWallet = () => injected() !== null;
 
-async function walletProvider(kind: WalletKind): Promise<Eip1193> {
+export async function walletProvider(kind: WalletKind): Promise<Eip1193> {
   if (kind === "injected") {
     const p = injected();
     if (!p) throw new Error("no browser wallet");
@@ -77,7 +77,7 @@ export async function connectWallet(
 const CHAIN_HEX = `0x${baseSepolia.id.toString(16)}`;
 
 /** Browser wallets refuse typed data whose chainId is not the active chain; switch (or add) first. */
-async function onBaseSepolia(p: Eip1193): Promise<void> {
+export async function onBaseSepolia(p: Eip1193): Promise<void> {
   try {
     await p.request({
       method: "wallet_switchEthereumChain",
