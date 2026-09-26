@@ -1,6 +1,6 @@
 // One chain tx in flight per key (DESIGN §7). Each submit simulates first (so a revert is named
-// before anything is signed), takes the nonce from the node with blockTag pending, retries once on
-// `nonce too low`, and waits for the receipt.
+// before anything is signed), takes the nonce as max(node pending, last sent + 1), retries up to 3
+// sends when the nonce is taken, and waits for the receipt.
 import {
   BaseError,
   ContractFunctionRevertedError,
@@ -65,10 +65,13 @@ export function revertName(err: unknown): string | undefined {
   return reverted.data?.errorName ?? reverted.reason ?? "unknown";
 }
 
-function isNonceTooLow(err: unknown): boolean {
+/** The node already has a tx at this nonce: too low, a pending one (underpriced), or ours (known). */
+function isNonceTaken(err: unknown): boolean {
   if (err instanceof BaseError && err.walk((e) => e instanceof NonceTooLowError)) return true;
-  return err instanceof Error && /nonce too low/i.test(err.message);
+  return err instanceof Error && /nonce too low|replacement transaction underpriced|already known/i.test(err.message);
 }
+
+const SEND_ATTEMPTS = 3;
 
 export interface TxQueue {
   submit(from: Address, call: TxCall): Promise<Hash>;
@@ -108,10 +111,10 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
     }
   }
 
-  async function nextNonce(from: Address): Promise<number> {
+  async function nextNonce(from: Address, tried = -1): Promise<number> {
     const pending = await io.pendingNonce(from);
-    const last = lastUsed.get(from.toLowerCase());
-    return last === undefined ? pending : Math.max(pending, last + 1);
+    const last = lastUsed.get(from.toLowerCase()) ?? -1;
+    return Math.max(pending, last + 1, tried + 1);
   }
 
   async function write(from: Address, call: TxCall, nonce: number): Promise<Hash> {
@@ -121,11 +124,14 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
   }
 
   async function send(from: Address, call: TxCall): Promise<Hash> {
-    try {
-      return await write(from, call, await nextNonce(from));
-    } catch (err) {
-      if (!isNonceTooLow(err)) throw err;
-      return write(from, call, await nextNonce(from));
+    let nonce = await nextNonce(from);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await write(from, call, nonce);
+      } catch (err) {
+        if (!isNonceTaken(err) || attempt >= SEND_ATTEMPTS) throw err;
+        nonce = await nextNonce(from, nonce);
+      }
     }
   }
 
