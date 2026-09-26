@@ -127,3 +127,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | frontend T8.2 brand exploration | public/brand-lab/*, lib/copy/brand-lab.json | Eight original vector logo directions with paired 16:9 covers, PNG exports and download gallery; desktop and 390px browser checks passed. Human selection and review pending. |
 
 | frontend T8.2 brand exploration round two | public/brand-lab/*, lib/copy/brand-lab.json | Refined Coin Stack geometry, ten additional original vector identities and covers, compact 18-logo overview, regenerated PNG/SVG archive. Desktop/mobile overflow and image export checks passed. Human review pending. |
+
+| frontend T8.2 coin stack lettering | public/brand-lab/*, lib/copy/coin-stack.json, lib/copy/brand-lab.json | Four original E glyphs, before/after comparison and matched cover exports. Minted E updates the gallery default; product branding unchanged. Desktop/390px checks passed; human selection pending. |
