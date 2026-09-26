@@ -85,6 +85,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
   const tails = new Map<string, Promise<unknown>>();
+  // Last nonce a node accepted from us, per key. A lagging node can report a pending count that
+  // does not include our own last send, so never go below lastUsed + 1.
+  const lastUsed = new Map<string, number>();
   const staleRetries = opts.staleRetries ?? 2;
   const staleDelayMs = opts.staleDelayMs ?? 1_500;
 
@@ -105,12 +108,24 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
     }
   }
 
+  async function nextNonce(from: Address): Promise<number> {
+    const pending = await io.pendingNonce(from);
+    const last = lastUsed.get(from.toLowerCase());
+    return last === undefined ? pending : Math.max(pending, last + 1);
+  }
+
+  async function write(from: Address, call: TxCall, nonce: number): Promise<Hash> {
+    const hash = await io.write(from, call, nonce);
+    lastUsed.set(from.toLowerCase(), nonce);
+    return hash;
+  }
+
   async function send(from: Address, call: TxCall): Promise<Hash> {
     try {
-      return await io.write(from, call, await io.pendingNonce(from));
+      return await write(from, call, await nextNonce(from));
     } catch (err) {
       if (!isNonceTooLow(err)) throw err;
-      return io.write(from, call, await io.pendingNonce(from));
+      return write(from, call, await nextNonce(from));
     }
   }
 
