@@ -15,6 +15,8 @@ contract EndCreditsEscrowTest is Test {
     address internal stranger = makeAddr("stranger");
     address internal maintainerA = makeAddr("maintainerA");
     address internal maintainerB = makeAddr("maintainerB");
+    address internal approver;
+    uint256 internal approverKey;
 
     uint64 internal constant DELAY = 3 days;
     uint64 internal constant TTL = 1 days;
@@ -33,8 +35,11 @@ contract EndCreditsEscrowTest is Test {
         usdc = new MockUSDC();
         escrow = new EndCreditsEscrow(usdc, recorder, DELAY);
         usdc.mint(payer, START);
-        vm.prank(payer);
+        (approver, approverKey) = makeAddrAndKey("approver");
+        vm.startPrank(payer);
         usdc.approve(address(escrow), type(uint256).max);
+        escrow.setApprover(approver);
+        vm.stopPrank();
     }
 
     function _hold() internal returns (uint64 expiresAt) {
@@ -409,6 +414,7 @@ contract EndCreditsEscrowTest is Test {
         usdc.mint(funder, amount);
         vm.startPrank(funder);
         usdc.approve(address(escrow), amount);
+        escrow.setApprover(approver);
         escrow.hold(TIP, PKG, payee, amount, REASON, ttl);
         vm.stopPrank();
         assertEq(usdc.balanceOf(funder), 0);

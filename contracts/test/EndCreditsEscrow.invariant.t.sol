@@ -30,6 +30,11 @@ contract EscrowHandler is CommonBase, StdCheats, StdUtils {
         escrow = escrow_;
         usdc = usdc_;
         recorder = recorder_;
+        for (uint256 i; i < 3; i++) {
+            (address approver,) = makeAddrAndKey(string(abi.encode("approver", i)));
+            vm.prank(payers[i]);
+            escrow.setApprover(approver);
+        }
     }
 
     function _fund(address who, uint256 amount) internal {
