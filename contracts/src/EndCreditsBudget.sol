@@ -52,7 +52,8 @@ contract EndCreditsBudget {
         if (perPeriod == 0) revert ZeroAmount();
 
         Allowance storage a = allowances[msg.sender][spender];
-        if (a.perPeriod == 0 || a.period != period) {
+        // A missing allowance has period 0, which is never a valid period, so this also covers it.
+        if (a.period != period) {
             a.period = period;
             a.periodStart = uint64(block.timestamp);
             a.spentInPeriod = 0;
