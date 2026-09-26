@@ -2,7 +2,7 @@ export const CREDITS_DESK = {
   eyebrow: "SESSION CREDITS",
   title: "Every build has a cast.",
   intro:
-    "The open-source work behind this session, with a decision and a receipt for every credit.",
+    "The open-source work behind this session. Follow each allocation, decision, and recorded transaction.",
   ticket: "SESSION / CONTRIBUTION RECORD",
   cast: "The supporting cast",
   castNote: "Grouped by how each package contributed to your session.",

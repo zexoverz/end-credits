@@ -35,11 +35,11 @@ export function RollButton({
   }
 
   return (
-    <div className="my-6 flex flex-col items-center gap-2 text-sm">
+    <div className="credits-roll-action">
       <button
         onClick={roll}
         disabled={busy || result?.kind === "requested"}
-        className="rounded bg-white px-4 py-2 font-medium text-black disabled:opacity-40"
+        className="product-button"
       >
         {ROLL_COPY.ROLL_BUTTON}
       </button>
@@ -48,7 +48,9 @@ export function RollButton({
         <p
           role="status"
           className={
-            result.kind === "requested" ? "text-white/70" : "text-held"
+            result.kind === "requested"
+              ? "credits-action-ok"
+              : "credits-action-error"
           }
         >
           {result.text}
