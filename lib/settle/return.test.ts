@@ -1,7 +1,7 @@
 // Integration: a refunded tip goes back to the owner's budget wallet (real Postgres, fake chain).
 // Run with TEST_DATABASE_URL set (migrated); skipped otherwise.
 import { eq } from "drizzle-orm";
-import type { Address, Hash, Hex } from "viem";
+import type { Address, Hash } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { beforeAll, describe, expect, it } from "vitest";
 import { connect, fakeChain, makeOwner, seedHold, TEST_DB } from "../__fixtures__/owner-db";
