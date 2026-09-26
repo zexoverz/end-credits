@@ -1,6 +1,7 @@
 "use client";
 
 // MetaMask extension provider shared by sign-in, claims and approvals.
+import { MetaMaskIcon } from "@/components/approver/metamask-icon";
 import { ActionNotice, useFeedback } from "@/components/product/feedback";
 import { CONTROL as U } from "@/lib/copy/control-room";
 import { useState } from "react";
@@ -163,7 +164,10 @@ export function ConnectWallet({
             disabled={busy}
             onClick={() => connect("injected")}
           >
-            {busy ? C.CONNECTING : C.CONNECT}
+            <span className="inline-flex items-center justify-center gap-2">
+              <MetaMaskIcon />
+              {busy ? C.CONNECTING : C.CONNECT}
+            </span>
           </Button>
         </div>
       )}
