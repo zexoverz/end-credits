@@ -20,14 +20,43 @@ export function Arrow({
 
 export function BrandMark({ ...props }: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 40 40" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M10 3H3v7m27-7h7v7M3 30v7h7m27-7v7h-7"
-        stroke="currentColor"
-        strokeWidth="3"
+    <svg viewBox="0 0 160 160" fill="none" aria-hidden="true" {...props}>
+      <circle
+        cx="87"
+        cy="87"
+        r="57"
+        fill="#ADF3C0"
+        stroke="#20261F"
+        strokeWidth="7"
       />
-      <circle cx="20" cy="20" r="12" fill="#9bf6b8" />
-      <path d="m17 14 9 6-9 6Z" fill="currentColor" />
+      <path d="M121 47l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M132 63l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M134 83l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M129 103l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M116 120l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M98 130l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M77 134l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <path d="M57 128l9 9" stroke="#20261F" strokeWidth="3.5" />
+      <circle
+        cx="72"
+        cy="72"
+        r="57"
+        fill="#ADF3C0"
+        stroke="#20261F"
+        strokeWidth="7"
+      />
+      <circle
+        cx="72"
+        cy="72"
+        r="44"
+        fill="none"
+        stroke="#20261F"
+        strokeWidth="2.5"
+      />
+      <path
+        d="M49 45H94L95 60H91Q87 50 78 50H67V69H74Q81 69 82 62H86V81H82Q81 74 74 74H67V94H79Q90 94 93 83H97L94 99H49V95L55 93V51L49 49Z"
+        fill="#20261F"
+      />
     </svg>
   );
 }
