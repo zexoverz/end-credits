@@ -544,6 +544,7 @@
   }
   .session-ticket {
     position: relative;
+    top: auto;
     display: grid;
     grid-template-columns: 1fr 110px;
     gap: 0 16px;
@@ -624,4 +625,8 @@
   .credits-status-dot {
     animation: none !important;
   }
+}
+
+.cast-evidence .reason-evidence > li[data-evidence-tone="checked"] small {
+  color: #4d673d;
 }
