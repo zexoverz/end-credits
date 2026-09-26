@@ -202,6 +202,12 @@ export function EscrowPanel({ data }: { data: Dashboard }) {
         ))}
       </dl>
       <p>{W.ledgerBody}</p>
+      <Link
+        className="escrow-refused-link"
+        href="/app?view=decisions&outcome=refused"
+      >
+        {fill(S.refused, { count: data.cards.refused.count })} ↗
+      </Link>
     </section>
   );
 }

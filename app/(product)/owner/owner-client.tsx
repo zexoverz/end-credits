@@ -233,6 +233,7 @@ function SignedIn({
   const wallet = checklist?.steps.find((s) => s.id === "wallet_bound");
   const allowance = checklist?.steps.find((s) => s.id === "spend_allowance");
   const first = checklist?.steps.find((s) => s.id === "first_session");
+  const approver = checklist?.steps.find((s) => s.id === "approver_set");
   return (
     <>
       <SetupChecklist
@@ -304,8 +305,14 @@ function SignedIn({
             <span className="desk-eyebrow">03 / {W.approver}</span>
             <h2>{W.approverBody}</h2>
             <p className="tile-value">
-              {checklist?.steps.find((s) => s.id === "approver_set")?.detail ??
-                (checkError ? O.unknown : !checklist ? O.checking : W.notSet)}
+              {approver?.detail ??
+                (checkError
+                  ? O.unknown
+                  : !checklist
+                    ? O.checking
+                    : approver?.done
+                      ? W.configured
+                      : W.notSet)}
             </p>
             <span className="tile-link">{W.editApprover} ↗</span>
           </div>
@@ -315,9 +322,13 @@ function SignedIn({
           <div>
             <span className="desk-eyebrow">04 / {W.agent}</span>
             <h2>
-              {checklist?.steps.find((s) => s.id === "agent_key")?.done
-                ? W.connected
-                : W.connect}
+              {checkError
+                ? O.unknown
+                : !checklist
+                  ? O.checking
+                  : checklist.steps.find((s) => s.id === "agent_key")?.done
+                    ? W.connected
+                    : W.connect}
             </h2>
             <p>{W.agentBody}</p>
             <span className="tile-link">{W.editAgent} ↗</span>
@@ -461,16 +472,6 @@ function SignedIn({
           </header>
           <div className="allowance-slot">
             <div>
-              <span className="allowance-status">
-                {allowance?.done
-                  ? O.done
-                  : allowance?.detail === "coming soon"
-                    ? O.soon
-                    : O.unknown}
-              </span>
-              {allowance?.detail && (
-                <p className="allowance-server-detail">{allowance.detail}</p>
-              )}
               <BudgetWallet />
               <a href="#keys">{O.continueKeys}</a>
             </div>

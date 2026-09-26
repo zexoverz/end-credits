@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboxItems } from "./action-inbox";
+import { inboxItems } from "@/components/product/action-inbox";
 import type { Action } from "@/lib/multibaas/actions";
 const hold: Action = {
   kind: "approve_hold",
@@ -35,7 +35,7 @@ describe("action inbox", () => {
   );
   it("never combines different holds, unidentified tips or package reserves", () => {
     const other = { ...hold, tipId: "0xdef" };
-    const unknown = { ...hold, tipId: null };
+    const unknown = { ...hold, tipId: undefined };
     const reserve: Action = {
       kind: "reserve_waiting",
       package: hold.package,

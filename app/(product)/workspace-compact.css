@@ -1126,3 +1126,23 @@
     grid-column: 1/-1;
   }
 }
+
+.escrow-refused-link {
+  display: inline-block;
+  font-size: 12px;
+  margin-top: 8px;
+  color: #5b6651;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.setup-runway-top > .desk-solid-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  background: #242b22;
+  color: #fff;
+  padding: 13px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+}
