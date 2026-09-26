@@ -154,7 +154,7 @@ describe.skipIf(!DB_URL)("sessions API (integration)", () => {
       const payee = "0x1234567890abcdef1234567890abcdef12345678";
       await db().insert(s.credits).values([
         { sessionId: id, packageId: a.id, score: 2, amountMicro: BigInt(90_000), role: "thanks", outcome: "paid", payee },
-        { sessionId: id, packageId: b.id, score: 9, amountMicro: BigInt(100_000), role: "starring", outcome: "held", reasons: ["HELD_MEDIUM"] },
+        { sessionId: id, packageId: b.id, score: 9, amountMicro: BigInt(100_000), role: "starring", outcome: "held", reasons: ["HELD_MEDIUM"], tipId: "0xt1p" },
         { sessionId: id, packageId: c.id, score: 12, amountMicro: BigInt(250_000), role: "starring", outcome: "paid", capped: true, payee, txHash: "0xabc" },
         { sessionId: id, packageId: d.id, score: 3, amountMicro: BigInt(50_000), role: "research", outcome: "reserved" },
       ]);
@@ -172,7 +172,7 @@ describe.skipIf(!DB_URL)("sessions API (integration)", () => {
         txHash: "0xabc",
         payee: "0x1234…5678",
       });
-      expect(view.credits[1]).toMatchObject({ amount: "0.1", payee: null, reasons: ["HELD_MEDIUM"] });
+      expect(view.credits[1]).toMatchObject({ amount: "0.1", payee: null, reasons: ["HELD_MEDIUM"], tipId: "0xt1p" });
       expect(JSON.stringify(view)).not.toContain(payee);
     });
   });

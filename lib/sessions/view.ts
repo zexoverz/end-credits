@@ -20,6 +20,8 @@ export interface CreditView {
   signal: MainSignal | null;
   txHash: string | null;
   payee: string | null;
+  /** Set on held credits: the `/approve/<tipId>` link. */
+  tipId: string | null;
 }
 
 export interface SessionView {
@@ -93,6 +95,7 @@ export function previewCredits(rows: UsageRow[]): CreditView[] {
     signal: main.get(p.name) ?? null,
     txHash: null,
     payee: null,
+    tipId: null,
   }));
 }
 
@@ -109,6 +112,7 @@ export async function sessionView(id: string): Promise<SessionView | null> {
       reasons: credits.reasons,
       txHash: credits.txHash,
       payee: credits.payee,
+      tipId: credits.tipId,
     })
     .from(credits)
     .innerJoin(packages, eq(packages.id, credits.packageId))
@@ -136,6 +140,7 @@ export async function sessionView(id: string): Promise<SessionView | null> {
       signal: signals.get(r.name) ?? null,
       txHash: r.txHash,
       payee: shortAddress(r.payee),
+      tipId: r.tipId,
     })),
   };
 }
