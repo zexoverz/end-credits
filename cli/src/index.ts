@@ -7,7 +7,7 @@ import { flag, parseArgs } from "./args";
 import { buildUpload, formatTable } from "./attribute";
 import { writeConfig } from "./config";
 import { readStdin } from "./hook";
-import { runInit } from "./init";
+import { MCP_ADD_GLOBAL, runInit, runMcpInit, type InitResult } from "./init";
 import { runLogin } from "./login";
 import { runMcp } from "./mcp";
 import { ecHome, isSessionId, ledgerPath } from "./paths";
@@ -30,7 +30,21 @@ function init(global: boolean): number {
   const file = path.join(base, ".claude", "settings.json");
   const result = runInit(file);
   say(cliMsg(INIT_CODES[result], { path: file }));
-  return result === "invalid" ? 1 : 0;
+  const mcp = initMcp(global);
+  return result === "invalid" || mcp === "invalid" ? 1 : 0;
+}
+
+const MCP_CODES = { added: "MCP_ADDED", unchanged: "MCP_UNCHANGED", invalid: "INIT_INVALID" } as const;
+
+function initMcp(global: boolean): InitResult | null {
+  if (global) {
+    say(cliMsg("MCP_GLOBAL", { command: MCP_ADD_GLOBAL }));
+    return null;
+  }
+  const file = path.join(process.cwd(), ".mcp.json");
+  const result = runMcpInit(file);
+  say(cliMsg(MCP_CODES[result], { path: file }));
+  return result;
 }
 
 function key(token: string | undefined, api: string | undefined): number {
