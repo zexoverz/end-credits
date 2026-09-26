@@ -124,6 +124,7 @@ describe("end_credits_explain", () => {
     reasons: [],
     signal: null,
     txHash: null,
+    paidVia: null,
     payee: null,
     tipId: null,
     ...over,
