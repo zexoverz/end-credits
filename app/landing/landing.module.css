@@ -1731,3 +1731,39 @@
     gap: 3px;
   }
 }
+
+/* Give the statistic illustrations the same visual weight as their numbers. */
+.stats article {
+  container-type: inline-size;
+}
+.statTop {
+  gap: 20px;
+  min-height: clamp(112px, 38cqw, 220px);
+}
+.statTop .statNumber {
+  font-size: clamp(48px, 19cqw, 96px);
+}
+.statTop > svg {
+  display: block;
+  width: 44%;
+  max-width: 240px;
+  height: auto;
+  opacity: 1;
+}
+.statTop .dotGrid {
+  width: 40%;
+  max-width: 216px;
+  aspect-ratio: 1;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: clamp(3px, 1.2cqw, 7px);
+}
+.statTop .dotGrid span {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+@media (max-width: 650px) {
+  .statTop {
+    gap: 16px;
+  }
+}
