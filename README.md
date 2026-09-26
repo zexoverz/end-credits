@@ -225,10 +225,17 @@ TODO(live): the final judged demo session id and its roll link.
 
 ### Feedback on the API
 
-- Time to first call: TODO(live)
-- What confused us: TODO(live)
-- What was missing: TODO(live)
-- What worked well: TODO(live)
+- **Time to first call:** minutes once the key arrived. The key took several hours to arrive by
+  email; meanwhile we built the client against `llms.txt` and the OpenAPI pages via `.md`, which were
+  enough to have it ready before the first request.
+- **What confused us:** an address Intercepta has never seen returns HTTP 404 with an error body, not
+  a 200 "no history" verdict. A client naturally reads that as an outage. We had to special-case it;
+  before that, our simulation fallback could have paid on a clean simulation of a plain transfer.
+- **What was missing:** testnet chain ids (we map Base Sepolia to Base 8453 and say so on every
+  screen), and signature analysis for EIP-3009 `TransferWithAuthorization`, which is what x402
+  `exact` payments sign. The Permit family is covered.
+- **What worked well:** the impersonation (poisoning) endpoint exists and is fast (about 350 ms in
+  the probe), and the trait descriptions are clear enough to show an owner verbatim.
 
 ## x402
 
