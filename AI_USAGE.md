@@ -137,3 +137,5 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | frontend spending limit done states | components/budget/{budget-wallet,spending-limit}.ts*, lib/copy/budget.ts | Claude Code wrote it: the slider starts from the on-chain limit, done steps show their result instead of the button, a used-up window explains when it resets. Design unchanged. Human review pending. |
 
 | frontend cli install step | app/(product)/owner/{owner-client,agent-keys}.tsx, lib/copy/onboarding.ts | Claude Code wrote it: the agent setup card now starts with the one-line CLI install, with a copy button. Design unchanged. Human review pending. |
+
+| backend claim signed-in state | lib/claim/summary.ts, test | Claude Code wrote it: after a finished claim drops the GitHub token, the package page asks to sign in again instead of showing signed in while the wallet step fails. Human review pending. |
