@@ -25,13 +25,17 @@ type Load =
   | { state: "error"; error: string }
   | { state: "ok"; summary: OwnerSummary };
 export function OwnerClient({
+  initialSignedIn,
   worldCode,
   initialSection = "budget",
 }: {
+  initialSignedIn: boolean;
   worldCode: string | null;
   initialSection?: string;
 }) {
-  const [load, setLoad] = useState<Load>({ state: "loading" });
+  const [load, setLoad] = useState<Load>({
+    state: initialSignedIn ? "loading" : "signed_out",
+  });
   const [logoutError, setLogoutError] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const refresh = useCallback(async () => {
@@ -42,8 +46,8 @@ export function OwnerClient({
   }, []);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- owner state changes after the API responds
-    void refresh();
-  }, [refresh]);
+    if (initialSignedIn) void refresh();
+  }, [refresh, initialSignedIn]);
   async function logout() {
     setLoggingOut(true);
     setLogoutError(false);
