@@ -100,11 +100,27 @@ describe.skipIf(!TEST_DB)("owner onboarding (integration)", () => {
 
   it("with BUDGET_ADDRESS set, the allowance reader decides spend_allowance", async () => {
     process.env.BUDGET_ADDRESS = "0x00000000000000000000000000000000000000cc";
+    // No wallet yet: the real reader answers null without touching the chain.
     expect(step(await get(), "spend_allowance")).toMatchObject({ done: false, detail: null });
-    const read = async () => BigInt(5_000_000);
-    expect(step(await get({ ...deps, readSpendAllowance: read }), "spend_allowance")).toMatchObject({
-      done: true,
-      detail: "5 USDC",
+    const asked: (string | null)[] = [];
+    const allowance = (a: Partial<import("./onboarding").SpendAllowance>) => async (w: Address | null) => {
+      asked.push(w);
+      return { perPeriod: BigInt(20_000_000), period: BigInt(86400), remaining: BigInt(12_500_000), approved: BigInt(20_000_000), ...a };
+    };
+    const spend = async (a: Partial<import("./onboarding").SpendAllowance>) =>
+      step(await get({ ...deps, readSpendAllowance: allowance(a) }), "spend_allowance");
+    expect(await spend({})).toMatchObject({ done: true, detail: "20 USDC per day, 12.5 left" });
+    expect(await spend({ remaining: BigInt(0) })).toMatchObject({ done: false, detail: "20 USDC per day, 0 left" });
+    expect(await spend({ approved: BigInt(5_000_000), period: BigInt(3600) })).toMatchObject({
+      done: false,
+      detail: "20 USDC per hour, 12.5 left, only 5 USDC approved",
     });
+    expect(step(await get({ ...deps, readSpendAllowance: async () => null }), "spend_allowance")).toMatchObject({ done: false, detail: null });
+    // The named budget wallet is read, not the sign-in wallet.
+    const funder = privateKeyToAccount(generatePrivateKey()).address;
+    await db.update(s.owners).set({ walletAddress: privateKeyToAccount(generatePrivateKey()).address, budgetOwner: funder }).where(eq(s.owners.id, ownerId));
+    asked.length = 0;
+    await spend({});
+    expect(asked).toEqual([funder]);
   });
 });
