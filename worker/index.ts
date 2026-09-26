@@ -3,14 +3,14 @@
 import { chain } from "../lib/chain/keys";
 import { db } from "../lib/db/client";
 import { checkEnv, WORKER_BOOT } from "../lib/env";
-import { settleDepsFromEnv } from "../lib/settle/deps";
+import { settleDepsFromEnv, settleDepsPerOwner } from "../lib/settle/deps";
 import { startExpirer } from "./expirer";
 import { startSettler } from "./settler";
 
 checkEnv(WORKER_BOOT);
 
 const log = (line: string) => console.error(line);
-const loops = [startSettler(settleDepsFromEnv(process.env, log), log), startExpirer(db(), chain(), log)];
+const loops = [startSettler(settleDepsFromEnv(process.env, log), log, settleDepsPerOwner(process.env, log)), startExpirer(db(), chain(), log)];
 console.log("end-credits worker up");
 
 let stopping = false;

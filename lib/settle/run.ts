@@ -3,11 +3,14 @@
 import { errorLabel, settleSession, type SettleDeps } from "./settle";
 import { claimNextSession, failSession } from "./store";
 
-export async function settleNext(deps: SettleDeps): Promise<string | null> {
+/** Deps for one session: its owner's payer key. Without it, every session uses `deps`. */
+export type DepsFor = (sessionId: string) => Promise<SettleDeps>;
+
+export async function settleNext(deps: SettleDeps, depsFor?: DepsFor): Promise<string | null> {
   const id = await claimNextSession(deps.database);
   if (!id) return null;
   try {
-    await settleSession(id, deps);
+    await settleSession(id, depsFor ? await depsFor(id) : deps);
   } catch (err) {
     await failSession(deps.database, id);
     deps.log?.(`settle: session ${id} failed: ${errorLabel(err)}`);
