@@ -8,7 +8,7 @@ import { registryUrl } from "../registry/npm";
 import { fetchRepoFile, rawUrl, type GitHubOpts } from "./github";
 import { packageKey } from "./keys";
 import type { ObservationStore, PayeeSource } from "./observe";
-import { checksum, parseFundingJson, parseNpmFunding, parseTeaYaml, type Parsed } from "./parse";
+import { checksum, parseFundingJson, parseNpmFunding, parseTeaYaml, parseX402Endpoint, type Parsed } from "./parse";
 import { repoPublishes } from "./spoof";
 
 export type PackageRef = {
@@ -20,7 +20,7 @@ export type PackageRef = {
 };
 
 export type Resolution =
-  | { address: Address; source: PayeeSource; sourceUrl: string }
+  | { address: Address; source: PayeeSource; sourceUrl: string; x402Endpoint?: string }
   | { address: null; reason?: MessageCode; vars?: Record<string, string> };
 
 export type ResolveDeps = GitHubOpts & {
@@ -65,7 +65,10 @@ export async function resolvePayee(pkg: PackageRef, deps: ResolveDeps): Promise<
       const hit = await accept(
         text === null ? null : { parsed: parse(text), source, sourceUrl: rawUrl(repo, file) },
       );
-      if (hit) return hit;
+      if (!hit) continue;
+      // The maintainer's own x402 endpoint rides only on the FUNDING.json that named the payee.
+      const endpoint = source === "drips" && text !== null ? parseX402Endpoint(text) : null;
+      return endpoint ? { ...hit, x402Endpoint: endpoint } : hit;
     }
   }
 

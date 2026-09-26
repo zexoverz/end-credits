@@ -106,6 +106,33 @@ describe("resolvePayee order", () => {
   });
 });
 
+describe("resolvePayee x402 endpoint", () => {
+  const withEndpoint = (x402: unknown) => JSON.stringify({ drips: { ethereum: { ownedBy: DRIPS } }, x402 });
+  const tip = "https://tips.example.com/tip";
+
+  it("carries the FUNDING.json x402 endpoint next to the drips payee", async () => {
+    const { d } = deps({ [`${RAW}/FUNDING.json`]: withEndpoint({ endpoint: tip }) });
+    expect(await resolvePayee(pkg, d)).toEqual({
+      address: DRIPS,
+      source: "drips",
+      sourceUrl: `${RAW}/FUNDING.json`,
+      x402Endpoint: tip,
+    });
+  });
+
+  it("drops an http endpoint and keeps the payee", async () => {
+    const { d } = deps({ [`${RAW}/FUNDING.json`]: withEndpoint({ endpoint: "http://tips.example.com/tip" }) });
+    expect(await resolvePayee(pkg, d)).toEqual({ address: DRIPS, source: "drips", sourceUrl: `${RAW}/FUNDING.json` });
+  });
+
+  it("a claim never takes the FUNDING.json endpoint", async () => {
+    const { d } = deps({ [`${RAW}/FUNDING.json`]: withEndpoint({ endpoint: tip }) }, CLAIM);
+    const r = await resolvePayee(pkg, d);
+    expect(r).toMatchObject({ address: CLAIM, source: "claim" });
+    expect(r).not.toHaveProperty("x402Endpoint");
+  });
+});
+
 describe("resolvePayee invalid addresses", () => {
   const badFunding = JSON.stringify({ drips: { ethereum: { ownedBy: "0x1234" } } });
 
