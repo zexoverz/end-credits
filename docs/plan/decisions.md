@@ -1087,3 +1087,11 @@ reserve twice). It throws; the settler records an execution error and nothing mo
   No history → accepted (fresh payer wallets are normal), the 404 row is still recorded.
 - **Budget:** one simulation per paid credit, one payer quick scan per payer per 5 min.
 - **Gap:** the settler's x402 client maps our 403/503 to `EXECUTION_FAILED`, not a named refusal.
+
+**Simulation off by default.** Intercepta's simulation only runs with the sender's real mainnet
+balance; our payer holds testnet USDC only. Simulating from a substituted mainnet wallet returned a
+`WALLET_DRAINER` detector on a plain transfer to a payee that scans clean, a signal about the
+substituted sender, not our payment. Showing it would mislead, so the settler runs the simulation
+only when `SIMULATE_PAYMENTS=true` (for a mainnet payer). Screening the x402 payer on the paid side
+stays on. This is also API feedback: simulation cannot cover a testnet agent's payment, and
+signature analysis does not cover EIP-3009 `TransferWithAuthorization`, the message x402 signs.
