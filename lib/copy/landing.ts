@@ -1,7 +1,7 @@
 // Copy for / (AGENTS rule 14). NOT_A_PAYWALL lives in lib/messages.ts and is reused, not copied.
 // The measurement is SPEC §6.1 (scripts/measure-funding.py, 25 Sep 2026); change both together.
 export const REPO_URL = "https://github.com/zexoverz/end-credits";
-export const ESCROW_ADDRESS = "0x63047583FbCe241D72d71137C940aa27BBdC60f1";
+export const ESCROW_ADDRESS = "0x849F6cd44e4A3248d033aBB1b670257F77bFCc46";
 
 export const LANDING = {
   NAME: "End Credits",
