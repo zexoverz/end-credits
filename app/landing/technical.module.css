@@ -797,7 +797,7 @@
   inset: 0;
   background: #468155;
   transform-origin: left;
-  animation: chapterTime 1s linear forwards;
+  animation: chapterTime 3s linear forwards;
   animation-play-state: paused;
 }
 .theater[data-running="true"] .chapterProgress {
