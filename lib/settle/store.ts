@@ -188,7 +188,14 @@ export async function knownPayees(database: Database, exceptPackageId: string): 
 export async function finishSession(
   database: Database,
   sessionId: string,
-  s: { budgetMicro: bigint; manifestHash: string | null; recordTx: string | null; budgetPullTx?: string | null },
+  s: {
+    budgetMicro: bigint;
+    manifestHash: string | null;
+    recordTx: string | null;
+    budgetPullTx?: string | null;
+    leftoverMicro?: bigint | null;
+    returnTx?: string | null;
+  },
 ) {
   await database
     .update(sessions)
@@ -198,6 +205,8 @@ export async function finishSession(
       manifestHash: s.manifestHash,
       recordTx: s.recordTx,
       budgetPullTx: s.budgetPullTx ?? null,
+      leftoverMicro: s.leftoverMicro ?? null,
+      returnTx: s.returnTx ?? null,
     })
     .where(eq(sessions.id, sessionId));
 }
