@@ -35,6 +35,31 @@ export function parseFundingJson(text: string): Parsed {
   return NONE;
 }
 
+export const X402_ENDPOINT_MAX = 2048;
+
+/** Our FUNDING.json extension (decisions.md "Agent-to-agent x402"): a top-level
+ *  `"x402": {"endpoint": "https://…"}`. https only, no credentials or fragment, at most 2048 chars;
+ *  else null. The payee is still `drips.*.ownedBy`; the endpoint only says where to pay it. */
+export function parseX402Endpoint(text: string): string | null {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const raw = isObj(doc) && isObj(doc.x402) ? doc.x402.endpoint : undefined;
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > X402_ENDPOINT_MAX) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.hash) return null;
+  const out = url.toString();
+  return out.length > X402_ENDPOINT_MAX ? null : out;
+}
+
 export function parseTeaYaml(text: string): Parsed {
   let doc: unknown;
   try {
