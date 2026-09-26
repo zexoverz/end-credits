@@ -8,6 +8,7 @@ import { ActionNotice, useFeedback } from "@/components/product/feedback";
 import { CONTROL as U } from "@/lib/copy/control-room";
 import { useEffect, useState } from "react";
 import type { ProviderInterface } from "@base-org/account/browser";
+import { stringToHex } from "viem";
 import { baseSepolia } from "viem/chains";
 import { Button, ErrorBox, Mono } from "@/components/ui";
 import { fill } from "@/lib/client/approve";
@@ -116,6 +117,22 @@ export async function signTypedData(
   if (typeof sig !== "string" || !sig.startsWith("0x"))
     throw new Error("no signature");
   return sig;
+}
+
+/** EIP-191 message signature, using the same provider as connectWallet. */
+export async function signPersonalMessage(
+  address: string,
+  message: string,
+  kind: WalletKind,
+): Promise<string> {
+  const p = await walletProvider(kind);
+  const signature = await p.request({
+    method: "personal_sign",
+    params: [stringToHex(message), address],
+  });
+  if (typeof signature !== "string" || !/^0x[0-9a-f]+$/i.test(signature))
+    throw new Error("no_signature");
+  return signature;
 }
 
 export const errorName = (e: unknown) =>
