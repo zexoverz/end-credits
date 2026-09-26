@@ -966,3 +966,28 @@ dashboard history restarts from v2.
 `already known` is not retried after all: it can mean our own transaction reached the pool and
 the reply was lost, and a bumped resend would run the same call twice (a second `reserve` would
 reserve twice). It throws; the settler records an execution error and nothing moves twice.
+
+## Packages not on the npm registry (26 Sep)
+
+- **Why:** the npm account is suspended, so the `@endcredits-demo/*` fixtures install from GitHub
+  (`pnpm add @endcredits-demo/moved-payout@github:zexoverz/endcredits-fixture-moved-payout`). The
+  registry 404s for them, and so it does for real packages installed from git or a private registry.
+- **CLI:** each uploaded package carries `repository` and `homepage` from the installed
+  `node_modules/<name>/package.json`, only when `lib/registry/declared.ts` accepts them: a GitHub
+  owner/repo (same regex as `lib/registry/npm.ts`, plus a GitHub owner rule so `../x` is not read as
+  a repo), a relative `directory` with no `..`, an https homepage, 512 chars max. Anything else is
+  dropped, so no local path leaves the machine and the upload is never rejected for it.
+- **Upload:** `uploadSchema` accepts the same fields with the same check. Ingest writes them to
+  `packages.declared_repo` / `declared_directory` / `declared_homepage` (migration `0004`). The first
+  declaration wins; a later upload never overwrites a declared repo.
+- **Settle:** `loadPackage` throws `RegistryNotFound` on a 404 only. The settler then uses the
+  declared repo, sets `packages.repo_source = 'declared'`, and adds `REPO_DECLARED` to the credit.
+  Downloads and first publish stay unknown (the spam rule does not count unknown as low). Payee
+  resolution, the anti-spoof check and change detection run as for a registry package. A 404 with
+  nothing declared, or any other registry error, refuses with `RESOLVE_FAILED` as before.
+- **Known gap:** for a name not on npm, whoever uploads first picks the repo, and anti-spoof only
+  asks that repo's `package.json` to carry the name, which anyone can write. Accepted for the demo;
+  the payee still goes through Intercepta and the lookalike and spam rules.
+- Live check, 26 Sep (script deleted): `@endcredits-demo/moved-payout` → registry 404 → declared
+  `zexoverz/endcredits-fixture-moved-payout` → `repoPublishes` true (false for another name) →
+  `0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551` from `FUNDING.json` (drips).
