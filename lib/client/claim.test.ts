@@ -52,6 +52,8 @@ function view(status: ClaimView["status"], over: Partial<ClaimView> = {}): Claim
     prNumber: null,
     prUrl: null,
     claimedAmount: null,
+    setClaimTx: null,
+    claimTxs: [],
     coolingUntil: null,
     code: null,
     message: null,
