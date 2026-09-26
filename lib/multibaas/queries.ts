@@ -98,7 +98,7 @@ function paidTotals(payer: string): EventQuery {
           input(2, "amount"),
           ...where("block", "tx", "at"),
         ],
-        filter: { fieldType: "input", inputIndex: 0, operator: "equal", value: getAddress(payer) },
+        filter: { fieldType: "input", inputIndex: 0, operator: "equal", value: getAddress(payer).toLowerCase() },
       },
     ],
     orderBy: "block",
