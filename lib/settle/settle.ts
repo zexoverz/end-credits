@@ -53,6 +53,8 @@ export type SettleDeps = {
     /** What the hot key can still pull from `owner` this period. */
     remaining(owner: Address): Promise<bigint>;
     pull(owner: Address, amount: bigint): Promise<Hash>;
+    /** Hot key USDC transfer back to `owner`: whatever was pulled and did not move. */
+    returnToOwner(owner: Address, amount: bigint): Promise<Hash>;
   };
   now?: () => Date;
   concurrency?: number;
@@ -167,9 +169,10 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
   const full = { ...deps, now };
   // Every decision is stored before anything is signed or sent (AGENTS rule 6).
   await mapLimit(work, limit, (w) => decideOne(w, work, full));
-  const pull = budgetOwner ? await pullOnce(budgetOwner, work, full) : { tx: null, error: null };
+  const pull = budgetOwner ? await pullOnce(budgetOwner, work, full) : { tx: null, error: null, need: BigInt(0) };
   if (pull.error) await markPullFailed(work, pull.error, full);
   else await mapLimit(work, limit, (w) => executeOne(w, full, sessionKey, owner.holdTtlSeconds));
+  const back = budgetOwner && pull.tx && !pull.error ? await returnLeftover(budgetOwner, pull.need, work, full) : null;
 
   const manifest = manifestOf(
     work.map((w) => ({
@@ -197,6 +200,8 @@ export async function settleSession(sessionId: string, deps: SettleDeps): Promis
     manifestHash: manifest.hash,
     recordTx,
     budgetPullTx: pull.tx,
+    leftoverMicro: back?.leftover ?? null,
+    returnTx: back?.tx ?? null,
   });
 }
 
@@ -209,15 +214,34 @@ async function pullOnce(
   owner: Address,
   work: Work[],
   deps: SettleDeps,
-): Promise<{ tx: string | null; error: string | null }> {
+): Promise<{ tx: string | null; error: string | null; need: bigint }> {
   const need = work.filter(moves).reduce((a, w) => a + w.amount, BigInt(0));
-  if (need === BigInt(0)) return { tx: null, error: null };
+  if (need === BigInt(0)) return { tx: null, error: null, need };
   try {
-    return { tx: await deps.budget!.pull(owner, need), error: null };
+    return { tx: await deps.budget!.pull(owner, need), error: null, need };
   } catch (err) {
     const error = err instanceof TxRevertedError ? err.errorName : errorLabel(err);
     deps.log?.(`settle: budget pull of ${need} from ${owner} failed: ${error}`);
-    return { tx: err instanceof TxRevertedError ? (err.hash ?? null) : null, error };
+    return { tx: err instanceof TxRevertedError ? (err.hash ?? null) : null, error, need };
+  }
+}
+
+// What was pulled and did not move (a failed payment, hold or reserve) goes back to the owner's
+// wallet, exactly. A failed return leaves `leftover` recorded and no tx; the expirer retries it.
+async function returnLeftover(
+  owner: Address,
+  pulled: bigint,
+  work: Work[],
+  deps: SettleDeps,
+): Promise<{ leftover: bigint; tx: string | null }> {
+  const moved = work.filter((w) => moves(w) && !!w.tx).reduce((a, w) => a + w.amount, BigInt(0));
+  const leftover = pulled - moved;
+  if (leftover <= BigInt(0)) return { leftover: BigInt(0), tx: null };
+  try {
+    return { leftover, tx: await deps.budget!.returnToOwner(owner, leftover) };
+  } catch (err) {
+    deps.log?.(`settle: return of ${leftover} to ${owner} failed: ${errorLabel(err)}`);
+    return { leftover, tx: null };
   }
 }
 

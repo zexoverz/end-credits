@@ -82,6 +82,8 @@ export const sessions = pgTable(
     manifestHash: text("manifest_hash"),
     recordTx: text("record_tx"),
     budgetPullTx: text("budget_pull_tx"),
+    leftoverMicro: micro("leftover_micro"),
+    returnTx: text("return_tx"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -210,6 +212,7 @@ export const holds = pgTable(
     holdTx: text("hold_tx").notNull(),
     releaseTx: text("release_tx"),
     refundTx: text("refund_tx"),
+    returnTx: text("return_tx"),
     resolvedAt: ts("resolved_at"),
   },
   (t) => [

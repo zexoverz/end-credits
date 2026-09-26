@@ -14,8 +14,8 @@ import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { budgetAbi, erc20Abi } from "../chain/abi";
-import { allowanceOf, pull, remaining, usdcAllowanceToBudget, usdcBalance } from "../chain/budget";
-import { approveEscrow, recordSession, reserve, reserved } from "../chain/escrow";
+import { allowanceOf, pull, remaining, returnToOwner, usdcAllowanceToBudget, usdcBalance } from "../chain/budget";
+import { approveEscrow, hold, recordSession, refund, reserve, reserved, setApprover, tipOf } from "../chain/escrow";
 import { createChainContext, type ChainContext } from "../chain/keys";
 import { TxRevertedError } from "../chain/txqueue";
 
@@ -167,6 +167,7 @@ describe.skipIf(!ready)("settleSession with the budget wallet on anvil", () => {
           order.push("pull");
           return pull(o, amount, ctx, budget);
         },
+        returnToOwner: (o, amount) => returnToOwner(o, amount, ctx),
       },
     });
 
@@ -197,5 +198,92 @@ describe.skipIf(!ready)("settleSession with the budget wallet on anvil", () => {
     expect(await usdcBalance(HOT.address, ctx)).toBe(BigInt(0));
     expect(await reserved(c.key as Hex, ctx)).toBe(amount);
     expect(await remaining(OWNER.address, undefined, ctx, budget)).toBe(PER_DAY - amount);
+  }, 60_000);
+
+  it("a denied tip goes back to the owner's wallet: pull, hold, refund, return", async () => {
+    const { db } = await import("../db/client");
+    const s = await import("../db/schema");
+    const { settleSession } = await import("./settle");
+    const { denyHold } = await import("../approve/actions");
+    const { sessionKeyFor } = await import("../sessions/ingest");
+    const { dbObservations } = await import("../payee/observe");
+    const database = db();
+    const observations = dbObservations(database);
+    await setApprover(RECORDER.address, ctx);
+
+    const [owner] = await database
+      .insert(s.owners)
+      .values({ displayName: "anvil-return", payerAddress: HOT.address, budgetOwner: OWNER.address, sessionBudgetMicro: BigInt(500_000) })
+      .returning();
+    const [key] = await database.insert(s.agentKeys).values({ ownerId: owner.id, label: "k", tokenHash: randomUUID(), boundVia: "dev" }).returning();
+    const id = randomUUID();
+    await database.insert(s.sessions).values({ id, ownerId: owner.id, agentKeyId: key.id, claudeSessionId: randomUUID(), sessionKey: sessionKeyFor(id) });
+    const name = `anvil-return-${id.slice(0, 8)}`;
+    await database.insert(s.usage).values([{ sessionId: id, packageName: name, signal: "import", count: 1 }]);
+    const payee = privateKeyToAccount(`0x${"77".repeat(32)}`).address;
+
+    const ownerBefore = await usdcBalance(OWNER.address, ctx);
+    const hotBefore = await usdcBalance(HOT.address, ctx);
+    await settleSession(id, {
+      database,
+      // The decision checks the pinned Base Sepolia USDC; the chain calls use the mock.
+      usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      payer: HOT.address,
+      observations,
+      loadPackage: async (n) => ({
+        name: n,
+        version: "1.0.0",
+        repoFullName: null,
+        repoDirectory: null,
+        homepage: null,
+        funding: null,
+        fundingLinks: [],
+        createdAt: new Date("2020-01-01"),
+        weeklyDownloads: 1_000_000,
+      }),
+      resolvePayee: async (pkg) => {
+        await observations.record({ packageId: pkg.id, address: payee, source: "drips", sourceUrl: "x" });
+        return { address: payee, source: "drips", sourceUrl: "x" };
+      },
+      // A screen that fails is a hold, never a payment (AGENTS rule 7).
+      screenPayee: async () => {
+        throw new Error("screen down");
+      },
+      escrow: {
+        reserve: (k, a, sk) => reserve(k, a, sk, ctx),
+        hold: (a) => hold(a, ctx),
+        recordSession: (t) => recordSession(t, ctx),
+      },
+      payCredit: async () => {
+        throw new Error("no payment expected");
+      },
+      budget: {
+        remaining: (o) => remaining(o, undefined, ctx, budget),
+        pull: (o, amount) => pull(o, amount, ctx, budget),
+        returnToOwner: (o, amount) => returnToOwner(o, amount, ctx),
+      },
+    });
+
+    const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
+    expect(c.outcome).toBe("held");
+    const amount = c.amountMicro;
+    expect(await usdcBalance(OWNER.address, ctx)).toBe(ownerBefore - amount);
+    expect((await tipOf(c.tipId as Hex, ctx)).status).toBe("pending");
+
+    const res = await denyHold(owner.id, c.tipId as Hex, {
+      refund: (tip) => refund(tip, ctx),
+      returnToOwner: (o, a) => returnToOwner(o, a, ctx),
+      release: async () => {
+        throw new Error("no release expected");
+      },
+      releaseDomain: () => ({ escrow: ctx.escrow, chainId: foundry.id }),
+      verifyRelease: async () => false,
+    });
+    expect(res).toMatchObject({ ok: true });
+    expect((await tipOf(c.tipId as Hex, ctx)).status).toBe("refunded");
+    const [h] = await database.select().from(s.holds).where(eq(s.holds.creditId, c.id));
+    expect(h.returnTx).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(await usdcBalance(OWNER.address, ctx)).toBe(ownerBefore);
+    expect(await usdcBalance(HOT.address, ctx)).toBe(hotBefore);
   }, 60_000);
 });

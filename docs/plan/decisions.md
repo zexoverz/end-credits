@@ -1276,3 +1276,31 @@ is not used.
   still pulled in full. Acceptable for the hackathon; a sweep back is the follow-up.
 - **Onboarding:** `spend_allowance` is done when the allowance has something left this period and the
   USDC approval to the budget contract covers at least `perPeriod`.
+
+## Refunds go back to the owner's wallet (26 Sep)
+
+Supersedes the "Leftover" bullet in "Budget integration (26 Sep)".
+
+- **Why:** with the budget wallet the hot key pulls a session's spend first, and the escrow refunds a
+  denied or expired tip to its `payer`, the hot key. Without a return the owner's money would end up
+  on our key, which contradicts "money never sits on our server".
+- **Return:** `returnToOwner(owner, amount)` in `lib/chain/budget.ts` is a hot-key `USDC.transfer`
+  through the hot key's tx queue (same nonce order as its escrow writes and pulls). Exact amount or a
+  revert; never a partial transfer of whatever the balance allows.
+- **Which holds:** only when the owner has `budget_owner` and the tip's session has a
+  `budget_pull_tx`. Sessions paid from the hot key's own balance return nothing. The target is the
+  owner's current `budget_owner`.
+- **Deny:** the return runs inside the deny transaction, after `refund` and under the hold's row lock,
+  so the expirer's retry cannot send the same return. A failed return does not roll back the refund:
+  the refund stays recorded, the credit gets `RETURN_PENDING` once, and `holds.return_tx` stays null.
+- **Expiry:** after marking a hold expired, the expirer returns it the same way.
+- **Settlement leftover:** after execution, `leftover = pulled − (x402 paid + holds sent + reserves
+  sent)`. When positive it goes back at once; `sessions.leftover_micro` and `sessions.return_tx` are
+  stored. Only after a pull that succeeded.
+- **Retry:** every expirer tick (30 s) first sends every return still owed: holds with `refund_tx`,
+  no `return_tx` and a funded session; settled funded sessions with `leftover_micro > 0` and no
+  `return_tx`. Each row is locked (`FOR UPDATE SKIP LOCKED`) and re-checked before sending, so a return
+  goes out once.
+- **Limit:** an x402 payment that errors on our side but settles later would already have been counted
+  as not moved and returned; the later settlement then spends the hot key's own balance or fails.
+  Accepted for the hackathon.

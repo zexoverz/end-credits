@@ -40,6 +40,8 @@ export const MESSAGES = {
   APPROVED_SESSION: "Approved by the owner. Released {amount} USDC to {address}.",
   DENIED: "Denied. {amount} USDC returned to the owner.",
   EXPIRED: "Not approved in time. {amount} USDC returned to the owner.",
+  RETURNED: "Returned {amount} USDC to the owner's wallet.",
+  RETURN_PENDING: "Refunded, but the transfer back to the owner's wallet has not gone through yet. Retrying.",
   CANCELLED: "Verification cancelled. Nothing was released.",
   STALE_AUTH: "A fresh verification is required. Nothing was released.",
   WRONG_HUMAN: "This approval belongs to a different human.",
