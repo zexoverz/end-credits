@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { SetApprover } from "@/components/approver/set-approver";
 import { Button, Card, ErrorBox, Mono, Page } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import { addressUrl, usdc } from "@/lib/client/format";
 import type { OwnerSummary, SettingsView } from "@/lib/client/owner";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
@@ -52,13 +52,19 @@ export function OwnerClient({ worldCode }: { worldCode: string | null }) {
   return (
     <Page title={C.TITLE}>
       {load.state === "loading" && <p className="text-muted">{C.LOADING}</p>}
-      {load.state === "error" && <ErrorBox>{C.LOAD_FAILED.replace("{error}", load.error)}</ErrorBox>}
-      {load.state === "signed_out" && <SignIn worldCode={worldCode} onSignedIn={refresh} />}
+      {load.state === "error" && (
+        <ErrorBox>{C.LOAD_FAILED.replace("{error}", load.error)}</ErrorBox>
+      )}
+      {load.state === "signed_out" && (
+        <SignIn worldCode={worldCode} onSignedIn={refresh} />
+      )}
       {load.state === "ok" && (
         <SignedIn
           summary={load.summary}
           onLogout={logout}
-          onSettings={(settings) => setLoad({ state: "ok", summary: { ...load.summary, settings } })}
+          onSettings={(settings) =>
+            setLoad({ state: "ok", summary: { ...load.summary, settings } })
+          }
         />
       )}
     </Page>
@@ -77,23 +83,38 @@ function SignedIn({
   const now = useNow();
   const { payer } = summary;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="owner-sections">
       <div className="flex items-center justify-between gap-2 text-sm">
-        <span>{C.SIGNED_IN_AS.replace("{name}", summary.owner.displayName)}</span>
-        <Button type="button" onClick={onLogout} className="bg-transparent text-foreground ring-1 ring-line">
+        <span>
+          {C.SIGNED_IN_AS.replace("{name}", summary.owner.displayName)}
+        </span>
+        <Button
+          type="button"
+          onClick={onLogout}
+          className="bg-transparent text-foreground ring-1 ring-line"
+        >
           {C.LOGOUT}
         </Button>
       </div>
 
       <Card title={C.PAYER}>
         <div className="flex flex-col gap-1 text-sm">
-          <a href={addressUrl(payer.address)} target="_blank" rel="noreferrer" className="underline">
+          <a
+            href={addressUrl(payer.address)}
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
             <Mono>{payer.address}</Mono>
           </a>
           {payer.error ? (
-            <ErrorBox>{C.BALANCE_ERROR.replace("{error}", payer.error)}</ErrorBox>
+            <ErrorBox>
+              {C.BALANCE_ERROR.replace("{error}", payer.error)}
+            </ErrorBox>
           ) : (
-            <span className="text-lg font-semibold">{usdc(payer.usdcBalance)}</span>
+            <span className="text-lg font-semibold">
+              {usdc(payer.usdcBalance)}
+            </span>
           )}
         </div>
       </Card>

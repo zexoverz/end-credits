@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Card, ErrorBox } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import {
   parseSettingsForm,
   settingsErrors,

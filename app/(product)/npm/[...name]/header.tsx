@@ -18,7 +18,7 @@ export function NoticeLine({ notice }: { notice: Notice | null }) {
 export function Header({ s }: { s: PackageSummary }) {
   const links = safeLinks(s.alsoAccepts);
   return (
-    <header className="mb-6 space-y-3">
+    <header className="claim-heading mb-6 space-y-3">
       <h1 className="font-mono text-2xl font-semibold">{s.package}</h1>
       {s.repo ? (
         <p className="text-sm text-muted">

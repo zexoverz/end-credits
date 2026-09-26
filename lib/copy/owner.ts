@@ -1,6 +1,6 @@
 // Page copy for /owner (AGENTS.md rule 14). World failure texts live in lib/messages.ts.
 export const OWNER_COPY = {
-  TITLE: "Owner",
+  TITLE: "Your agent. Your limits.",
   LOADING: "Loading…",
   LOAD_FAILED: "Could not load the owner page ({error}).",
   SIGNED_OUT: "Sign in to manage budgets, agent keys and held tips.",
@@ -16,9 +16,9 @@ export const OWNER_COPY = {
   WORLD_NO_OWNER:"No owner exists yet to bind this World ID to.",
   SIGNED_IN_AS: "Signed in as {name}",
   LOGOUT: "Sign out",
-  PAYER: "Payer",
+  PAYER: "Your funding wallet",
   BALANCE_ERROR: "Balance unavailable ({error}).",
-  SETTINGS: "Settings",
+  SETTINGS: "Contribution limits",
   BUDGET: "Session budget (USDC)",
   CAP: "Per-package cap (USDC)",
   DAILY: "Daily limit (USDC)",

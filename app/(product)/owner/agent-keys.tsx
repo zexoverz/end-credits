@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, ErrorBox, Mono } from "@/components/ui";
-import { api } from "@/lib/client/api";
+import { api } from "@/components/product/request";
 import { keyCommand, type KeyView } from "@/lib/client/owner";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
 

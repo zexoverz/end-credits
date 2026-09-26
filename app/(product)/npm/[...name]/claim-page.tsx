@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Page } from "@/components/ui";
-import { api, type ApiResult } from "@/lib/client/api";
+import { api, type ApiResult } from "@/components/product/request";
 import {
   blocker,
   claimPath,
@@ -27,7 +27,13 @@ const MOVING = new Set(["pr_open", "merged", "verified", "claimed", "refused"]);
 
 type Busy = null | "wallet" | "pr" | "status";
 
-export function ClaimPage({ name, githubCancelled }: { name: string; githubCancelled: boolean }) {
+export function ClaimPage({
+  name,
+  githubCancelled,
+}: {
+  name: string;
+  githubCancelled: boolean;
+}) {
   const [summary, setSummary] = useState<PackageSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [claim, setClaim] = useState<ClaimView | null>(null);
@@ -37,17 +43,27 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
   const [prNotice, setPrNotice] = useState<Notice | null>(null);
   const [statusNotice, setStatusNotice] = useState<Notice | null>(null);
 
-  const apply = useCallback((r: ApiResult<PackageSummary>): PackageSummary | null => {
-    if (!r.ok) {
-      setLoadError(r.status === 404 ? claimCopy("NOT_FOUND") : claimCopy("LOAD_FAILED", { error: r.error }));
-      return null;
-    }
-    setSummary(r.data);
-    setClaim(r.data.claim);
-    return r.data;
-  }, []);
+  const apply = useCallback(
+    (r: ApiResult<PackageSummary>): PackageSummary | null => {
+      if (!r.ok) {
+        setLoadError(
+          r.status === 404
+            ? claimCopy("NOT_FOUND")
+            : claimCopy("LOAD_FAILED", { error: r.error }),
+        );
+        return null;
+      }
+      setSummary(r.data);
+      setClaim(r.data.claim);
+      return r.data;
+    },
+    [],
+  );
 
-  const load = useCallback(async () => apply(await api<PackageSummary>(summaryPath(name))), [name, apply]);
+  const load = useCallback(
+    async () => apply(await api<PackageSummary>(summaryPath(name))),
+    [name, apply],
+  );
 
   const check = useCallback(
     async (method: "GET" | "POST") => {
@@ -84,7 +100,10 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
   }, [polling, check]);
 
   const postWallet = async (address: string) => {
-    const r = await api<ClaimView>(claimPath(name, "wallet"), { method: "POST", body: JSON.stringify({ address }) });
+    const r = await api<ClaimView>(claimPath(name, "wallet"), {
+      method: "POST",
+      body: JSON.stringify({ address }),
+    });
     if (!r.ok) return setWalletNotice(errorNotice(r.body, r.status));
     setWalletNotice(null);
     setClaim(r.data);
@@ -106,10 +125,19 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
     setWalletNotice(null);
     try {
       const address = await connectPasskey();
-      if (!address) return setWalletNotice({ tone: "error", text: walletErrorText(null), code: "wallet" });
+      if (!address)
+        return setWalletNotice({
+          tone: "error",
+          text: walletErrorText(null),
+          code: "wallet",
+        });
       await run("wallet", () => postWallet(address));
     } catch (e) {
-      setWalletNotice({ tone: "error", text: walletErrorText(e), code: "wallet" });
+      setWalletNotice({
+        tone: "error",
+        text: walletErrorText(e),
+        code: "wallet",
+      });
     } finally {
       setWaiting(false);
     }
@@ -139,11 +167,22 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
     <Page>
       <Header s={summary} />
       {stop && stop !== "ALREADY_PAYABLE" && stop !== "NO_REPO" && (
-        <NoticeLine notice={{ tone: "info", text: claimCopy(stop, { package: summary.package }), code: stop }} />
+        <NoticeLine
+          notice={{
+            tone: "info",
+            text: claimCopy(stop, { package: summary.package }),
+            code: stop,
+          }}
+        />
       )}
-      <ol className="mt-4 space-y-3">
+      <ol className="claim-steps">
         <Step n={1} title="STEP_GITHUB" state={st.github}>
-          <GithubStep name={name} repo={repo} login={summary.maintainer?.login ?? null} cancelled={githubCancelled} />
+          <GithubStep
+            name={name}
+            repo={repo}
+            login={summary.maintainer?.login ?? null}
+            cancelled={githubCancelled}
+          />
         </Step>
         <Step n={2} title="STEP_WALLET" state={st.wallet}>
           <WalletStep
@@ -157,7 +196,14 @@ export function ClaimPage({ name, githubCancelled }: { name: string; githubCance
           />
         </Step>
         <Step n={3} title="STEP_PR" state={st.pr}>
-          <PrStep repo={repo} claim={claim} done={st.pr === "done"} busy={busy === "pr"} notice={prNotice} onOpen={onPr} />
+          <PrStep
+            repo={repo}
+            claim={claim}
+            done={st.pr === "done"}
+            busy={busy === "pr"}
+            notice={prNotice}
+            onOpen={onPr}
+          />
         </Step>
         <Step n={4} title="STEP_MERGE" state={st.merge}>
           <MergeStep
