@@ -962,3 +962,7 @@ dashboard history restarts from v2.
   queue, all mined (nonces 9, 10, 11: `0xc2d4a963…2b52`, `0xab4734c6…5dd9`, `0x87007ad2…e402`).
   Every node answered a fresh pending count on this run, so no retry fired live; the bump paths
   are covered by the unit tests only.
+
+`already known` is not retried after all: it can mean our own transaction reached the pool and
+the reply was lost, and a bumped resend would run the same call twice (a second `reserve` would
+reserve twice). It throws; the settler records an execution error and nothing moves twice.
