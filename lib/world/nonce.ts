@@ -15,6 +15,8 @@ export interface ApprovalPayload {
   owner_sub_hash: string;
   /** The approval row id, so every attempt has its own nonce (the column is unique). */
   attempt: string;
+  /** Escrow v2: the approvalRef the owner's approver signed, so the proof binds that signature. */
+  approval_ref: string;
 }
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
