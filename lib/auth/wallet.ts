@@ -124,7 +124,6 @@ async function ownerFor(address: Address, deps: WalletAuthDeps): Promise<Bound> 
   if (bound) return { ownerId: bound.id };
   const [first] = await db().select().from(owners).orderBy(asc(owners.createdAt), asc(owners.id)).limit(1);
   if (!first) return { error: "no_owner" };
-  if (first.walletAddress) return { error: "wrong_wallet" };
   let approver: Address;
   try {
     approver = await deps.approverOf(first.payerAddress as Address);
@@ -132,6 +131,7 @@ async function ownerFor(address: Address, deps: WalletAuthDeps): Promise<Bound> 
     return { error: "chain_error" };
   }
   if (approver !== zeroAddress && approver.toLowerCase() !== lower) return { error: "wrong_wallet" };
+  // Binds only while the row has no wallet: an owner with one refuses every other wallet.
   const [updated] = await db()
     .update(owners)
     .set({ walletAddress: address })
