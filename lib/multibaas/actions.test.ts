@@ -34,7 +34,7 @@ describe("buildActions", () => {
     held(3, "50000", "2026-09-26T20:00:00Z"), // sooner than 1, not within 2 h
     held(4, "70000", "2026-09-26T12:00:00Z"), // already expired: cannot be released
   ]);
-  const holds = new Map([[tip(2), { tipId: tip(2), package: "@endcredits-demo/moved-payout", payee: "0xabc", reasons: [{ text: "Held: changed." }] }]]);
+  const holds = new Map([[tip(2), { tipId: tip(2), package: "@endcredits-demo/moved-payout", payee: "0xabc", payer: "0xpayer", reasons: [{ text: "Held: changed." }] }]]);
   const reserves = [
     { packageKey: K3, name: "@endcredits-demo/unclaimed-utils", amount: 400000n, sessions: 2 },
     { packageKey: K4, name: "@endcredits-demo/claimed-kit", amount: 0n, sessions: 1 },
@@ -64,6 +64,7 @@ describe("buildActions", () => {
       tipId: tip(2),
       package: "@endcredits-demo/moved-payout",
       payee: "0xabc",
+      payer: "0xpayer",
       expiresAt: "2026-09-26T13:00:00.000Z",
     });
     expect(actions[0].title).toBe(
@@ -72,7 +73,7 @@ describe("buildActions", () => {
   });
 
   it("a hold missing from our DB still shows, labelled by tip id", () => {
-    expect(actions[2]).toMatchObject({ package: null, payee: null, detail: null });
+    expect(actions[2]).toMatchObject({ package: null, payee: null, payer: null, detail: null });
     expect(actions[2].title).toContain(tip(3));
   });
 
