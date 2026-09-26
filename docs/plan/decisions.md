@@ -1017,3 +1017,21 @@ reserve twice). It throws; the settler records an execution error and nothing mo
   (moved-payout address A) now answers **200** `{toxicScore: 0, traits: []}`, not the 404, so it is a
   normal clean screen. `0x3da02e1f29bcbed185eca0d3299efd46e6e7e155` answers the 404, and the client
   returns `noHistory: true` with the raw body stored at status 404.
+
+## Intercepta: one retry on timeouts (26 Sep)
+
+- **Why:** in a production settlement the impersonation check timed out once at 8 s
+  (`{"error":"TIMEOUT"}` in `screens`) while the quick scan for the same address answered 200 clean in
+  about 1 s. The payee held as `SCREEN_UNAVAILABLE`. Holding was right (AGENTS rule 7), but one slow
+  request should not decide a payee.
+- **Rule:** every Intercepta call (quick scan, impersonation, token risks, simulation) retries once,
+  after 500 ms (`RETRY_DELAY_MS`, `retryDelayMs` in tests), on a timeout, a network error, a 5xx or a
+  429 (`transient` in `lib/intercepta/http.ts`). No retry on any other 4xx, including the no-history
+  404, or on a body that fails to parse. Each attempt keeps its own 8 s deadline.
+- **Audit:** both attempts are stored in `screens`, the failed one with its error body. Only the last
+  attempt decides, and its row id is the one returned.
+- **Still failing:** unchanged. `Screen.error` is set and the payee holds as `SCREEN_UNAVAILABLE`.
+  Never paid without both screens.
+- **Latency:** quick scan, impersonation and token risks already ran in parallel in `screenPayee`, so
+  the worst case per payee is about 16.5 s rather than 8 s, and only when a call fails.
+- **Budget:** requests double only on failures.
