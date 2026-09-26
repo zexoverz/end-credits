@@ -17,3 +17,5 @@ next-env.d.ts
 .claude/worktrees/
 contracts/broadcast/*/31337/
 .vitest/
+.playwright-mcp/
+contracts/broadcast/
