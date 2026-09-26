@@ -12,7 +12,6 @@ import { Button, Card, ErrorBox, Mono } from "@/components/ui";
 import {
   connectWallet,
   errorName,
-  hasInjectedWallet,
   onBaseSepolia,
   walletProvider,
   type WalletKind,
@@ -66,12 +65,7 @@ async function send(
   data: Hex,
 ): Promise<string> {
   const p = await walletProvider(kind);
-  try {
-    await onBaseSepolia(p);
-  } catch {
-    // Base Account is created for Base Sepolia already; a refused switch there is not fatal.
-    if (kind === "injected") throw new Error("wrong network");
-  }
+  await onBaseSepolia(p);
   const hash = await p.request({
     method: "eth_sendTransaction",
     params: [{ from, to, data }],
@@ -87,7 +81,6 @@ export function BudgetWallet() {
     address: string;
     kind: WalletKind;
   } | null>(null);
-  const [browserWallet, setBrowserWallet] = useState(false);
   const [perPeriod, setPerPeriod] = useState("");
   const [period, setPeriod] = useState(DAY);
   const [sliderMax, setSliderMax] = useState(100);
@@ -114,8 +107,6 @@ export function BudgetWallet() {
         setSliderMax((v) => Math.max(v, Number(r.data.dailyLimit)));
       }
     });
-    const t = setTimeout(() => setBrowserWallet(hasInjectedWallet()), 0);
-    return () => clearTimeout(t);
   }, [refresh]);
 
   async function run(label: string, action: () => Promise<string | null>) {
@@ -243,19 +234,10 @@ export function BudgetWallet() {
           </ActionNotice>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {browserWallet && (
-              <Button
-                type="button"
-                disabled={!!busy}
-                onClick={() => connect("injected")}
-              >
-                {C.CONNECT_BROWSER}
-              </Button>
-            )}
             <Button
               type="button"
               disabled={!!busy}
-              onClick={() => connect("base")}
+              onClick={() => connect("injected")}
             >
               {C.CONNECT}
             </Button>

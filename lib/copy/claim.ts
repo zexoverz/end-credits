@@ -83,9 +83,9 @@ export const CLAIM_COPY = {
   GITHUB_WHY: "We check that you can push to {repo}.",
 
   WALLET_WHY:
-    "A Coinbase smart wallet on Base, secured by a passkey. No seed phrase, no gas.",
-  WALLET_BUTTON: "Create passkey wallet",
-  WALLET_CONNECTING: "Waiting for the passkey…",
+    "Connect MetaMask and select the account that should receive your claim on Base Sepolia. We screen this address before funds are released.",
+  WALLET_BUTTON: "Connect MetaMask",
+  WALLET_CONNECTING: "Waiting for MetaMask…",
   WALLET_REJECTED: "The wallet request was cancelled.",
   WALLET_FAILED: "The wallet did not return an address ({error}).",
   WALLET_OR: "Or use an existing address",

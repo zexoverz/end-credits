@@ -23,7 +23,7 @@ import {
 } from "@/lib/client/claim";
 import { claimCopy } from "@/lib/copy/claim";
 import { Header, NoticeLine } from "./header";
-import { connectPasskey } from "./passkey";
+import { connectWallet } from "@/components/approver/connect-wallet";
 import { GithubStep, MergeStep, PrStep, Step, WalletStep } from "./steps";
 
 const POLL_MS = 5_000;
@@ -148,13 +148,12 @@ export function ClaimPage({
     }
   };
 
-  // Not tied to `busy`: a closed popup may never answer, and the button or the typed address must
-  // still work after that.
-  const onPasskey = async () => {
+  // Allow retry when a wallet popup closes without answering.
+  const onConnect = async () => {
     setWaiting(true);
     setWalletNotice(null);
     try {
-      const address = await connectPasskey();
+      const address = await connectWallet();
       if (!address)
         return setWalletNotice({
           tone: "error",
@@ -306,8 +305,7 @@ export function ClaimPage({
               busy={busy === "wallet"}
               waiting={waiting}
               notice={walletNotice}
-              onPasskey={() => void onPasskey()}
-              onAddress={(a) => void run("wallet", () => postWallet(a))}
+              onConnect={() => void onConnect()}
             />
           </Step>
           <Step n={3} title="STEP_PR" state={st.pr}>

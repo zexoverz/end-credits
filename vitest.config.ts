@@ -9,6 +9,7 @@ export default defineConfig({
       "cli/**/*.test.ts",
       "worker/**/*.test.ts",
       "app/**/*.test.ts",
+      "components/**/*.test.ts",
       "services/**/*.test.ts",
     ],
     environment: "node",

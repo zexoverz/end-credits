@@ -1,11 +1,10 @@
 // The four claim steps. Each renders from the step state; actions come in from claim-page.tsx.
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Button, Mono } from "@/components/ui";
 import {
   loginUrl,
-  parseAddress,
   type ClaimView,
   type Notice,
   type StepState,
@@ -123,8 +122,7 @@ type WalletProps = {
   busy: boolean;
   waiting: boolean;
   notice: Notice | null;
-  onPasskey: () => void;
-  onAddress: (address: string) => void;
+  onConnect: () => void;
 };
 
 export function WalletStep({
@@ -133,11 +131,8 @@ export function WalletStep({
   busy,
   waiting,
   notice,
-  onPasskey,
-  onAddress,
+  onConnect,
 }: WalletProps) {
-  const [typed, setTyped] = useState("");
-  const [invalid, setInvalid] = useState(false);
   if (done && claim?.wallet) {
     return (
       <p>
@@ -145,54 +140,13 @@ export function WalletStep({
       </p>
     );
   }
-  const submit = () => {
-    if (busy) return;
-    const a = parseAddress(typed);
-    setInvalid(!a);
-    if (a) onAddress(a);
-  };
   return (
     <>
       <p className="text-muted">{claimCopy("WALLET_WHY")}</p>
-      <Button onClick={onPasskey} disabled={busy}>
+      <Button onClick={onConnect} disabled={busy}>
         {waiting ? claimCopy("WALLET_CONNECTING") : claimCopy("WALLET_BUTTON")}
       </Button>
-      <div className="space-y-1">
-        <label htmlFor="wallet-address" className="block text-muted">
-          {claimCopy("WALLET_OR")}
-        </label>
-        <form
-          className="claim-address-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <input
-            id="wallet-address"
-            className="w-full rounded border border-line bg-background px-2 py-1 font-mono text-xs"
-            placeholder={claimCopy("ADDRESS_PLACEHOLDER")}
-            aria-invalid={invalid}
-            aria-describedby="wallet-hint"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-          />
-          <Button type="submit" disabled={busy || !typed.trim()}>
-            {claimCopy("WALLET_USE")}
-          </Button>
-        </form>
-        <p id="wallet-hint">{claimCopy("ADDRESS_HINT")}</p>
-      </div>
       {busy && <p role="status">{claimCopy("SAVING_WALLET")}</p>}
-      {invalid && (
-        <NoticeLine
-          notice={{
-            tone: "error",
-            text: claimCopy("WALLET_INVALID"),
-            code: "invalid",
-          }}
-        />
-      )}
       <NoticeLine notice={notice} />
     </>
   );

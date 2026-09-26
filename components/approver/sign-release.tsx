@@ -11,12 +11,7 @@ import { Button, ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
 import { fill } from "@/lib/client/approve";
 import { APPROVER_COPY as C } from "@/lib/copy/approver";
-import {
-  connectWallet,
-  errorName,
-  signTypedData,
-  walletKindFor,
-} from "./connect-wallet";
+import { connectWallet, errorName, signTypedData } from "./connect-wallet";
 
 type Prepared = { approvalId: string; approver: string; typedData: unknown };
 
@@ -66,7 +61,7 @@ export function SignRelease({
       const p = await api<Prepared>(`${base}/prepare`, { method: "POST" });
       if (!p.ok) throw new Error(p.error);
       setStep("wallet");
-      const kind = await walletKindFor(p.data.approver);
+      const kind = "injected";
       const address = await connectWallet(kind);
       if (!address) throw new Error("no account");
       if (!same(address, p.data.approver)) {
