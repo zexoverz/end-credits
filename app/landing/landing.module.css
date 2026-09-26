@@ -1,7 +1,14 @@
 .site {
-  --ink: #181b18;
-  --paper: #f4f4f0;
-  --mint: #a2f4bc;
+  --ink: #20261f;
+  --paper: #f7f7ef;
+  --mint: #adf3c0;
+  --surface: #ffffff;
+  --mint-soft: #e8f6e9;
+  --mint-deep: #39734b;
+  --muted: #53604f;
+  --on-ink-muted: #c3d4c4;
+  --line: #d5ded0;
+  --line-strong: #91ae94;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-geist-sans), sans-serif;
@@ -19,7 +26,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 28px;
-  border-bottom: 1px solid #dedfd8;
+  border-bottom: 1px solid var(--line);
 }
 .brand {
   display: inline-flex;
@@ -71,11 +78,11 @@
   height: 19px;
 }
 .button:hover {
-  background: #363e34;
+  background: var(--ink);
   transform: translateY(-2px);
 }
 .buttonOutline {
-  border: 1px solid #b9beb4;
+  border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--ink);
 }
@@ -91,14 +98,14 @@
   left: 20px;
   z-index: 50;
   padding: 14px;
-  background: #181b18;
+  background: var(--ink);
   color: white;
 }
 .skip:focus {
   top: 12px;
 }
 .site :focus-visible {
-  outline: 3px solid #26783f;
+  outline: 3px solid var(--line-strong);
   outline-offset: 5px;
 }
 .hero {
@@ -145,7 +152,7 @@
   max-width: 395px;
   font-size: 17px;
   line-height: 1.65;
-  color: #5b6058;
+  color: var(--muted);
   letter-spacing: -0.02em;
 }
 .actions {
@@ -163,7 +170,7 @@
 }
 .footnote {
   font-size: 10px;
-  color: #626b5b;
+  color: var(--muted);
   letter-spacing: 0;
 }
 .heroScene {
@@ -195,13 +202,13 @@
 }
 .agentCard {
   position: relative;
-  background: #fff;
-  border: 1px solid #262e2020;
+  background: var(--surface);
+  border: 1px solid rgb(32 38 31 / 12.55%);
   border-radius: 13px;
   width: 88%;
   padding: 20px 22px;
   transform: rotate(-4deg);
-  box-shadow: 0 12px 24px #1937260c;
+  box-shadow: 0 12px 24px rgb(32 38 31 / 4.71%);
   animation: cardIn 0.7s both;
 }
 .agentName {
@@ -212,13 +219,13 @@
   font-weight: 600;
 }
 .agentGlyph {
-  color: #b86e4e;
+  color: var(--muted);
   font-size: 27px;
   line-height: 1;
 }
 .agentCode {
   margin-left: auto;
-  color: #8b8e87;
+  color: var(--muted);
   font-size: 20px;
 }
 .agentCard > p {
@@ -231,7 +238,7 @@
   display: flex;
   gap: 9px;
   margin-top: 13px;
-  color: #626b5b;
+  color: var(--muted);
   font-family: var(--font-geist-mono), monospace;
   font-size: 9px;
   line-height: 1.7;
@@ -241,13 +248,13 @@
   position: relative;
   width: 91%;
   align-self: flex-end;
-  border: 1px solid #e1e3dc;
-  background: #fdfefb;
+  border: 1px solid var(--line);
+  background: var(--mint-soft);
   border-radius: 13px;
   margin-top: -7px;
   padding: 22px;
   transform: rotate(3deg);
-  box-shadow: 0 16px 35px #1f552b16;
+  box-shadow: 0 16px 35px rgb(32 38 31 / 8.63%);
   animation: receiptIn 0.85s 0.15s both;
 }
 .receiptHeader {
@@ -256,7 +263,7 @@
   gap: 9px;
   font-size: 17px;
   padding-bottom: 18px;
-  border-bottom: 1px solid #e7e8e2;
+  border-bottom: 1px solid var(--line);
 }
 .receiptHeader svg {
   height: 26px;
@@ -275,14 +282,14 @@
   min-width: 58px;
 }
 .receiptRow > span:nth-last-child(2) {
-  color: #626b5b;
+  color: var(--muted);
   font-size: 10px;
 }
 .packageMark {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: #e9eee5;
+  background: var(--mint-soft);
   display: grid;
   place-items: center;
   font-family: var(--font-geist-mono), monospace;
@@ -290,13 +297,13 @@
 }
 .check {
   margin-left: auto;
-  color: #347a4a;
+  color: var(--muted);
 }
 .receiptCard > p {
   font-size: 9px;
-  color: #626b5b;
+  color: var(--muted);
   margin-top: 20px;
-  border-top: 1px dashed #d8ddd2;
+  border-top: 1px dashed var(--line);
   padding-top: 13px;
   letter-spacing: 0;
 }
@@ -319,14 +326,14 @@
 .statusDot {
   height: 6px;
   width: 6px;
-  background: #237b3d;
+  background: var(--mint-deep);
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
 }
 .ecosystem {
   padding: 35px 0 66px;
-  border-top: 1px solid #dedfd8;
+  border-top: 1px solid var(--line);
 }
 .ecosystemIntro {
   display: flex;
@@ -346,7 +353,7 @@
   max-width: 420px;
   font-size: 13px;
   line-height: 1.7;
-  color: #6a6e65;
+  color: var(--muted);
 }
 .packageGrid {
   display: grid;
@@ -355,7 +362,7 @@
 }
 .project {
   border-radius: 13px;
-  background: #fff;
+  background: var(--surface);
   padding: 20px;
   display: flex;
   align-items: center;
@@ -363,14 +370,14 @@
   transition: background 0.2s;
 }
 .project:hover {
-  background: #e4f3e6;
+  background: var(--mint-soft);
 }
 .projectMark {
   display: grid;
   place-items: center;
   width: 38px;
   height: 38px;
-  border: 1px solid #c9cec2;
+  border: 1px solid var(--line);
   border-radius: 10px;
   font-family: var(--font-geist-mono), monospace;
   font-size: 21px;
@@ -383,25 +390,25 @@
 }
 .project small {
   display: block;
-  color: #626b5b;
+  color: var(--muted);
   font-size: 10px;
   letter-spacing: 0;
   margin-top: 3px;
 }
 .projectArrow {
   margin-left: auto;
-  color: #626b5b;
+  color: var(--muted);
 }
 .caption {
   font-size: 10px;
-  color: #626b5b;
+  color: var(--muted);
   margin-top: 16px;
   letter-spacing: 0;
 }
 .problem,
 .flowSection {
   padding: 75px 0;
-  border-top: 1px solid #dedfd8;
+  border-top: 1px solid var(--line);
   scroll-margin-top: 30px;
 }
 .sectionHeading {
@@ -426,7 +433,7 @@
 .sectionHeading > p {
   font-size: 14px;
   line-height: 1.8;
-  color: #6a6e65;
+  color: var(--muted);
   max-width: 360px;
   margin-bottom: 4px;
 }
@@ -442,8 +449,8 @@
   overflow: hidden;
 }
 .valueCard {
-  background: #202620;
-  color: #f6f7f0;
+  background: var(--ink);
+  color: var(--paper);
 }
 .statNumber {
   font-size: 82px;
@@ -464,7 +471,7 @@
   letter-spacing: 0;
 }
 .valueCard p {
-  color: #b9c4b8;
+  color: var(--on-ink-muted);
 }
 .stats a {
   display: inline-block;
@@ -481,19 +488,19 @@
   height: 155px;
   right: 20px;
   top: 26px;
-  color: #a2f4bc;
+  color: var(--mint);
   opacity: 0.8;
 }
 .gapCard {
   background: white;
 }
 .gapCard p {
-  color: #626b5b;
+  color: var(--muted);
 }
 .gapCard small {
   display: block;
   font-size: 9px;
-  color: #626b5b;
+  color: var(--muted);
   line-height: 1.6;
   max-width: 350px;
   margin-top: 12px;
@@ -511,10 +518,10 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #e4e7e0;
+  background: var(--mint-soft);
 }
 .dotGrid .filledDot {
-  background: #359254;
+  background: var(--mint-deep);
 }
 .workflow {
   display: grid;
@@ -527,14 +534,14 @@
   text-align: left;
   gap: 17px;
   padding: 24px 0;
-  border-bottom: 1px solid #d9ded2;
+  border-bottom: 1px solid var(--line);
   width: 100%;
   cursor: pointer;
   opacity: 1;
   transition: opacity 0.2s;
 }
 .steps button:first-child {
-  border-top: 1px solid #d9ded2;
+  border-top: 1px solid var(--line);
 }
 .steps button:hover,
 .steps .selectedStep {
@@ -553,7 +560,7 @@
 .steps p {
   font-size: 12px;
   line-height: 1.8;
-  color: #626b5b;
+  color: var(--muted);
   margin-top: 9px;
 }
 .steps svg {
@@ -563,11 +570,11 @@
   margin-top: 6px;
 }
 .selectedStep > span {
-  color: #23733c;
+  color: var(--muted);
 }
 .flowStage {
   position: relative;
-  background: #e5e9e0;
+  background: var(--mint-soft);
   border-radius: 22px;
   min-height: 397px;
   padding: 47px 27px 25px;
@@ -575,8 +582,8 @@
 }
 .flowWindow {
   position: relative;
-  background: #fafbf7;
-  box-shadow: 0 16px 20px #293e2410;
+  background: var(--mint-soft);
+  box-shadow: 0 16px 20px rgb(32 38 31 / 6.27%);
   border-radius: 12px;
   overflow: hidden;
   animation: windowIn 0.45s both;
@@ -586,7 +593,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e2e6dc;
+  border-bottom: 1px solid var(--line);
   padding: 13px 16px;
   font-family: var(--font-geist-mono);
   font-size: 9px;
@@ -595,7 +602,7 @@
 .windowDots {
   font-size: 16px;
   letter-spacing: 2px;
-  color: #bbc3b3;
+  color: var(--muted);
 }
 .flowCode {
   padding: 20px 15px;
@@ -609,10 +616,10 @@
   gap: 12px;
 }
 .flowCode p > span {
-  color: #626b5b;
+  color: var(--muted);
 }
 .flowFoot {
-  background: #a2f4bc;
+  background: var(--mint);
   padding: 13px 15px;
   display: flex;
   gap: 9px;
@@ -623,7 +630,7 @@
 .connector {
   width: 100%;
   height: 82px;
-  color: #718368;
+  color: var(--muted);
   margin-top: -2px;
 }
 .flowTags {
@@ -633,8 +640,8 @@
   gap: 12px;
 }
 .flowTags span {
-  background: #f6f8f0;
-  border: 1px solid #cbd3c1;
+  background: var(--mint-soft);
+  border: 1px solid var(--line);
   padding: 9px 14px;
   border-radius: 7px;
   font-family: var(--font-geist-mono);
@@ -642,7 +649,7 @@
 }
 .controls {
   padding: 58px 40px 0;
-  background: #e9eae3;
+  background: var(--mint-soft);
   border-radius: 24px;
 }
 .controls > h2 {
@@ -671,7 +678,7 @@
 .controlGrid p {
   font-size: 12px;
   line-height: 1.8;
-  color: #626b5b;
+  color: var(--muted);
   max-width: 275px;
 }
 .maintainer {
@@ -679,7 +686,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 30px;
-  border-top: 1px solid #cfd5c6;
+  border-top: 1px solid var(--line);
   margin-top: 44px;
   padding: 30px 0;
 }
@@ -689,7 +696,7 @@
 }
 .maintainer p {
   font-size: 12px;
-  color: #626b5b;
+  color: var(--muted);
   max-width: 415px;
   line-height: 1.7;
   margin-top: 7px;
@@ -708,7 +715,7 @@
   max-width: 270px;
 }
 .faq details {
-  border-bottom: 1px solid #dce0d4;
+  border-bottom: 1px solid var(--line);
   padding: 19px 0;
 }
 .faq details:first-child {
@@ -735,7 +742,7 @@
 .faq details p {
   font-size: 12px;
   line-height: 1.8;
-  color: #6b7463;
+  color: var(--muted);
   margin-top: 14px;
   max-width: 480px;
 }
@@ -753,7 +760,7 @@
 }
 .setup > div > p:not(.eyebrow) {
   font-size: 13px;
-  color: #42674a;
+  color: var(--muted);
   line-height: 1.8;
   margin: 20px 0 26px;
   max-width: 345px;
@@ -766,8 +773,8 @@
 .terminal {
   align-self: center;
   border-radius: 12px;
-  background: #1e271f;
-  color: #f2f9ec;
+  background: var(--ink);
+  color: var(--paper);
   padding: 20px;
   min-width: 0;
 }
@@ -777,11 +784,11 @@
   align-items: center;
   gap: 10px;
   font-size: 10px;
-  color: #aabfa7;
+  color: var(--on-ink-muted);
   letter-spacing: 0;
 }
 .terminalHeader button {
-  border: 1px solid #5a6c54;
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 9px;
@@ -796,7 +803,7 @@
 }
 .terminal > p {
   font-size: 9px;
-  color: #9eae98;
+  color: var(--on-ink-muted);
   line-height: 1.8;
   letter-spacing: 0;
 }
@@ -817,7 +824,7 @@
 .footer p,
 .footer > a {
   font-size: 10px;
-  color: #626b5b;
+  color: var(--muted);
   letter-spacing: 0;
 }
 .footer > div > p {
@@ -1072,7 +1079,7 @@
   }
   .steps button,
   .steps button:first-child {
-    border-top: 1px solid #d9ded2;
+    border-top: 1px solid var(--line);
     border-bottom: 0;
     flex-direction: column;
     gap: 10px;
@@ -1159,7 +1166,7 @@
   .menu {
     display: block;
     font-size: 10px;
-    border: 1px solid #ccd1c4;
+    border: 1px solid var(--line);
     border-radius: 999px;
     padding: 10px 13px;
     letter-spacing: 0;
@@ -1170,12 +1177,12 @@
     top: 65px;
     left: 0;
     right: 0;
-    background: #fff;
-    border: 1px solid #dde2d4;
+    background: var(--surface);
+    border: 1px solid var(--line);
     border-radius: 15px;
     z-index: 10;
     padding: 20px;
-    box-shadow: 0 12px 22px #2f3e2020;
+    box-shadow: 0 12px 22px rgb(32 38 31 / 12.55%);
   }
   .navOpen {
     display: flex;
@@ -1334,13 +1341,13 @@
   .steps button,
   .steps button:first-child {
     flex-direction: row;
-    border-bottom: 1px solid #d9ded2;
+    border-bottom: 1px solid var(--line);
     border-top: 0;
     padding: 20px 0;
     gap: 17px;
   }
   .steps button:first-child {
-    border-top: 1px solid #d9ded2;
+    border-top: 1px solid var(--line);
   }
   .steps h3 {
     font-size: 20px;
@@ -1459,7 +1466,7 @@
     order: 3;
     width: 100%;
     padding-top: 18px;
-    border-top: 1px solid #dedfd8;
+    border-top: 1px solid var(--line);
   }
   .footer > a {
     margin-left: auto;
@@ -1477,10 +1484,10 @@
 }
 
 .steps .selectedStep {
-  border-color: #79b884;
+  border-color: var(--line-strong);
 }
 .setup .terminal > p[aria-live] {
-  color: #adc4a3;
+  color: var(--on-ink-muted);
   font-size: 10px;
   line-height: 1.8;
   margin: 0;
@@ -1567,14 +1574,14 @@
 .faqIntro > p:last-child {
   font-size: 15px;
   line-height: 1.7;
-  color: #626b5b;
+  color: var(--muted);
   max-width: 29ch;
 }
 .faq details {
   padding: 0;
 }
 .faq details:first-child {
-  border-top: 1px solid #dce0d4;
+  border-top: 1px solid var(--line);
 }
 .faq summary {
   padding: 24px 0;
@@ -1591,7 +1598,7 @@
   height: 26px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #e8ebe3;
+  background: var(--mint-soft);
   font-size: 20px;
 }
 .faq details p {
@@ -1600,7 +1607,7 @@
   max-width: 58ch;
   margin: 0;
   padding: 0 38px 25px 0;
-  color: #5c6855;
+  color: var(--muted);
 }
 .controlGrid p {
   font-size: 14px;
