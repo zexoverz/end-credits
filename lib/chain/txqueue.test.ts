@@ -96,11 +96,62 @@ describe("txqueue", () => {
     expect(write).toHaveBeenNthCalledWith(2, A, call, 8);
   });
 
-  it("gives up after a second nonce too low", async () => {
-    const write = vi.fn<TxIo["write"]>().mockRejectedValue(new NonceTooLowError({ nonce: 7 }));
+  it("uses lastUsed + 1 when a stale node returns an old nonce after a send", async () => {
+    const io = fakeIo();
+    const q = createTxQueue(io);
+    await q.submit(A, call);
+    await q.submit(A, call);
+    expect(io.write).toHaveBeenNthCalledWith(1, A, call, 7);
+    expect(io.write).toHaveBeenNthCalledWith(2, A, call, 8);
+  });
+
+  it("does not count a nonce the node rejected as used", async () => {
+    const write = vi
+      .fn<TxIo["write"]>()
+      .mockRejectedValueOnce(new Error("insufficient funds"))
+      .mockResolvedValueOnce(`0x${"ab".repeat(32)}`);
+    const q = createTxQueue(fakeIo({ write }));
+    await q.submit(A, call).catch(() => undefined);
+    await q.submit(A, call);
+    expect(write).toHaveBeenNthCalledWith(2, A, call, 7);
+  });
+
+  it("tracks the last nonce per key", async () => {
+    const io = fakeIo();
+    const q = createTxQueue(io);
+    await q.submit(A, call);
+    await q.submit(B, call);
+    expect(io.write).toHaveBeenLastCalledWith(B, call, 7);
+  });
+
+  it("retries underpriced with a higher nonce and sends once", async () => {
+    const write = vi
+      .fn<TxIo["write"]>()
+      .mockRejectedValueOnce(new Error("replacement transaction underpriced"))
+      .mockResolvedValueOnce(`0x${"ab".repeat(32)}`);
     const io = fakeIo({ write });
-    await expect(createTxQueue(io).submit(A, call)).rejects.toBeInstanceOf(NonceTooLowError);
+    await createTxQueue(io).submit(A, call);
     expect(write).toHaveBeenCalledTimes(2);
+    expect(write).toHaveBeenNthCalledWith(1, A, call, 7);
+    expect(write).toHaveBeenNthCalledWith(2, A, call, 8);
+  });
+
+  it("does not resend on already known, so the same call is never sent twice", async () => {
+    const write = vi
+      .fn<TxIo["write"]>()
+      .mockRejectedValueOnce(new Error("already known"))
+      .mockResolvedValueOnce(`0x${"ab".repeat(32)}`);
+    const io = fakeIo({ write });
+    await expect(createTxQueue(io).submit(A, call)).rejects.toThrow("already known");
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws after 3 underpriced sends", async () => {
+    const write = vi.fn<TxIo["write"]>().mockRejectedValue(new Error("replacement transaction underpriced"));
+    const io = fakeIo({ write });
+    await expect(createTxQueue(io).submit(A, call)).rejects.toThrow("underpriced");
+    expect(write).toHaveBeenCalledTimes(3);
+    expect(write).toHaveBeenNthCalledWith(3, A, call, 9);
   });
 
   it("does not retry other send errors", async () => {

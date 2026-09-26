@@ -942,3 +942,27 @@ Run on 2026-09-26; `git diff` on `src/` was clean afterwards. The v1 table above
 `endcredits_escrow` 2.0. Verified on Sourcify (`exact_match`) and Basescan. v1 at
 `0x63047583FbCe241D72d71137C940aa27BBdC60f1` held only test events and is no longer used; the
 dashboard history restarts from v2.
+
+## Nonce reuse on lagging nodes (26 Sep)
+
+- **What happened:** two txs sent back to back from one key on `https://sepolia.base.org`; the
+  second read `getTransactionCount(pending)` from a node that had not seen the first, got the same
+  nonce, and failed `replacement transaction underpriced` (-32000). The settler sends runs of
+  holds/reserves from the payer key and runs of recorder calls, so this would break settlement.
+- **Fix:** `createTxQueue` keeps the last nonce a node accepted per key (set only once `write`
+  returns a hash). Next nonce is `max(node pending, lastUsed + 1)`. On `nonce too low`,
+  `replacement transaction underpriced` or `already known` it retries with
+  `max(node pending, lastUsed + 1, triedNonce + 1)`, up to 3 sends; any other error throws at once.
+- **Known gap:** `already known` can also mean our own tx reached the pool and the reply was lost
+  (a transport retry). Bumping then would send the call twice. Accepted for the demo: the queue
+  sends each call once, and escrow calls keyed by `tipId` revert on a duplicate.
+- **Process-local:** `lastUsed` lives in memory. Two processes signing with the same key can still
+  collide; the settler is the only sender per key.
+- Live check, 26 Sep: 3 USDC `transfer`s of 1 micro-USDC back to back from the payer through the
+  queue, all mined (nonces 9, 10, 11: `0xc2d4a963…2b52`, `0xab4734c6…5dd9`, `0x87007ad2…e402`).
+  Every node answered a fresh pending count on this run, so no retry fired live; the bump paths
+  are covered by the unit tests only.
+
+`already known` is not retried after all: it can mean our own transaction reached the pool and
+the reply was lost, and a bumped resend would run the same call twice (a second `reserve` would
+reserve twice). It throws; the settler records an execution error and nothing moves twice.
