@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/components/product/request";
 import { ErrorBox, Button, Badge } from "@/components/ui";
-import { StudioArtwork, PackageGlyph } from "@/components/product/artwork";
+import { DeskAsset } from "@/components/product/desk-assets";
+import { Pager } from "@/components/product/pager";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
 import { SessionOpen } from "@/components/product/session-open";
 import { STUDIO as S } from "@/lib/copy/studio";
 import { fill } from "@/lib/client/roll";
@@ -12,6 +14,7 @@ export function Sessions({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   async function load() {
     const r = await api<{ items: HistoryItem[] }>("/api/history");
     if (r.ok) {
@@ -41,6 +44,8 @@ export function Sessions({ embedded = false }: { embedded?: boolean }) {
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   );
+  const pages = Math.ceil(shown.length / 4),
+    current = Math.min(page, Math.max(0, pages - 1));
   return (
     <div className="studio-sessions">
       <p className="studio-page-subtitle">{S.sessionsBody}</p>
@@ -53,7 +58,7 @@ export function Sessions({ embedded = false }: { embedded?: boolean }) {
       {!items && !error && <p role="status">{S.sessionLoading}</p>}
       {items?.length === 0 && (
         <section className="studio-sessions-empty">
-          <StudioArtwork kind="session" />
+          <DeskAsset kind="session" />
           <div>
             <h2>{S.sessionsEmpty}</h2>
             <p>{S.sessionsEmptyBody}</p>
@@ -67,44 +72,55 @@ export function Sessions({ embedded = false }: { embedded?: boolean }) {
             aria-label={S.sessionSearch}
             placeholder={S.sessionSearch}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
           />
+          <div className="session-table-head">
+            <span>{W.sessionColumn}</span>
+            <span>{W.decisionColumn}</span>
+          </div>
           <div className="studio-session-list">
-            {shown.map(([id, rows]) => (
+            {shown.slice(current * 4, current * 4 + 4).map(([id, rows]) => (
               <article key={id}>
-                <div className="session-cast-icons">
-                  {rows.slice(0, 3).map((r) => (
-                    <PackageGlyph name={r.package} key={r.creditId} />
-                  ))}
-                </div>
-                <div>
-                  <Link href={`/app/credits/${id}`}>
-                    {id.slice(0, 8)}
-                    <span> ↗</span>
-                  </Link>
-                  <p>
-                    {fill(S.sessionCount, { count: rows.length })}
-                    <span>·</span>
-                    {new Date(rows[0].decidedAt).toLocaleDateString()}
-                  </p>
-                  <small>
-                    {rows
-                      .slice(0, 3)
-                      .map((r) => r.package)
-                      .join(" · ")}
-                  </small>
-                </div>
-                <div className="session-decisions">
-                  {[...new Set(rows.map((r) => r.outcome))].map((o) => (
-                    <Badge key={o} outcome={o} />
-                  ))}
-                </div>
-                <Link className="session-view-link" href={`/app/credits/${id}`}>
-                  {S.sessionCredits} ↗
+                <Link
+                  className="session-row-link"
+                  href={`/app/credits/${id}`}
+                  aria-label={`${W.credits} ${id}`}
+                >
+                  <DeskAsset kind="session" compact />
+                  <div className="session-row-main">
+                    <strong>
+                      {id.slice(0, 8)}
+                      <span aria-hidden="true"> ↗</span>
+                    </strong>
+                    <p>
+                      {rows
+                        .slice(0, 2)
+                        .map((r) => r.package)
+                        .join(" · ")}
+                      {rows.length > 2 && ` +${rows.length - 2}`}
+                    </p>
+                    <time dateTime={rows[0].decidedAt}>
+                      {new Date(rows[0].decidedAt).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </div>
+                  <div className="session-decisions">
+                    {[...new Set(rows.map((r) => r.outcome))].map((o) => (
+                      <Badge key={o} outcome={o} />
+                    ))}
+                  </div>
                 </Link>
               </article>
             ))}
           </div>
+          <Pager page={current} pages={pages} onPage={setPage} />
           {shown.length === 0 && <p>{S.sessionNoMatches}</p>}
         </>
       )}

@@ -1,3 +1,4 @@
+import { OutcomeMark } from "@/components/product/desk-assets";
 import type { ReactNode } from "react";
 import { EXPERIENCE as C } from "@/lib/copy/experience";
 export type Outcome =
@@ -13,7 +14,7 @@ export function Badge({ outcome }: { outcome: string | null }) {
     <span
       className={`outcome-badge outcome-${outcome && OUTCOMES.has(outcome) ? outcome : "dust"}`}
     >
-      <i />
+      <OutcomeMark outcome={outcome ?? null} />
       {outcome ?? C.screening}
     </span>
   );

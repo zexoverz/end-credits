@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge, ErrorBox, Mono } from "@/components/ui";
 import { INSIGHTS as C } from "@/lib/copy/control-room";
 import type { RiskProfile as Profile } from "@/lib/risk/profile";
@@ -23,7 +24,7 @@ export function RiskProfile({
   const imp = profile?.intercepta.impersonation;
   const sim = profile?.intercepta.simulation;
   return (
-    <section className="risk-profile">
+    <section id="payee-risk" className="risk-profile">
       <header>
         <div>
           <p className="control-eyebrow">{C.riskLabel}</p>
@@ -46,6 +47,9 @@ export function RiskProfile({
         <p className="risk-empty">{hasPayee ? C.noRisk : C.noPayee}</p>
       ) : (
         <>
+          <div className="risk-address">
+            <Address address={profile.address} />
+          </div>
           <div className="risk-overview">
             <div className="risk-score">
               <span>{C.score}</span>
@@ -158,9 +162,9 @@ export function RiskProfile({
               )}
             </div>
           </div>
-          <details className="risk-observations">
+          <details open className="risk-observations">
             <summary>
-              {C.observations}
+              {C.packagesAtAddress}
               <span>{profile.payeeOf.length}</span>
             </summary>
             {profile.payeeOf.length === 0 ? (
@@ -169,7 +173,11 @@ export function RiskProfile({
               profile.payeeOf.map((p) => (
                 <article key={p.packageKey}>
                   <header>
-                    <strong>{p.package}</strong>
+                    <Link
+                      href={`/app/npm/${p.package.split("/").map(encodeURIComponent).join("/")}`}
+                    >
+                      {p.package}
+                    </Link>
                     {p.changed && <span>{C.changed}</span>}
                   </header>
                   <ol>

@@ -2,6 +2,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PublicClaim } from "./public-claim";
+import { INSIGHTS as C } from "@/lib/copy/control-room";
 import { RiskProfile } from "./risk-profile";
 import { Button, Page } from "@/components/ui";
 import { api, type ApiResult } from "@/components/product/request";
@@ -195,17 +197,30 @@ export function ClaimPage({
   return (
     <Page>
       <Header s={summary} />
+      <nav className="package-section-nav">
+        <a href="#payee-risk">{C.riskJump}</a>
+        <a href="#maintainer-claim">{C.claimJump}</a>
+      </nav>
+      <PublicClaim claim={summary.claimed ?? null} />
+      <RiskProfile
+        profile={summary.payeeRisk ?? null}
+        failed={summary.errors.includes("risk")}
+        hasPayee={!!summary.payee}
+      />
       <NoticeLine notice={refreshNotice} />
-      {stop && stop !== "ALREADY_PAYABLE" && stop !== "NO_REPO" && (
-        <NoticeLine
-          notice={{
-            tone: "info",
-            text: claimCopy(stop, { package: summary.package }),
-            code: stop,
-          }}
-        />
-      )}
-      <section className="maintainer-flow">
+      {stop &&
+        stop !== "ALREADY_PAYABLE" &&
+        stop !== "NO_REPO" &&
+        stop !== "PAYEE_REFUSED" && (
+          <NoticeLine
+            notice={{
+              tone: "info",
+              text: claimCopy(stop, { package: summary.package }),
+              code: stop,
+            }}
+          />
+        )}
+      <section id="maintainer-claim" className="maintainer-flow">
         <aside className="claim-guide">
           <p className="claim-eyebrow">{claimCopy("EYEBROW")}</p>
           <h2>{claimCopy("FLOW_TITLE")}</h2>
@@ -328,11 +343,6 @@ export function ClaimPage({
           {claimCopy("REAUTH")}
         </a>
       )}
-      <RiskProfile
-        profile={summary.payeeRisk ?? null}
-        failed={summary.errors.includes("risk")}
-        hasPayee={!!summary.payee}
-      />
     </Page>
   );
 }

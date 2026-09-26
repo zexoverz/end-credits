@@ -94,6 +94,13 @@ export const INSIGHTS = {
   noActionsBody: "There are no pending actions in this activity snapshot.",
   source: "Source",
   review: "Review →",
+  reviewHold: "Review & sign →",
+  claimReserve: "View claim →",
+  findPackage: "Find package →",
+  actionsUnavailable: "Pending actions are not available in this response.",
+  riskJump: "Payout risk ↓",
+  claimJump: "Maintainer claim ↓",
+  packagesAtAddress: "Packages naming this address",
   actionKind: {
     hold_expiring: "Expiring soon",
     approve_hold: "Approval needed",

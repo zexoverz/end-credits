@@ -263,3 +263,16 @@ describe("safeLinks", () => {
     expect(safeLinks(links)).toEqual(["https://opencollective.com/x", "http://a.b"]);
   });
 });
+
+describe("refused payout state", () => {
+  it("blocks a new claim with the specific refusal state, even with a stale payable message", () => {
+    const s = summary({package:"@endcredits-demo/refused", payeeRefused:"Agents refuse to pay this address.", alreadyPayable:"stale payable"});
+    expect(blocker(s,null)).toBe("PAYEE_REFUSED");
+    expect(steps(s,null)).toEqual({github:"locked",wallet:"locked",pr:"locked",merge:"locked"});
+  });
+  it("keeps the maintainer's existing claim accessible", () => {
+    const s = summary({payeeRefused:"Agents refuse to pay this address.", maintainer:me});
+    expect(blocker(s,view("pr_open"))).toBeNull();
+    expect(steps(s,view("pr_open")).merge).toBe("active");
+  });
+});

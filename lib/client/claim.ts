@@ -39,6 +39,7 @@ const AFTER_PR = new Set(["pr_open", "merged", "verified", "claimed", "refused"]
 // Whether this visitor can run the claim at all; the reason when not.
 export function blocker(s: PackageSummary, claim: ClaimView | null): ClaimCopyCode | "ALREADY_PAYABLE" | null {
   if (claim && claim.status !== "none") return null; // their own claim always shows
+  if (s.payeeRefused) return "PAYEE_REFUSED";
   if (!s.repo) return "NO_REPO";
   if (s.alreadyPayable) return "ALREADY_PAYABLE";
   if (s.state === "claimed") return "CLAIMED_BY_OTHER";

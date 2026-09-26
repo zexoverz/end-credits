@@ -65,12 +65,21 @@ export function Header({ s }: { s: PackageSummary }) {
           ))}
         </p>
       )}
-      {s.alreadyPayable && (
+      {s.alreadyPayable && !s.payeeRefused && (
         <NoticeLine
           notice={{
             tone: "info",
             text: s.alreadyPayable,
             code: "ALREADY_PAYABLE",
+          }}
+        />
+      )}
+      {s.payeeRefused && (
+        <NoticeLine
+          notice={{
+            tone: "error",
+            text: s.payeeRefused,
+            code: "PAYEE_REFUSED",
           }}
         />
       )}

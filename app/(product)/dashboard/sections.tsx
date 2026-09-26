@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
+import { OutcomeMark } from "@/components/product/desk-assets";
 import { Badge, Mono } from "@/components/ui";
 import { StudioArtwork, PackageGlyph } from "@/components/product/artwork";
 import {
@@ -177,55 +179,36 @@ export function RecentEvents({
 }
 export function EscrowPanel({ data }: { data: Dashboard }) {
   const lines = cardsView(data).held;
-  const total = lines.reduce((n, l) => n + l.count, 0);
-  const pending = data.cards.held.pending.count;
   return (
-    <aside className="studio-side-column">
-      <section className={`studio-attention ${pending ? "has-holds" : ""}`}>
-        <div className="attention-icon" aria-hidden="true">
-          {pending ? "Ⅱ" : "✓"}
-        </div>
-        <p className="studio-kicker">{S.attention}</p>
-        <h2>{pending ? fill(S.held, { count: pending }) : S.clearTitle}</h2>
-        <p>{pending ? S.heldBody : S.clearBody}</p>
-        {pending > 0 && (
-          <Link href="/app/owner?section=approvals">{S.review} ↗</Link>
-        )}
-      </section>
-      <section className="studio-vault">
-        <StudioArtwork kind="press" />
-        <h2>{S.escrow}</h2>
-        <p>{S.escrowBody}</p>
-        {total > 0 && (
-          <div className="escrow-distribution" aria-hidden="true">
-            {lines.map((l, i) => (
-              <span
-                key={l.label}
-                className={`escrow-segment segment-${i}`}
-                style={{ flexGrow: l.count }}
-              />
-            ))}
-          </div>
-        )}
-        <dl>
-          {lines.map((l, i) => (
-            <div key={l.label}>
-              <dt>
-                <i className={`segment-${i}`} />
-                {[S.pending, S.approved, S.denied, S.expired][i]}
-              </dt>
-              <dd>
-                {l.count}
-                <small>{l.amount}</small>
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <Link href="/app?view=decisions&outcome=refused">
-          {fill(S.refused, { count: data.cards.refused.count })} ↗
+    <section className="escrow-summary">
+      <header>
+        <h2>{W.ledger}</h2>
+        <Link href="/app?view=decisions" aria-label={W.decisions}>
+          ↗
         </Link>
-      </section>
-    </aside>
+      </header>
+      <dl>
+        {lines.map((l, i) => (
+          <div key={l.label}>
+            <dt>
+              <OutcomeMark outcome={["held", "paid", "refused", "dust"][i]} />
+              {[W.pending, W.released, W.denied, W.expired][i]}
+            </dt>
+            <dd>
+              {l.count}
+              <small>{l.amount}</small>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p>{W.ledgerBody}</p>
+      <Link
+        className="escrow-refused-link"
+        href="/app?view=decisions&outcome=refused"
+      >
+        {fill(S.refused, { count: data.cards.refused.count })} ↗
+      </Link>
+    </section>
   );
 }
 export function Footer({ data }: { data: Dashboard }) {

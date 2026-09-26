@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
 import type { Onboarding } from "@/lib/owner/onboarding";
-import { ONBOARDING as C, SETUP_STEPS } from "@/lib/copy/onboarding";
-import { Button, ErrorBox } from "@/components/ui";
+import { ONBOARDING as O, SETUP_STEPS } from "@/lib/copy/onboarding";
+import { WORKSPACE as C } from "@/lib/copy/workspace";
+import { ErrorBox } from "@/components/ui";
 export function SetupChecklist({
   data,
   error,
@@ -15,87 +15,102 @@ export function SetupChecklist({
   onRefresh: () => void;
 }) {
   const count = data?.steps.filter((s) => s.done).length ?? 0;
-  const next = data?.steps.find((s) => s.id === data.next);
-  const nextCopy = SETUP_STEPS.find((s) => s.id === next?.id);
+  const next = data?.steps.find((s) => s.id === data.next),
+    copy = SETUP_STEPS.find((s) => s.id === next?.id);
   return (
-    <section className="setup-itinerary" aria-labelledby="itinerary-title">
-      <header>
-        <div>
-          <p className="setup-kicker">{C.checklist}</p>
-          <h2 id="itinerary-title">
-            {data && data.next === null ? C.completeTitle : C.guideTitle}
-          </h2>
-          <p>{C.checklistBody}</p>
-        </div>
-        <Button className="setup-refresh" onClick={onRefresh} disabled={busy}>
-          {busy ? C.checking : C.check}
-        </Button>
-      </header>
-      {error && (
+    <section className="setup-runway" aria-label={O.checklist}>
+      {error ? (
         <ErrorBox>
-          {C.checklistFailed} <span>{error}</span>
+          {O.checklistFailed} {error}
         </ErrorBox>
-      )}
-      {!data && !error && <p role="status">{C.checking}</p>}
-      {data && (
+      ) : !data ? (
+        <p role="status">{O.checking}</p>
+      ) : (
         <>
-          <div className="setup-next">
-            <div className="setup-progress-number">
-              <strong>
-                {count}
-                <small>/{data.steps.length}</small>
-              </strong>
-              <span>{C.progress}</span>
-            </div>
-            <div>
-              <p className="setup-kicker">{data.next ? C.next : C.done}</p>
-              <h3>{nextCopy?.title ?? C.completeTitle}</h3>
-              <p>{data.next ? nextCopy?.body : C.completeBody}</p>
-              {next?.detail && (
-                <p className="setup-next-detail">{next.detail}</p>
-              )}
-            </div>
-            <Link
-              className="product-button"
-              href={next?.href ?? nextCopy?.href ?? "/app"}
-            >
-              {nextCopy?.action ?? C.activity}
-              <span aria-hidden="true">↗</span>
-            </Link>
-          </div>
-          <ol className="setup-checkpoints">
-            {data.steps.map((step, i) => {
-              const copy = SETUP_STEPS.find((s) => s.id === step.id);
-              return (
-                <li
-                  key={step.id}
-                  data-done={step.done}
-                  data-next={data.next === step.id}
-                >
-                  <Link
-                    href={step.href ?? copy?.href ?? "/app/owner"}
-                    aria-current={data.next === step.id ? "step" : undefined}
-                  >
-                    <span className="checkpoint-index">
-                      {step.done ? "✓" : String(i + 1).padStart(2, "0")}
-                    </span>
-                    <strong>{copy?.title ?? step.id}</strong>
-                    <small>
-                      {step.done
-                        ? C.done
-                        : data.next === step.id
-                          ? C.current
-                          : C.todo}
-                    </small>
-                    {step.detail && (
-                      <span className="checkpoint-detail">{step.detail}</span>
+          <div className="setup-runway-top">
+            <div className="setup-film" aria-hidden="true">
+              <svg
+                viewBox="0 0 156 70"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path d="M7 9h142v52H7z" />
+                <path d="M7 20h142M7 50h142" />
+                {data.steps.map((s, i) => (
+                  <g key={s.id}>
+                    <path d={`M${16 + i * 19} 14h7m-7 42h7`} />
+                    <rect
+                      x={14 + i * 19}
+                      y="27"
+                      width="13"
+                      height="16"
+                      rx="2"
+                      fill={s.done ? "#242b22" : "#fff"}
+                    />
+                    {s.done && (
+                      <path d={`m${17 + i * 19} 35 2 2 5-5`} stroke="#b1f1c6" />
                     )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ol>
+                  </g>
+                ))}
+              </svg>
+              <span>
+                {count}/{data.steps.length} {C.complete}
+              </span>
+            </div>
+            <div className="setup-runway-copy">
+              <span>{data.next ? C.setup : C.readyBody}</span>
+              <h2>{copy?.title ?? C.ready}</h2>
+              {data.next && <p>{copy?.body}</p>}
+            </div>
+            <a
+              className="desk-solid-button"
+              href={next?.href ?? copy?.href ?? "/app"}
+            >
+              {copy?.action ?? C.activity} <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div className="setup-runway-bottom">
+            <details>
+              <summary>
+                {C.setupDetail}
+                <span aria-hidden="true">+</span>
+              </summary>
+              <ol className="setup-checkpoints-compact">
+                {data.steps.map((s, i) => {
+                  const c = SETUP_STEPS.find((k) => k.id === s.id);
+                  return (
+                    <li
+                      key={s.id}
+                      data-done={s.done}
+                      data-next={s.id === data.next}
+                    >
+                      <a
+                        href={s.href ?? c?.href ?? "/app/owner"}
+                        aria-current={s.id === data.next ? "step" : undefined}
+                      >
+                        <span>
+                          {s.done ? "✓" : String(i + 1).padStart(2, "0")}
+                        </span>
+                        <strong>{c?.title}</strong>
+                        <small>{s.detail ?? (s.done ? O.done : O.todo)}</small>
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ol>
+            </details>
+            <button type="button" disabled={busy} onClick={onRefresh}>
+              {busy ? O.checking : C.refresh} <span aria-hidden="true">↻</span>
+            </button>
+          </div>
         </>
+      )}
+      {error && (
+        <button type="button" disabled={busy} onClick={onRefresh}>
+          {C.refresh}
+        </button>
       )}
     </section>
   );

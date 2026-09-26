@@ -18,6 +18,7 @@ import {
   type WalletKind,
 } from "@/components/approver/connect-wallet";
 import { fill } from "@/lib/client/approve";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
 import { BUDGET_COPY as C } from "@/lib/copy/budget";
 import { parseUsdc, USDC_PATTERN } from "@/lib/money";
 
@@ -177,19 +178,22 @@ export function BudgetWallet() {
         <p className="text-muted">{C.EXPLAIN}</p>
         {view && (
           <>
-            <div>
-              {C.WALLET}:{" "}
-              {view.budgetOwner ? (
-                <Mono>{view.budgetOwner}</Mono>
-              ) : (
-                <span className="text-muted">{C.NONE}</span>
-              )}
-            </div>
-            {view.spender && (
+            <details className="allowance-addresses">
+              <summary>{W.walletDetails}</summary>
               <div>
-                {C.SPENDER}: <Mono>{view.spender}</Mono>
+                {C.WALLET}:{" "}
+                {view.budgetOwner ? (
+                  <Mono>{view.budgetOwner}</Mono>
+                ) : (
+                  <span className="text-muted">{C.NONE}</span>
+                )}
               </div>
-            )}
+              {view.spender && (
+                <div>
+                  {C.SPENDER}: <Mono>{view.spender}</Mono>
+                </div>
+              )}
+            </details>
             {view.budgetOwner && view.error === null && (
               <dl className="allowance-balances">
                 <div>
@@ -348,7 +352,12 @@ export function BudgetWallet() {
           </div>
         )}
 
-        <Button type="button" disabled={!!busy} onClick={() => void refresh()}>
+        <Button
+          className="allowance-refresh"
+          type="button"
+          disabled={!!busy}
+          onClick={() => void refresh()}
+        >
           {C.REFRESH}
         </Button>
         {busy && (

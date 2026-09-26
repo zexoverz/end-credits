@@ -56,6 +56,12 @@ export const CLAIM_COPY = {
   PAYEE_ERROR: "Could not check whether this package already lists a wallet.",
   ALSO_ACCEPTS: "Also accepts",
   PAYEE: "Payee",
+  PUBLIC_CLAIM_TITLE: "Claim recorded on chain.",
+  PUBLIC_CLAIM_BODY:
+    "Verify the registered wallet and each transaction on Base Sepolia.",
+  PUBLIC_WALLET: "Registered receiving wallet",
+  PAYEE_REFUSED:
+    "The listed payout address was refused. Review the stored screening evidence.",
   CLAIMED_BY_OTHER:
     "{package} has been claimed. Agents pay its wallet directly.",
   LOADING: "Loading…",

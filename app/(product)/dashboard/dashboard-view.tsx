@@ -8,8 +8,9 @@ import { ActionQueue, ActivityTimeline } from "./insights";
 import { Sessions } from "../app/sessions/sessions";
 import { History } from "../history/history";
 import { SessionOpen } from "@/components/product/session-open";
-import { StudioArtwork } from "@/components/product/artwork";
-import { SetupGuide } from "@/components/product/setup-guide";
+import { DeskAsset } from "@/components/product/desk-assets";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
+
 import { ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
 import {
@@ -90,28 +91,18 @@ export function DashboardView({
 
   return (
     <div className="session-desk">
-      <header className="desk-intro">
+      <header className="activity-desk-heading">
         <div>
-          <p className="desk-eyebrow">{D.eyebrow}</p>
-          <h1>{D.title}</h1>
-          <p className="desk-description">{D.subtitle}</p>
-          <div className="desk-intro-actions">
-            <SetupGuide />
-            <Link href="/app/owner?section=budget">{D.controls} ↗</Link>
-          </div>
+          <p className="desk-eyebrow">{W.live}</p>
+          <h1>{W.activityTitle}</h1>
+          <p>{W.activityBody}</p>
         </div>
-        <figure className="desk-process">
-          <figcaption>{D.guideLabel}</figcaption>
-          <StudioArtwork kind="signals" />
-          <ol>
-            {D.steps.map((step, i) => (
-              <li key={step}>
-                <span>0{i + 1}</span>
-                {step}
-              </li>
-            ))}
-          </ol>
-        </figure>
+        <div className="activity-heading-art">
+          <DeskAsset kind="session" />
+          <Link className="desk-outline-button" href="/app/owner">
+            {W.controls} ↗
+          </Link>
+        </div>
       </header>
       <div className="desk-overview-bar">
         <p>{D.scope}</p>
@@ -149,9 +140,7 @@ export function DashboardView({
       {state.phase === "error" && <ErrorPanel error={state.error} />}
       {state.phase === "data" && (
         <>
-          <ActionQueue actions={state.data.actions ?? []} />
           <Cards data={state.data} />
-          <ActivityTimeline buckets={state.data.timeline ?? []} />
         </>
       )}
       <div className="desk-work-area">
@@ -194,22 +183,18 @@ export function DashboardView({
             <SessionOpen />
           </details>
         </section>
-        <div className="desk-ledger">
-          <header>
-            <p className="desk-eyebrow">{D.ledger}</p>
-            <p>{D.ledgerBody}</p>
-          </header>
-          {state.phase === "data" ? (
-            <EscrowPanel data={state.data} />
-          ) : state.phase === "loading" ? (
-            <p role="status">{C.LOADING}</p>
-          ) : (
-            <ErrorPanel error={state.error} />
+        <div className="desk-action-column">
+          {state.phase === "data" && (
+            <>
+              <ActionQueue actions={state.data.actions} />
+              <EscrowPanel data={state.data} />
+            </>
           )}
         </div>
       </div>
       {state.phase === "data" && (
         <>
+          <ActivityTimeline buckets={state.data.timeline ?? []} />
           <details className="desk-cast">
             <summary>
               <span>{D.cast}</span>
