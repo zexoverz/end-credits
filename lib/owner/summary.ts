@@ -24,6 +24,8 @@ export interface PendingHold {
 
 export interface OwnerSummary {
   owner: { id: string; displayName: string };
+  /** Escrow v2: the owner's approver wallet as stored; the on-chain state is at /api/owner/approver. */
+  approver: string | null;
   settings: SettingsView;
   payer: { address: string; usdcBalance: string | null; error: "rpc_unavailable" | null };
   pendingHolds: PendingHold[];
@@ -114,6 +116,7 @@ export async function ownerSummary(
   ]);
   return {
     owner: { id: owner.id, displayName: owner.displayName },
+    approver: owner.approverAddress ?? null,
     settings: settingsView(owner),
     payer,
     pendingHolds: holdsList,

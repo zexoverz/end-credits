@@ -11,6 +11,7 @@ const payload: ApprovalPayload = {
   text_version: "v1",
   owner_sub_hash: `0x${"ef".repeat(32)}`,
   attempt: "11111111-1111-4111-8111-111111111111",
+  approval_ref: `0x${"12".repeat(32)}`,
 };
 
 describe("canonicalJson", () => {

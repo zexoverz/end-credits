@@ -1,10 +1,11 @@
-// Approval step-up, start (DESIGN §14.2). Instead of releasing on the owner session, write a pending
-// World approval bound to this tip by its nonce and send the owner to World for a fresh Orb proof:
-// max_age=0, prompt=login, acr_values=orb-v3, PKCE. Nothing is released here.
-import { randomUUID } from "node:crypto";
+// Approval step-up, start (DESIGN §14.2). Instead of releasing on the owner session, bind the
+// prepared, signed approval row to a World verification by its nonce and send the owner to World for
+// a fresh Orb proof: max_age=0, prompt=login, acr_values=orb-v3, PKCE. Nothing is released here; the
+// callback releases with the stored approver signature.
+import { eq } from "drizzle-orm";
 import * as client from "openid-client";
 import type { Hex } from "viem";
-import { Abort, checked, type ActionError } from "../approve/actions";
+import { Abort, checked, type ActionError, type SignedApproval } from "../approve/actions";
 import { findHold } from "../approve/hold";
 import { db } from "../db/client";
 import { approvals } from "../db/schema";
@@ -28,6 +29,7 @@ export const approveWithWorld = () =>
 export async function startWorldApproval(
   ownerId: string,
   tipId: Hex,
+  approval: SignedApproval,
   deps: WorldDeps = {},
   now: Date = new Date(),
 ): Promise<StartResult> {
@@ -41,7 +43,6 @@ export async function startWorldApproval(
     throw e;
   }
 
-  const approvalId = randomUUID();
   const payload: ApprovalPayload = {
     tipId: row.tipId,
     packageKey: row.packageKey,
@@ -50,26 +51,25 @@ export async function startWorldApproval(
     action: "release",
     text_version: APPROVE_TEXT_VERSION,
     owner_sub_hash: identity.subHash,
-    attempt: approvalId,
+    attempt: approval.id,
+    approval_ref: approval.approvalRef,
   };
   const nonce = approvalNonce(payload);
   const state = client.randomState();
   const codeVerifier = client.randomPKCECodeVerifier();
 
+  // The World verification clock starts now, not at prepare.
   await db()
-    .insert(approvals)
-    .values({
-      id: approvalId,
-      holdId: row.holdId,
-      ownerId,
+    .update(approvals)
+    .set({
       method: "world",
       payload,
       nonce,
       state,
       codeVerifierEnc: sealSecret(codeVerifier),
       startedAt: now,
-      status: "pending",
-    });
+    })
+    .where(eq(approvals.id, approval.id));
 
   const url = await authorizeUrl(worldConfig(deps), {
     redirectUri: approveRedirectUri(),
@@ -78,5 +78,5 @@ export async function startWorldApproval(
     codeVerifier,
     extra: { max_age: "0", prompt: "login", acr_values: ACR_ORB },
   });
-  return { ok: true, url: url.href, approvalId };
+  return { ok: true, url: url.href, approvalId: approval.id };
 }

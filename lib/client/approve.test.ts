@@ -25,6 +25,7 @@ const view = (over: Partial<ApproveView> = {}): ApproveView => ({
   status: "pending",
   expiresAt: at(3600),
   worldRequired: false,
+  hasApprover: true,
   signedIn: true,
   isOwner: true,
   txHash: null,

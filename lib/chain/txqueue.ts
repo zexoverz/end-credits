@@ -8,6 +8,7 @@ import {
   type Abi,
   type Address,
   type Hash,
+  type Hex,
   type PublicClient,
 } from "viem";
 import type { SignerClient } from "./keys";
@@ -19,6 +20,17 @@ export interface ContractCall {
   args: readonly unknown[];
 }
 
+/** A plain call with prebuilt calldata (an ERC-6492 factory deploy); `functionName` names it in errors. */
+export interface RawCall {
+  to: Address;
+  data: Hex;
+  functionName: string;
+}
+
+export type TxCall = ContractCall | RawCall;
+
+const isRaw = (c: TxCall): c is RawCall => "data" in c;
+
 export interface TxReceiptLite {
   status: "success" | "reverted";
   blockNumber: bigint;
@@ -28,8 +40,8 @@ export interface TxReceiptLite {
 export interface TxIo {
   pendingNonce(from: Address): Promise<number>;
   /** Throws when the call would revert (at `blockNumber` when given). */
-  simulate(from: Address, call: ContractCall, blockNumber?: bigint): Promise<void>;
-  write(from: Address, call: ContractCall, nonce: number): Promise<Hash>;
+  simulate(from: Address, call: TxCall, blockNumber?: bigint): Promise<void>;
+  write(from: Address, call: TxCall, nonce: number): Promise<Hash>;
   waitForReceipt(hash: Hash): Promise<TxReceiptLite>;
 }
 
@@ -59,7 +71,7 @@ function isNonceTooLow(err: unknown): boolean {
 }
 
 export interface TxQueue {
-  submit(from: Address, call: ContractCall): Promise<Hash>;
+  submit(from: Address, call: TxCall): Promise<Hash>;
 }
 
 export interface TxQueueOptions {
@@ -78,7 +90,7 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
 
   // A load-balanced RPC (sepolia.base.org) can answer from a node that has not seen the tx we just
   // mined, so a revert here may be stale. Re-simulate a few times before believing it.
-  async function simulateOrThrow(from: Address, call: ContractCall) {
+  async function simulateOrThrow(from: Address, call: TxCall) {
     for (let attempt = 0; ; attempt++) {
       try {
         return await io.simulate(from, call);
@@ -93,7 +105,7 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
     }
   }
 
-  async function send(from: Address, call: ContractCall): Promise<Hash> {
+  async function send(from: Address, call: TxCall): Promise<Hash> {
     try {
       return await io.write(from, call, await io.pendingNonce(from));
     } catch (err) {
@@ -102,7 +114,7 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
     }
   }
 
-  async function reasonAfterRevert(from: Address, call: ContractCall, block: bigint) {
+  async function reasonAfterRevert(from: Address, call: TxCall, block: bigint) {
     try {
       await io.simulate(from, call, block - BigInt(1));
       return "unknown";
@@ -111,7 +123,7 @@ export function createTxQueue(io: TxIo, opts: TxQueueOptions = {}): TxQueue {
     }
   }
 
-  async function run(from: Address, call: ContractCall): Promise<Hash> {
+  async function run(from: Address, call: TxCall): Promise<Hash> {
     await simulateOrThrow(from, call);
     const hash = await send(from, call);
     const receipt = await io.waitForReceipt(hash);
@@ -145,10 +157,17 @@ export function viemIo(publicClient: PublicClient, signers: readonly SignerClien
   return {
     pendingNonce: (from) => publicClient.getTransactionCount({ address: from, blockTag: "pending" }),
     async simulate(from, call, blockNumber) {
+      if (isRaw(call)) {
+        await publicClient.call({ account: from, to: call.to, data: call.data, blockNumber });
+        return;
+      }
       await publicClient.simulateContract({ ...call, account: signer(from).account, blockNumber });
     },
     write: (from, call, nonce) => {
       const s = signer(from);
+      if (isRaw(call)) {
+        return s.sendTransaction({ account: s.account, chain: s.chain, to: call.to, data: call.data, nonce });
+      }
       return s.writeContract({ ...call, account: s.account, chain: s.chain, nonce });
     },
     async waitForReceipt(hash) {
