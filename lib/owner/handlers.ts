@@ -1,6 +1,8 @@
 // HTTP handlers behind app/api/owner/*. Every one requires the owner (cookie or dev bearer).
+import { isAddress, type Address } from "viem";
 import { z } from "zod";
 import { withOwner } from "../auth/owner";
+import { getApprover, setOwnerApprover, type ApproverChain } from "./approver";
 import { createKey, keyInput, listKeys, revokeKey } from "./keys";
 import { ownerRow, settingsInput, settingsView, updateSettings } from "./settings";
 import { ownerSummary, type SummaryDeps } from "./summary";
@@ -56,5 +58,29 @@ export function handleRevokeKey(req: Request, id: string): Promise<Response> {
     if (!z.uuid().safeParse(id).success) return notFound();
     const key = await revokeKey(ownerId, id);
     return key ? Response.json(key) : notFound();
+  });
+}
+
+function result(r: { error: string; status: number } | object): Response {
+  if ("status" in r && "error" in r) {
+    const { status, ...rest } = r as { status: number; error: string };
+    return Response.json(rest, { status });
+  }
+  return Response.json(r, { headers: noStore });
+}
+
+const approverInput = z.object({ address: z.string().refine((a) => isAddress(a, { strict: false })) });
+
+/** GET /api/owner/approver → { approver, onchain, pending }. */
+export function handleGetApprover(req: Request, chain: ApproverChain): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => result(await getApprover(ownerId, chain)));
+}
+
+/** POST /api/owner/approver { address } → { approver, onchain, pending, tx }. */
+export function handleSetApprover(req: Request, chain: ApproverChain): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => {
+    const parsed = approverInput.safeParse(await body(req));
+    if (!parsed.success) return invalid(z.flattenError(parsed.error).fieldErrors);
+    return result(await setOwnerApprover(ownerId, parsed.data.address as Address, chain));
   });
 }
