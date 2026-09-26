@@ -6,6 +6,8 @@ export const MESSAGES = {
     "Held: the funding address for {package} changed {days} days ago. Waiting for the owner.",
   HELD_MEDIUM: "Held: Intercepta rates this address medium risk ({score}). Waiting for the owner.",
   HELD_NO_CODE: "Held: {address} is a contract on Ethereum with no code on Base.",
+  HELD_NO_HISTORY:
+    "Held: {address} has no history on mainnet, so Intercepta has nothing to judge. Waiting for the owner.",
   SCREEN_UNAVAILABLE: "Held: screening unavailable ({error}). Nothing is paid without a screen.",
   REFUSED_TRAIT: "Refused. Intercepta: {description}",
   IMPERSONATION:
