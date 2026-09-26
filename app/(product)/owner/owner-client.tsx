@@ -8,6 +8,7 @@ import { STUDIO as S } from "@/lib/copy/studio";
 import { StudioArtwork } from "@/components/product/artwork";
 import { SetupGuide } from "@/components/product/setup-guide";
 import { SetApprover } from "@/components/approver/set-approver";
+import { BudgetWallet } from "@/components/budget/budget-wallet";
 import { Button, ErrorBox, Mono, Page } from "@/components/ui";
 import { api } from "@/components/product/request";
 import { addressUrl, usdc } from "@/lib/client/format";
@@ -245,6 +246,7 @@ function SignedIn({
         <div className="control-approval-grid">
           <Holds holds={summary.pendingHolds} now={now} />
           <SetApprover />
+          <BudgetWallet />
         </div>
         <Notifications notifications={summary.notifications} />
       </div>
