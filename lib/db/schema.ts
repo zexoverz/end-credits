@@ -34,6 +34,7 @@ export const owners = pgTable(
     holdTtlSeconds: integer("hold_ttl_seconds").notNull().default(86400),
     settleMode: text("settle_mode").notNull().default("auto"),
     approverAddress: text("approver_address"),
+    walletAddress: text("wallet_address").unique(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -41,6 +42,12 @@ export const owners = pgTable(
     check("owners_settle_mode", sql`${t.settleMode} in ('auto','on_open')`),
   ],
 );
+
+/** SIWE nonces already spent: the cookie holds the live one, this row makes it single use. */
+export const siweNonces = pgTable("siwe_nonces", {
+  nonce: text().primaryKey(),
+  usedAt: ts("used_at").defaultNow().notNull(),
+});
 
 export const agentKeys = pgTable(
   "agent_keys",

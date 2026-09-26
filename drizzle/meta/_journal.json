@@ -36,6 +36,13 @@
       "when": 1790401276571,
       "tag": "0004_declared_repo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790424395359,
+      "tag": "0005_wallet_signin",
+      "breakpoints": true
     }
   ]
 }
