@@ -357,3 +357,5 @@ the credit is now `refused` with `PAYTO_MISMATCH` ("Refused: the payment request
 address than the one screened.") and its `PAID` line is removed. Same for `TOKEN_PIN` and
 `CHALLENGE_MISMATCH` from a maintainer endpoint. Nothing was signed. Show it like the other refusals.
 Fixtures: `@endcredits-demo/tip-jar` (honest) and `@endcredits-demo/swapped-jar` (clipper).
+
+- `GET /api/dashboard` `actions[]` of kind `approve_hold` / `hold_expiring` now include `payer`: the Agent wallet of the account that owns the hold (compare with `GET /api/owner/budget` `spender`). Null when unknown.

@@ -36,6 +36,6 @@ describe.skipIf(!DB_URL)("dashboard repo holdsByTip (integration)", () => {
     await db().insert(s.holds).values({ creditId: c.id, tipId, expiresAt: new Date(), holdTx: "0x1" });
 
     const found = await repo.holdsByTip([tipId.toUpperCase().replace("0X", "0x"), keccak256(stringToBytes("none"))]);
-    expect(found).toEqual([{ tipId, package: name, payee: "0xAbC", reasons }]);
+    expect(found).toEqual([{ tipId, package: name, payee: "0xAbC", payer: "0x0000000000000000000000000000000000000001", reasons }]);
   });
 });

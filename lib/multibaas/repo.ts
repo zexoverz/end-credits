@@ -41,15 +41,24 @@ export function drizzleDashboardRepo(database: Database = db()): DashboardRepo {
 
     async holdsByTip(tipIds) {
       const rows = await database
-        .select({ tipId: holds.tipId, package: packages.name, payee: credits.payee, reasons: credits.reasons })
+        .select({
+          tipId: holds.tipId,
+          package: packages.name,
+          payee: credits.payee,
+          payer: owners.payerAddress,
+          reasons: credits.reasons,
+        })
         .from(holds)
         .innerJoin(credits, eq(credits.id, holds.creditId))
         .innerJoin(packages, eq(packages.id, credits.packageId))
+        .innerJoin(sessions, eq(sessions.id, credits.sessionId))
+        .innerJoin(owners, eq(owners.id, sessions.ownerId))
         .where(inArray(sql`lower(${holds.tipId})`, tipIds.map((t) => t.toLowerCase())));
       return rows.map((r) => ({
         tipId: r.tipId.toLowerCase(),
         package: r.package,
         payee: r.payee,
+        payer: r.payer,
         reasons: Array.isArray(r.reasons) ? (r.reasons as { text: string }[]) : [],
       }));
     },

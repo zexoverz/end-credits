@@ -24,6 +24,8 @@ export interface Action {
   package?: string | null;
   packageKey?: string;
   payee?: string | null;
+  /** The Agent wallet that holds this tip: only the account behind it can sign the release. */
+  payer?: string | null;
   expiresAt?: string;
   sessions?: number;
 }
@@ -32,6 +34,8 @@ export interface HoldInfo {
   tipId: string;
   package: string;
   payee: string | null;
+  /** The owning account's Agent wallet (payer). */
+  payer?: string | null;
   reasons: { text: string }[];
 }
 
@@ -85,6 +89,7 @@ export function buildActions({ pending, holds, reserves, now }: ActionInput): Ac
       tipId: h.tipId,
       package: pkg,
       payee: info?.payee ?? null,
+      payer: info?.payer ?? null,
       expiresAt,
     };
   };
