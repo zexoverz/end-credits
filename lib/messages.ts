@@ -24,6 +24,7 @@ export const MESSAGES = {
   NO_APPROVER: "Held, but the owner has no approver wallet yet. Set one on /owner.",
   PAYEE_INVALID: "The funding file names an invalid address.",
   SPOOF_REPO: "Reserved: {repo} does not publish {package}.",
+  REPO_DECLARED: "Not on the npm registry; repository taken from the installed package.json.",
   SCREENED_AS: "Screened as its mainnet equivalent (Base, chain 8453).",
   APPROVED: "Approved with World ID. Released {amount} USDC to {address}.",
   APPROVED_SESSION: "Approved by the owner. Released {amount} USDC to {address}.",
