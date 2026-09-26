@@ -17,6 +17,7 @@ export interface ApproveView {
   status: ApproveStatus;
   expiresAt: string;
   worldRequired: boolean;
+  hasApprover: boolean;
   signedIn: boolean;
   isOwner: boolean;
   txHash: string | null;

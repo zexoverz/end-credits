@@ -3,7 +3,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { Hex } from "viem";
 import { db } from "../db/client";
-import { approvals } from "../db/schema";
+import { approvals, owners } from "../db/schema";
 import { msg } from "../messages";
 import { formatUsdc } from "../money";
 import { findHold } from "./hold";
@@ -22,6 +22,8 @@ export interface ApproveView {
   status: ApproveStatus;
   expiresAt: string;
   worldRequired: boolean;
+  /** Escrow v2: the owner has named an approver wallet, so a release can be signed. */
+  hasApprover: boolean;
   signedIn: boolean;
   isOwner: boolean;
   txHash: string | null;
@@ -36,6 +38,15 @@ function statusOf(holdStatus: string, expiresAt: Date, now: Date): ApproveStatus
   if (holdStatus === "denied") return "denied";
   if (holdStatus === "expired") return "expired";
   return expiresAt.getTime() <= now.getTime() ? "expired" : "pending";
+}
+
+async function ownerHasApprover(ownerId: string): Promise<boolean> {
+  const [o] = await db()
+    .select({ approver: owners.approverAddress })
+    .from(owners)
+    .where(eq(owners.id, ownerId))
+    .limit(1);
+  return Boolean(o?.approver);
 }
 
 async function lastFailure(holdId: string): Promise<string | null> {
@@ -69,6 +80,7 @@ export async function approveView(
     status,
     expiresAt: row.expiresAt.toISOString(),
     worldRequired: opts.worldRequired,
+    hasApprover: await ownerHasApprover(row.ownerId),
     signedIn: viewer !== null,
     isOwner: viewer?.ownerId === row.ownerId,
     txHash: row.releaseTx ?? row.refundTx,

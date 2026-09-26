@@ -3,10 +3,11 @@
 // TEST_DATABASE_URL. Every denied path asserts its code and that release was never called.
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { keccak256, stringToBytes, type Hex } from "viem";
+import type { Hex } from "viem";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   APP,
+  APPROVER,
   connect,
   fakeChain,
   HELD_TEXT,
@@ -15,6 +16,7 @@ import {
   req,
   seedHold,
   signInCookie,
+  signPrepared,
   TEST_DB,
 } from "../__fixtures__/owner-db";
 import { msg } from "../messages";
@@ -61,15 +63,34 @@ describe.skipIf(!TEST_DB)("world approval step-up (integration)", () => {
     return { hold, credit, approvals };
   };
 
+  /** prepare → approver signs → store; returns the approval id. */
+  async function signed(tipId: Hex, c = cookie): Promise<string> {
+    const chain = fakeChain();
+    const post = (path: string, body?: unknown) =>
+      req(path, { method: "POST", cookie: c, body: body === undefined ? undefined : JSON.stringify(body) });
+    const p = await h.handleApprovePrepare(post(`/api/approve/${tipId}/prepare`), tipId, { chain });
+    expect(p.status).toBe(200);
+    const { approvalId, typedData } = await p.json();
+    const signature = await signPrepared(typedData);
+    const r = await h.handleApproveSignature(post(`/api/approve/${tipId}/signature`, { approvalId, signature }), tipId, {
+      chain,
+    });
+    expect(r.status).toBe(200);
+    return approvalId;
+  }
+
+  const startReq = async (tipId: Hex, c = cookie) =>
+    req(`/api/approve/${tipId}/start`, {
+      method: "POST",
+      cookie: c,
+      body: JSON.stringify({ approvalId: await signed(tipId, c) }),
+    });
+
   /** POST start with WORLD_REQUIRED=true; returns the authorize URL's params. */
   async function startApproval(tipId: Hex) {
     process.env.WORLD_REQUIRED = "true";
     const chain = fakeChain();
-    const res = await h.handleApproveStart(
-      req(`/api/approve/${tipId}/start`, { method: "POST", cookie }),
-      tipId,
-      { chain },
-    );
+    const res = await h.handleApproveStart(await startReq(tipId), tipId, { chain });
     expect(res.status).toBe(200);
     const url = new URL((await res.json()).url);
     expect(chain.calls.release).toHaveLength(0);
@@ -122,18 +143,16 @@ describe.skipIf(!TEST_DB)("world approval step-up (integration)", () => {
       action: "release",
       text_version: "v1",
       attempt: a.id,
+      approval_ref: a.approvalRef,
     });
+    expect(a.releaseSignature).toBeTruthy();
   });
 
   it("start: APPROVE_METHOD=world also starts the step-up instead of releasing", async () => {
     process.env.APPROVE_METHOD = "world";
     const seeded = await seedHold(db, s, ownerId);
     const chain = fakeChain();
-    const res = await h.handleApproveStart(
-      req(`/api/approve/${seeded.tipId}/start`, { method: "POST", cookie }),
-      seeded.tipId,
-      { chain },
-    );
+    const res = await h.handleApproveStart(await startReq(seeded.tipId), seeded.tipId, { chain });
     expect((await res.json()).status).toBe("verify");
     expect(chain.calls.release).toHaveLength(0);
   });
@@ -142,15 +161,14 @@ describe.skipIf(!TEST_DB)("world approval step-up (integration)", () => {
     process.env.WORLD_REQUIRED = "true";
     const other = await makeOwner(db, s);
     const seeded = await seedHold(db, s, other);
-    const res = await h.handleApproveStart(
-      req(`/api/approve/${seeded.tipId}/start`, { method: "POST", cookie: await signInCookie(other) }),
-      seeded.tipId,
-      { chain: fakeChain() },
-    );
+    const res = await h.handleApproveStart(await startReq(seeded.tipId, await signInCookie(other)), seeded.tipId, {
+      chain: fakeChain(),
+    });
     expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("world_not_bound");
   });
 
-  it("approved: releases with keccak256(nonce), credit paid, APPROVED appended", async () => {
+  it("approved: releases with the stored signature and approvalRef, credit paid, APPROVED appended", async () => {
     const seeded = await seedHold(db, s, ownerId);
     const url = await startApproval(seeded.tipId);
     const { res, chain, calls } = await callback(url);
@@ -158,10 +176,16 @@ describe.skipIf(!TEST_DB)("world approval step-up (integration)", () => {
     expect(res.headers.get("location")).toBe(`${APP}/approve/${seeded.tipId}?result=APPROVED`);
     expect(calls).toHaveLength(1);
     expect(calls[0].body.get("redirect_uri")).toBe(`${APP}/api/approve/callback`);
-    const nonce = url.searchParams.get("nonce")!;
-    expect(chain.calls.release).toEqual([[seeded.tipId, keccak256(stringToBytes(nonce))]]);
-
     const { hold, credit, approvals } = await rows(seeded.tipId);
+    expect(chain.calls.release).toEqual([
+      {
+        tipId: seeded.tipId,
+        approvalRef: approvals[0].approvalRef,
+        deadline: approvals[0].releaseDeadline,
+        signature: approvals[0].releaseSignature,
+        approver: APPROVER.address,
+      },
+    ]);
     expect(hold.status).toBe("released");
     expect(credit.outcome).toBe("paid");
     expect(credit.txHash).toBe(hold.releaseTx);

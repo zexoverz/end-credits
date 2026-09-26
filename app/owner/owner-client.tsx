@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SetApprover } from "@/components/approver/set-approver";
 import { Button, Card, ErrorBox, Mono, Page } from "@/components/ui";
 import { api } from "@/lib/client/api";
 import { addressUrl, usdc } from "@/lib/client/format";
@@ -97,6 +98,7 @@ function SignedIn({
         </div>
       </Card>
 
+      <SetApprover />
       <Holds holds={summary.pendingHolds} now={now} />
       <Notifications notifications={summary.notifications} />
       <SettingsForm initial={summary.settings} onSaved={onSettings} />

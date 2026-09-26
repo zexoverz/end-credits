@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { SignRelease } from "@/components/approver/sign-release";
 import { Button, Card, ErrorBox, Mono } from "@/components/ui";
 import { api } from "@/lib/client/api";
 import {
@@ -75,10 +76,13 @@ export function ApproveClient({ tipId, result }: { tipId: string; result: string
     if (expiredLocally) void refresh();
   }, [expiredLocally, refresh]);
 
-  async function approve(v: ApproveView) {
+  async function approve(v: ApproveView, approvalId: string) {
     setBusy("approve");
     setActionError(null);
-    const r = await api<StartResponse>(`/api/approve/${encodeURIComponent(tipId)}/start`, { method: "POST" });
+    const r = await api<StartResponse>(`/api/approve/${encodeURIComponent(tipId)}/start`, {
+      method: "POST",
+      body: JSON.stringify({ approvalId }),
+    });
     if (!r.ok) {
       setActionError(actionErrorText("approve", r.status, r.body, v));
       setBusy(null);
@@ -172,7 +176,7 @@ function Actions({
 }: {
   view: ApproveView;
   busy: null | "approve" | "deny" | "redirect";
-  onApprove: (v: ApproveView) => void;
+  onApprove: (v: ApproveView, approvalId: string) => void;
   onDeny: (v: ApproveView) => void;
 }) {
   if (!view.signedIn) {
@@ -186,12 +190,17 @@ function Actions({
     );
   }
   if (!view.isOwner) return <ErrorBox>{C.NOT_OWNER}</ErrorBox>;
-  const label = busy === "redirect" ? C.REDIRECTING : busy === "approve" ? C.WORKING : view.worldRequired ? C.APPROVE_WORLD : C.APPROVE;
+  const label = busy === "redirect" ? C.REDIRECTING : busy === "approve" ? C.WORKING : null;
   return (
     <div className="flex flex-col gap-3">
-      <Button className="py-3 text-base" disabled={busy !== null} onClick={() => onApprove(view)}>
-        {label}
-      </Button>
+      <SignRelease
+        tipId={view.tipId}
+        worldRequired={view.worldRequired}
+        hasApprover={view.hasApprover}
+        disabled={busy !== null}
+        busyLabel={label}
+        onSigned={(approvalId) => onApprove(view, approvalId)}
+      />
       <Button
         className="bg-transparent py-3 text-base text-foreground ring-1 ring-line"
         disabled={busy !== null}

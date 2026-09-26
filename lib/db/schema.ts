@@ -33,6 +33,7 @@ export const owners = pgTable(
     dailyLimitMicro: micro("daily_limit_micro").notNull().default(sql`20000000`),
     holdTtlSeconds: integer("hold_ttl_seconds").notNull().default(86400),
     settleMode: text("settle_mode").notNull().default("auto"),
+    approverAddress: text("approver_address"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -216,6 +217,9 @@ export const approvals = pgTable(
     acr: text(),
     amr: text().array(),
     completedAt: ts("completed_at"),
+    approvalRef: text("approval_ref"),
+    releaseDeadline: bigint("release_deadline", { mode: "bigint" }),
+    releaseSignature: text("release_signature"),
   },
   (t) => [
     check("approvals_method", sql`${t.method} in ('session','world')`),

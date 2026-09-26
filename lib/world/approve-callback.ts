@@ -1,21 +1,24 @@
 // Approval step-up, callback (DESIGN §14.2): GET /api/approve/callback?code&state (or ?error=…).
 // Checks in order: pending approval by state (else 400 UNKNOWN_STATE), cancelled, exchange +
 // verifyIdToken with the stored nonce, (iss, sub) is the owner, auth_time >= started_at. Only then
-// the recorder releases, through the same outcome as the session path but with APPROVED. Every
+// the recorder releases with the approver signature stored on the approval (escrow v2), through the
+// same outcome as the session path but with APPROVED. Every
 // failure marks the approval failed with its code, releases nothing, and 302s to the approve page.
 import { and, eq } from "drizzle-orm";
-import { keccak256, stringToBytes, type Hex } from "viem";
+import type { Address, Hex } from "viem";
 import {
   Abort,
   chainCode,
   checked,
   markReleased,
+  releaseCall,
   unwrap,
   type ApproveChain,
+  type SignedApproval,
 } from "../approve/actions";
 import { lockHold } from "../approve/hold";
 import { db } from "../db/client";
-import { approvals, holds } from "../db/schema";
+import { approvals, holds, owners } from "../db/schema";
 import { msg } from "../messages";
 import { appPath, approveRedirectUri, publicCallbackUrl, worldConfig, type WorldDeps } from "./config";
 import { exchangeCode } from "./exchange";
@@ -38,6 +41,8 @@ interface Pending {
   codeVerifierEnc: string | null;
   startedAt: Date;
   tipId: Hex;
+  /** Null when the approval carries no stored signature or the owner has no approver. */
+  signed: SignedApproval | null;
 }
 
 async function pendingByState(state: string): Promise<Pending | null> {
@@ -50,13 +55,23 @@ async function pendingByState(state: string): Promise<Pending | null> {
       codeVerifierEnc: approvals.codeVerifierEnc,
       startedAt: approvals.startedAt,
       tipId: holds.tipId,
+      approvalRef: approvals.approvalRef,
+      deadline: approvals.releaseDeadline,
+      signature: approvals.releaseSignature,
+      approver: owners.approverAddress,
     })
     .from(approvals)
     .innerJoin(holds, eq(holds.id, approvals.holdId))
+    .innerJoin(owners, eq(owners.id, approvals.ownerId))
     .where(and(eq(approvals.state, state), eq(approvals.method, "world"), eq(approvals.status, "pending")))
     .limit(1);
   if (!row?.nonce || !row.state) return null;
-  return { ...row, nonce: row.nonce, state: row.state, tipId: row.tipId as Hex };
+  const { approvalRef, deadline, signature, approver, ...rest } = row;
+  const signed =
+    approvalRef && deadline !== null && signature && approver
+      ? { id: row.id, approvalRef: approvalRef as Hex, deadline, signature: signature as Hex, approver: approver as Address }
+      : null;
+  return { ...rest, nonce: row.nonce, state: row.state, tipId: row.tipId as Hex, signed };
 }
 
 const unknownState = () =>
@@ -99,9 +114,10 @@ async function release(
       // The hold lock is the one-release guard, as on the session path: a second callback racing
       // this one waits, then finds the hold released (not_pending) and releases nothing.
       const row = checked(await lockHold(tx, a.tipId), a.ownerId, now);
+      if (!a.signed) throw new Abort({ error: "chain_error", status: 502, code: "NO_SIGNATURE" });
       let releaseTx: Hex;
       try {
-        releaseTx = await chain.release(a.tipId, keccak256(stringToBytes(a.nonce)));
+        releaseTx = await chain.release(releaseCall(a.tipId, a.signed));
       } catch (e) {
         throw new Abort({ error: "chain_error", status: 502, code: chainCode(e) });
       }

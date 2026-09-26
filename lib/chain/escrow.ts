@@ -1,8 +1,8 @@
-// Typed calls into EndCreditsEscrow (DESIGN §16). Payer-signed: hold, reserve, approveEscrow.
-// Recorder-signed: release, refund, setClaim, claim, recordSession. Every write goes through the
-// per-key tx queue and returns the tx hash; a revert throws TxRevertedError with the custom error
-// name (`TipExists`, `NotPending`, ...).
-import type { Address, Hash, Hex } from "viem";
+// Typed calls into EndCreditsEscrow (DESIGN §16). Payer-signed: hold, reserve, approveEscrow,
+// setApprover. Recorder-signed: release, refund, setClaim, claim, recordSession, and the ERC-6492
+// wallet deploy. Every write goes through the per-key tx queue and returns the tx hash; a revert
+// throws TxRevertedError with the custom error name (`TipExists`, `NotPending`, ...).
+import { isErc6492Signature, parseErc6492Signature, type Address, type Hash, type Hex } from "viem";
 import { erc20Abi, escrowAbi } from "./abi";
 import { chain, type ChainContext } from "./keys";
 import { createTxQueue, viemIo, type TxQueue } from "./txqueue";
@@ -56,8 +56,46 @@ export function hold(a: HoldArgs, ctx: ChainContext = chain()): Promise<Hash> {
   ]);
 }
 
-export function release(tipId: Hex, approvalRef: Hex, ctx: ChainContext = chain()): Promise<Hash> {
-  return writeEscrow(ctx, "recorder", "release", [tipId, approvalRef]);
+export interface ReleaseArgs {
+  tipId: Hex;
+  approvalRef: Hex;
+  /** Unix seconds; the signature is valid up to and including this second. */
+  deadline: bigint;
+  /** The approver's EIP-712 signature, already unwrapped from any ERC-6492 envelope. */
+  signature: Hex;
+}
+
+export function release(a: ReleaseArgs, ctx: ChainContext = chain()): Promise<Hash> {
+  return writeEscrow(ctx, "recorder", "release", [a.tipId, a.approvalRef, a.deadline, a.signature]);
+}
+
+/** Payer names its approver. The first set is immediate; a change waits `changeDelay`. */
+export function setApprover(approver: Address, ctx: ChainContext = chain()): Promise<Hash> {
+  return writeEscrow(ctx, "payer", "setApprover", [approver]);
+}
+
+/**
+ * The signature `release` can check. A counterfactual smart wallet (Base Account) signs with an
+ * ERC-6492 envelope the contract does not read: deploy the wallet through its factory first (from
+ * the recorder, permissionless), then pass the inner signature. Anything else comes back unchanged.
+ */
+export async function deployErc6492Wallet(
+  approver: Address,
+  signature: Hex,
+  ctx: ChainContext = chain(),
+): Promise<Hex> {
+  if (!isErc6492Signature(signature)) return signature;
+  const parsed = parseErc6492Signature(signature);
+  if (!parsed.address || !parsed.data) return parsed.signature;
+  const code = await ctx.publicClient.getCode({ address: approver });
+  if (!code || code === "0x") {
+    await queueFor(ctx).submit(ctx.recorder.account.address, {
+      to: parsed.address,
+      data: parsed.data,
+      functionName: "deployErc6492Wallet",
+    });
+  }
+  return parsed.signature;
 }
 
 export function refund(tipId: Hex, ctx: ChainContext = chain()): Promise<Hash> {
@@ -148,6 +186,48 @@ export async function tipOf(tipId: Hex, ctx: ChainContext = chain()): Promise<Ti
     expiresAt: BigInt(t.expiresAt),
     status: TIP_STATUS[t.status] ?? "none",
   };
+}
+
+/** The approver in force for `payer` (default: our payer) now; the zero address when none. */
+export function approverOf(payer?: Address, ctx: ChainContext = chain()): Promise<Address> {
+  return ctx.publicClient.readContract({
+    address: ctx.escrow,
+    abi: escrowAbi,
+    functionName: "approverOf",
+    args: [payer ?? ctx.payer.account.address],
+  });
+}
+
+export interface ApproverState {
+  current: Address;
+  pending: Address;
+  /** Unix seconds the pending approver takes over; 0 when none is pending. */
+  activeAt: bigint;
+}
+
+/** The stored approver slot as is, pending change included and not promoted. */
+export async function approverState(payer?: Address, ctx: ChainContext = chain()): Promise<ApproverState> {
+  const [current, pending, activeAt] = await ctx.publicClient.readContract({
+    address: ctx.escrow,
+    abi: escrowAbi,
+    functionName: "approvers",
+    args: [payer ?? ctx.payer.account.address],
+  });
+  return { current, pending, activeAt: BigInt(activeAt) };
+}
+
+export function releaseDigest(
+  tipId: Hex,
+  approvalRef: Hex,
+  deadline: bigint,
+  ctx: ChainContext = chain(),
+): Promise<Hex> {
+  return ctx.publicClient.readContract({
+    address: ctx.escrow,
+    abi: escrowAbi,
+    functionName: "releaseDigest",
+    args: [tipId, approvalRef, deadline],
+  });
 }
 
 export function claimOf(packageKey: Hex, ctx: ChainContext = chain()): Promise<Address> {

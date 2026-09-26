@@ -32,7 +32,7 @@ contract Deploy is Script {
             return;
         }
         MultiBaas.linkContractWithOptions(
-            "EndCreditsEscrow", escrow, MultiBaas.withOptions("endcredits_escrow", "escrow", "1.0", "-100")
+            "EndCreditsEscrow", escrow, MultiBaas.withOptions("endcredits_escrow", "escrow", "2.0", "-100")
         );
     }
 }

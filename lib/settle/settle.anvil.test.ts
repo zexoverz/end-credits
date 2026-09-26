@@ -13,7 +13,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { escrowAbi } from "../chain/abi";
-import { approveEscrow, hold, recordSession, reserve, reserved, tipOf } from "../chain/escrow";
+import { approveEscrow, hold, recordSession, reserve, reserved, setApprover, tipOf } from "../chain/escrow";
 import { createChainContext, type ChainContext } from "../chain/keys";
 import type { Screen } from "../decision/types";
 
@@ -24,6 +24,8 @@ const ANVIL = path.join(homedir(), ".foundry/bin/anvil");
 const PAYER = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
 const RECORDER = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
 const HELD_PAYEE: Address = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+// Escrow v2: hold needs the payer to have named an approver.
+const APPROVER = privateKeyToAccount(`0x${"42".repeat(32)}`);
 
 function artifact(name: string): { abi: Abi; bytecode: Hex } | undefined {
   const file = path.join(OUT, `${name}.sol/${name}.json`);
@@ -84,6 +86,7 @@ describe.skipIf(!ready)("settleSession on anvil", () => {
     await publicClient.waitForTransactionReceipt({ hash: mint });
     ctx = createChainContext({ rpcUrl: RPC, chain: foundry, payer: PAYER, recorder: RECORDER, escrow, usdc, pollingInterval: 50 });
     await approveEscrow(BigInt(1_000_000_000), ctx);
+    await setApprover(APPROVER.address, ctx);
   }, 30_000);
 
   afterAll(() => {

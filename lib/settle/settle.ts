@@ -250,8 +250,8 @@ async function decideAndExecute(
     w.tx = await execute(w, decision, deps, sessionKey, ttlSeconds);
   } catch (err) {
     w.tx = null;
-    const code: MessageCode = err instanceof PaymentRefused ? err.code : "EXECUTION_FAILED";
-    const text = err instanceof PaymentRefused ? msg(err.code) : msg("EXECUTION_FAILED", { error: errorLabel(err) });
+    const code = executionFailureCode(err);
+    const text = code === "EXECUTION_FAILED" ? msg(code, { error: errorLabel(err) }) : msg(code);
     await store.appendReason(database, w.creditId, { source: "policy", code, text });
     deps.log?.(`settle: credit ${w.creditId} ${decision.outcome} not executed: ${errorLabel(err)}`);
   }
@@ -331,6 +331,14 @@ function payeeReason(r: Resolution): Reason[] {
 
 function policy(code: MessageCode): Reason {
   return { source: "policy", code, text: msg(code) };
+}
+
+// Escrow v2: `hold` reverts `NoApprover` in the simulation, before anything is signed, when the
+// payer has named no approver. The decision stays held; nothing moves.
+function executionFailureCode(err: unknown): MessageCode {
+  if (err instanceof PaymentRefused) return err.code;
+  if (err instanceof TxRevertedError && err.errorName === "NoApprover") return "NO_APPROVER";
+  return "EXECUTION_FAILED";
 }
 
 /** A short, secret-free label for an error: never the message, which may carry an RPC URL. */

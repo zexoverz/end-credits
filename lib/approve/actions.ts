@@ -1,9 +1,10 @@
-// Session approval and deny for a held tip (DESIGN §14.2, "Before E11"). The hold row is locked for
-// the whole call, chain tx included, so a second click waits and then sees the hold resolved: one
-// release or refund per tip. A chain error rolls everything back and leaves a failed approval row.
-import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { keccak256, toHex, type Hex } from "viem";
+// Session approval and deny for a held tip (DESIGN §14.2, "Before E11"; escrow v2 in decisions.md).
+// A release carries the owner's approver signature, stored on a prepared approval row beforehand
+// (lib/approve/signed.ts). The hold row is locked for the whole call, chain tx included, so a second
+// click waits and then sees the hold resolved: one release or refund per tip. A chain error rolls
+// everything back and marks the approval row failed.
+import { and, eq } from "drizzle-orm";
+import type { Address, Hex } from "viem";
 import { TxRevertedError } from "../chain/txqueue";
 import { db } from "../db/client";
 import { approvals, credits, holds } from "../db/schema";
@@ -11,10 +12,33 @@ import { msg } from "../messages";
 import { formatUsdc } from "../money";
 import { lockHold, type HoldRow } from "./hold";
 import { appendOwnerReason } from "./reasons";
+import type { ReleaseTypedData } from "./typed-data";
+
+/** A release as the escrow takes it, plus the approver whose ERC-6492 wallet may need deploying. */
+export interface ReleaseCall {
+  tipId: Hex;
+  approvalRef: Hex;
+  deadline: bigint;
+  signature: Hex;
+  approver: Address;
+}
 
 export interface ApproveChain {
-  release(tipId: Hex, approvalRef: Hex): Promise<Hex>;
+  release(a: ReleaseCall): Promise<Hex>;
   refund(tipId: Hex): Promise<Hex>;
+  /** The EIP-712 domain target: the escrow and its chain. */
+  releaseDomain(): { escrow: Address; chainId: number };
+  /** EOA, ERC-1271 or ERC-6492 check of the approver's signature over `typedData`. */
+  verifyRelease(approver: Address, typedData: ReleaseTypedData, signature: Hex): Promise<boolean>;
+}
+
+/** A prepared approval row with a stored signature, ready to release. */
+export interface SignedApproval {
+  id: string;
+  approvalRef: Hex;
+  deadline: bigint;
+  signature: Hex;
+  approver: Address;
 }
 
 export type ActionError =
@@ -56,42 +80,41 @@ export async function unwrap<T>(run: () => Promise<T>): Promise<T | ActionError>
 export async function approveWithSession(
   ownerId: string,
   tipId: Hex,
+  approval: SignedApproval,
   chain: ApproveChain,
   now: Date = new Date(),
 ): Promise<ApproveResult> {
-  const nonce = toHex(randomBytes(32));
-  const failure: { holdId?: string; code?: string } = {};
+  const failure: { code?: string } = {};
   const result = await unwrap(() =>
     db().transaction(async (tx) => {
       const row = checked(await lockHold(tx, tipId), ownerId, now);
       let releaseTx: Hex;
       try {
-        releaseTx = await chain.release(tipId, keccak256(nonce));
+        releaseTx = await chain.release(releaseCall(tipId, approval));
       } catch (e) {
-        failure.holdId = row.holdId;
         failure.code = chainCode(e);
         throw new Abort({ error: "chain_error", status: 502, code: failure.code });
       }
       const done = new Date();
       const message = await markReleased(tx, row, releaseTx, "APPROVED_SESSION", done);
-      await tx.insert(approvals).values({
-        holdId: row.holdId,
-        ownerId,
-        method: "session",
-        payload: { tipId, action: "release" },
-        nonce,
-        startedAt: now,
-        status: "approved",
-        completedAt: done,
-      });
+      await tx
+        .update(approvals)
+        .set({ status: "approved", completedAt: done })
+        .where(eq(approvals.id, approval.id));
       return { ok: true as const, releaseTx, message };
     }),
   );
-  if (failure.holdId && failure.code) {
-    await recordFailure(ownerId, now, { holdId: failure.holdId, code: failure.code });
-  }
+  if (failure.code) await markApprovalFailed(approval.id, failure.code);
   return result;
 }
+
+export const releaseCall = (tipId: Hex, a: SignedApproval): ReleaseCall => ({
+  tipId,
+  approvalRef: a.approvalRef,
+  deadline: a.deadline,
+  signature: a.signature,
+  approver: a.approver,
+});
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 
@@ -123,20 +146,12 @@ export async function markReleased(
   return message;
 }
 
-async function recordFailure(
-  ownerId: string,
-  startedAt: Date,
-  f: { holdId: string; code: string },
-): Promise<void> {
-  await db().insert(approvals).values({
-    holdId: f.holdId,
-    ownerId,
-    method: "session",
-    startedAt,
-    status: "failed",
-    failureCode: f.code,
-    completedAt: new Date(),
-  });
+/** A pending approval that ended without a release. */
+export async function markApprovalFailed(id: string, code: string): Promise<void> {
+  await db()
+    .update(approvals)
+    .set({ status: "failed", failureCode: code, completedAt: new Date() })
+    .where(and(eq(approvals.id, id), eq(approvals.status, "pending")));
 }
 
 export async function denyHold(

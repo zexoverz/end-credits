@@ -801,3 +801,144 @@ description says so.
 - `GET /api/sessions/:id` credits now carry `tipId` (null except on held credits).
 - stdout is the protocol; logs go to stderr; the agent key is never in a result. The bundle grows
   from ~30 KB to 1.4 MB; a `record` hook run costs ~5 ms more (73 vs 68 ms, node boot included).
+## Escrow v2 (owner-signed release)
+
+**Why.** In v1 `release` needed only the recorder, our server key, so a compromised server could
+send any held tip to its payee. v2 adds a second key the server does not hold: each payer names an
+approver (the owner's own wallet), and `release` needs that approver's EIP-712 signature over the
+exact tip. The recorder still submits the tx, but can no longer release on its own, change the
+payee or amount (both come from storage and are in the signed struct), reuse a signature on another
+tip, escrow or chain (`tipId` plus the EIP-712 domain), or hold a signature forever (`deadline`).
+
+- **Approver per payer.** `setApprover(approver)` is called by the payer. Zero reverts
+  `ZeroApprover`. The first set is immediate. A later set to a different address is stored as
+  `pending` with `activeAt = now + changeDelay` (the same immutable delay as claims, 3 days); until
+  then the old approver alone signs, from `activeAt` on the new one alone. Setting the current
+  address again is a no-op (no event, no delay) and does not cancel a pending change. Setting a
+  third address while one is pending replaces it and restarts the clock. `approverOf(payer)` is a
+  view that applies a due change; `setApprover` and `release` write the promotion (lazy). `hold`
+  only reads `current`, since a pending change never exists without one.
+  `ApproverSet(payer, approver, activeAt)`; for the first set `activeAt` is the set time.
+- **`hold`** reverts `NoApprover(payer)` when the payer has none. The check comes after the v1
+  checks, so v1 revert order is unchanged.
+- **`release(tipId, approvalRef, deadline, signature)`** checks in this order: `NotRecorder`,
+  `NotPending`, `TipExpired`, `SignatureExpired(deadline)` (`block.timestamp > deadline`, so the
+  deadline second itself is valid), then `BadApproval()` from OZ
+  `SignatureChecker.isValidSignatureNow(approverOf(payer), digest, signature)`: ECDSA for an EOA,
+  ERC-1271 for a contract. The approver is the one in force at release time, not at hold time.
+  `Released` is unchanged.
+- **Typed data** (domain from OZ `EIP712`, readable via `eip712Domain()`; digest via
+  `releaseDigest(tipId, approvalRef, deadline)`):
+  domain `{ name: "EndCreditsEscrow", version: "2", chainId: 84532, verifyingContract: <escrow> }`,
+  `Release(bytes32 tipId,address payee,uint256 amount,bytes32 approvalRef,uint256 deadline)`, with
+  `payee` and `amount` read from `tipOf(tipId)`.
+- **`refund`**: the tip's payer may now deny any time while pending, as the recorder can; anyone
+  still may after expiry. The approver alone cannot refund.
+- **What the timelock buys, and what it does not.** `PAYER_PRIVATE_KEY` is also a server key today,
+  so a server that holds both keys can call `setApprover` as the payer. The delay means such a change
+  is public (`ApproverSet`) for 3 days before it counts, and every tip held with a TTL up to the
+  delay (default 1 day) has expired and is refundable by then. A tip held with a TTL above
+  `changeDelay` (the max is 7 days) could still be released by a hijacked approver after `activeAt`,
+  so the backend should keep TTL at or below `changeDelay` and alert the owner on any `ApproverSet`.
+  Likewise the payer refund only gives the owner a server-free deny once the payer is the owner's
+  wallet.
+- **ERC-6492, for the backend.** A Coinbase / Base Account passkey wallet can be counterfactual
+  (not yet deployed). It then signs with an ERC-6492 wrapper (`factory, factoryCalldata, sig` plus
+  the `0x6492…6492` magic suffix), which `SignatureChecker` does not accept: with no code at the
+  address it tries ECDSA and fails `BadApproval`. The backend must detect the suffix, deploy the
+  wallet by calling `factory` with `factoryCalldata` (permissionless, any key can send it), then
+  submit the unwrapped inner signature to `release`. The contract does not implement 6492.
+  The same applies to `setApprover`: the approver address may be counterfactual when set, which is
+  fine, but it must have code by the time `release` checks the signature.
+- `Deploy.s.sol` is unchanged apart from linking in MultiBaas as version `2.0`; the constructor is
+  the same. `scripts/multibaas-setup.ts` still says `1.0` (follow-up).
+- Gas (forge `--isolate`, one call): `hold` 176,056 (first tip of a payer), `release` 76,609 with
+  an EOA approver, 79,793 with the ERC-1271 mock, `setApprover` 48,510 (first set).
+
+### Escrow v2 mutation pass
+
+Each row: the guard deleted (or the value swapped) in `contracts/src/EndCreditsEscrow.sol`, then
+`forge test`, then the source restored (scripted, the file rewritten from the saved original).
+Run on 2026-09-26; `git diff` on `src/` was clean afterwards. The v1 table above still holds.
+
+| hold: `NoApprover` | `test_hold_revertsWithoutApprover` |
+| setApprover: `ZeroApprover` | `test_setApprover_revertsOnZero` |
+| setApprover: same address is a no-op | `test_setApprover_sameAddressIsNoop` |
+| setApprover: change goes to `pending` (swapped to set `current` at once) | `test_release_oldApproverSignsUntilActiveAt`, `test_setApprover_changeAfterDueChangeStartsFromPromoted`, `test_setApprover_changeIsPendingUntilActiveAt` |
+| setApprover: `changeDelay` added to `activeAt` | `test_release_oldApproverSignsUntilActiveAt`, `test_setApprover_changeAfterDueChangeStartsFromPromoted` |
+| setApprover: `_promote` before a change | `test_setApprover_changeAfterDueChangeStartsFromPromoted` |
+| approverOf: pending promoted once due (branch removed) | `test_setApprover_changeIsPendingUntilActiveAt` |
+| approverOf / _promote: `>=` swapped to `>` at `activeAt` | `test_release_oldApproverSignsUntilActiveAt`, `test_setApprover_changeAfterDueChangeStartsFromPromoted`, `test_setApprover_changeIsPendingUntilActiveAt` |
+| release: `SignatureExpired` | `test_release_revertsAfterDeadline` |
+| release: signature check (`BadApproval`) | `test_release_oldApproverSignsUntilActiveAt`, `test_release_revertsOnEmptyOrGarbageSignature`, `test_release_revertsOnErc1271OtherSigner`, `test_release_revertsOnErc1271WrongMagic`, `test_release_revertsOnOtherDomain`, `test_release_revertsOnOtherSigner`, `test_release_revertsOnSignatureOverOtherAmount`, `test_release_revertsOnSignatureOverOtherApprovalRef`, `test_release_revertsOnSignatureOverOtherDeadline`, `test_release_revertsOnSignatureOverOtherPayee`, `test_release_revertsOnSignatureOverOtherTip`, `test_release_revertsWhenRecorderSigns` |
+| release: `_promote(tip.payer)` | `test_release_oldApproverSignsUntilActiveAt` |
+| releaseDigest: payee in the struct hash (swapped to `address(0)`) | `test_refund_revertsAfterRelease`, `test_releaseDigest_matchesTypedData`, `test_release_acceptsErc1271Wallet`, `test_release_oldApproverSignsUntilActiveAt`, `test_release_paysFixedPayee`, `test_release_revertsAfterDeadline`, `test_release_revertsTwice`, `test_release_succeedsJustBeforeExpiry` |
+| releaseDigest: amount in the struct hash (swapped to 0) | `test_refund_revertsAfterRelease`, `test_releaseDigest_matchesTypedData`, `test_release_acceptsErc1271Wallet`, `test_release_oldApproverSignsUntilActiveAt`, `test_release_paysFixedPayee`, `test_release_revertsAfterDeadline`, `test_release_revertsTwice`, `test_release_succeedsJustBeforeExpiry` |
+| refund: payer may deny | `test_refund_byPayerBeforeExpiry` |
+
+## Escrow v2 app integration
+
+- **Flow order.** `POST /api/approve/:tipId/prepare` → the owner's approver wallet signs the
+  returned typed data (`eth_signTypedData_v4`, Base Account) → `POST /api/approve/:tipId/signature
+  {approvalId, signature}` → `POST /api/approve/:tipId/start {approvalId}` → with World required
+  (`WORLD_REQUIRED=true` or `APPROVE_METHOD=world`) the existing Orb step-up, whose callback releases;
+  else the release runs at once. Deny is unchanged (recorder `refund`).
+- **Shapes.** prepare → `{approvalId, approver, typedData}` (typed data as JSON, uint256 as decimal
+  strings, `EIP712Domain` listed); 409 `no_approver` when the owner has none. signature → `{status:
+  "signed"}`; 400 `bad_signature`. start → as before, plus 409 `no_signature` when the approval has no
+  stored signature. The hold's own guards (404, 409 `not_pending`, 410) are checked first on every
+  step. `GET /api/owner/approver` → `{approver, onchain, pending: {address, activeAt} | null}`;
+  `POST {address}` adds `tx` (null when nothing was sent), 409 `payer_mismatch` when the server's
+  payer key is not the owner's payer, 502 `chain_error` with the revert name. `GET /api/owner` has
+  `approver`; `GET /api/approve/:tipId` has `hasApprover`.
+- **One approval row per attempt.** prepare writes it (`method` from config, `pending`) with
+  `approval_ref` and `release_deadline`; signature fills `release_signature`; start moves it to
+  `approved` or `failed` (the v1 code inserted the row after the fact). The World step-up now updates
+  that row (nonce, state, PKCE verifier, `started_at` reset to the step-up start) instead of inserting
+  one, and the nonce payload gains `approval_ref`, so the Orb proof is bound to the signed release.
+- **approvalRef** = `keccak256(abi.encode(bytes32 tipId, bytes16 approvalId))`, the approval row's
+  uuid as 16 bytes. It is only an audit link (`Released` logs it); the contract does not check it.
+- **deadline** = the hold's `expires_at` in unix seconds. `release` reverts `TipExpired` first at that
+  point anyway, so the signature lives exactly as long as the tip.
+- **The typed data is rebuilt from our rows at every step**, never taken from the client: payee and
+  amount from the credit, `approvalRef`/deadline from the approval row, domain from `ESCROW_ADDRESS`
+  and the RPC's chain id. A client that edits the message gets `bad_signature`.
+- **Signature check.** `publicClient.verifyTypedData` against the owner's stored approver: EOA,
+  ERC-1271, and ERC-6492 for a Base Account not yet deployed (viem runs its universal validator in
+  an `eth_call`). Tests use viem's local `verifyTypedData` (EOA only); the 6492 path is on anvil.
+- **ERC-6492 at release.** `deployErc6492Wallet(approver, sig)`: when the signature carries the
+  6492 suffix and the approver has no code, the recorder sends the factory call (`to`, `data` from
+  the envelope) through the tx queue (which now takes prebuilt calldata), then `release` gets the
+  inner signature; when the wallet already has code it only unwraps. Proven on anvil with the CREATE2
+  deployer as factory and `Mock1271Wallet` as the counterfactual approver: `verifyTypedData` accepts
+  the wrapped form, `release` with it reverts `BadApproval`, after the deploy the inner one releases.
+- **Stored vs on-chain approver.** `owners.approver_address` is what prepare hands out and what
+  signatures are checked against. A change is timelocked on chain; `POST /api/owner/approver` stores
+  the new address at once and shows the pending change with its `activeAt`. Until then a signature
+  from the new wallet passes our check but the release reverts `BadApproval` (shown as a chain
+  error). Setting the address already pending is not re-sent, since that would restart the delay.
+- **Settler.** `hold` without an approver reverts `NoApprover` in the tx queue's simulation, before
+  anything is signed. The credit keeps its stored `held` decision, no hold row is written, and the
+  reason `NO_APPROVER` ("Held, but the owner has no approver wallet yet. Set one on /owner.") is
+  appended. Nothing moves.
+- **Seed.** With `ESCROW_ADDRESS` and `APPROVER_ADDRESS` set and no approver on chain, the payer names
+  `APPROVER_ADDRESS` and the owner row stores it; an existing on-chain approver is never changed.
+- **MultiBaas.** `scripts/multibaas-setup.ts` now links the escrow as `endcredits_escrow` `2.0` at
+  alias `escrow` (same as `Deploy.s.sol`). If the alias points at an older escrow it is moved only with
+  `MULTIBAAS_ALLOW_UPDATE_ADDRESS=true`, the forge-multibaas semantics (delete the alias, recreate it,
+  relink). The earlier "still says 1.0" note is resolved; USDC stays `usdc` `1.0`.
+- **UI.** All wallet code sits in `components/approver/*` (`connect-wallet`, `set-approver` on
+  /owner, `sign-release` on /approve) with copy in `lib/copy/approver.ts`; the pages only import and
+  place them. The page redesign should keep these files as they are and restyle only.
+- Not verified: Base Account `eth_signTypedData_v4` on a real phone (passkey prompt, and whether an
+  undeployed wallet returns a 6492 envelope as expected), and `multibaas-setup.ts` against the live
+  MultiBaas deployment.
+
+## Escrow v2 deployed (26 Sep)
+
+`EndCreditsEscrow` v2 at `0x849F6cd44e4A3248d033aBB1b670257F77bFCc46` (tx
+`0x7f4f4f1fabbb7bca64b0b4babd0752ec71f6519339588c72efc3a25548111fb2`), deployed from
+`ethglobal-tokyo` with the forge-multibaas plugin, which moved the MultiBaas `escrow` alias to it as
+`endcredits_escrow` 2.0. Verified on Sourcify (`exact_match`) and Basescan. v1 at
+`0x63047583FbCe241D72d71137C940aa27BBdC60f1` held only test events and is no longer used; the
+dashboard history restarts from v2.

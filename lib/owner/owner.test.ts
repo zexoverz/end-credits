@@ -1,8 +1,11 @@
 // Integration: real Postgres. Run with TEST_DATABASE_URL set (migrated); skipped otherwise.
 import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { TxRevertedError } from "../chain/txqueue";
+import type { ApproverChain } from "./approver";
 import {
   APP,
+  APPROVER,
   connect,
   HELD_TEXT,
   makeOwner,
@@ -199,6 +202,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
         expect.objectContaining({ kind: "held", holdId: seeded.holdId, tipId: seeded.tipId }),
       ]);
       expect(body.settings.settleMode).toBeDefined();
+      expect(body.approver).toBe(APPROVER.address);
     });
 
     it("still answers when the balance read fails, without the RPC error text", async () => {
@@ -211,6 +215,87 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
       const body = await res.json();
       expect(body.payer).toMatchObject({ usdcBalance: null, error: "rpc_unavailable" });
       expect(JSON.stringify(body)).not.toContain("secret-key");
+    });
+  });
+
+  describe("approver", () => {
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    const PAYER = "0x00000000000000000000000000000000000000aa";
+    const NEW = "0x00000000000000000000000000000000000000b1";
+    const DELAY = 3 * 86400;
+
+    /** The escrow's approver slot for one payer, with the contract's set/change rules. */
+    function fakeApproverChain(payer = PAYER) {
+      const st = { current: ZERO as `0x${string}`, pending: ZERO as `0x${string}`, activeAt: BigInt(0) };
+      const sent: string[] = [];
+      const nowSec = () => BigInt(Math.floor(Date.now() / 1000));
+      const chain: ApproverChain & { sent: string[]; fail?: Error } = {
+        sent,
+        payer: () => payer as `0x${string}`,
+        approverOf: async () => (st.pending !== ZERO && nowSec() >= st.activeAt ? st.pending : st.current),
+        approverState: async () => ({ ...st }),
+        setApprover: async (a) => {
+          if (chain.fail) throw chain.fail;
+          sent.push(a);
+          if (st.current === ZERO) st.current = a;
+          else if (st.current !== a) Object.assign(st, { pending: a, activeAt: nowSec() + BigInt(DELAY) });
+          return `0x${"05".repeat(32)}`;
+        },
+      };
+      return chain;
+    }
+
+    const post = (body: unknown, c = cookie) =>
+      req("/api/owner/approver", { method: "POST", body: JSON.stringify(body), cookie: c });
+
+    it("401 without an owner session", async () => {
+      const chain = fakeApproverChain();
+      expect((await h.handleGetApprover(req("/api/owner/approver"), chain)).status).toBe(401);
+      expect((await h.handleSetApprover(post({ address: NEW }, ""), chain)).status).toBe(401);
+      expect(chain.sent).toHaveLength(0);
+    });
+
+    it("first set is immediate on chain and stored; setting it again sends nothing", async () => {
+      const owner = await makeOwner(db, s, { approver: null });
+      const c = await signInCookie(owner);
+      const chain = fakeApproverChain();
+      const res = await h.handleSetApprover(post({ address: NEW }, c), chain);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ approver: NEW, onchain: NEW, pending: null, tx: `0x${"05".repeat(32)}` });
+      const [row] = await db.select().from(s.owners).where(eq(s.owners.id, owner));
+      expect(row.approverAddress).toBe(NEW);
+      expect((await (await h.handleSetApprover(post({ address: NEW }, c), chain)).json()).tx).toBeNull();
+      expect(chain.sent).toEqual([NEW]);
+      const got = await (await h.handleGetApprover(req("/api/owner/approver", { cookie: c }), chain)).json();
+      expect(got).toEqual({ approver: NEW, onchain: NEW, pending: null });
+    });
+
+    it("a change is shown pending with its activeAt, not hidden, and not re-sent", async () => {
+      const owner = await makeOwner(db, s, { approver: null });
+      const c = await signInCookie(owner);
+      const chain = fakeApproverChain();
+      await h.handleSetApprover(post({ address: NEW }, c), chain);
+      const res = await h.handleSetApprover(post({ address: APPROVER.address }, c), chain);
+      const body = await res.json();
+      expect(body.onchain).toBe(NEW);
+      expect(body.pending.address).toBe(APPROVER.address);
+      expect(Date.parse(body.pending.activeAt) - Date.now()).toBeGreaterThan((DELAY - 60) * 1000);
+      await h.handleSetApprover(post({ address: APPROVER.address }, c), chain);
+      expect(chain.sent).toEqual([NEW, APPROVER.address]);
+    });
+
+    it("refuses a bad address, another payer key, and names a chain error", async () => {
+      const chain = fakeApproverChain();
+      expect((await h.handleSetApprover(post({ address: "0x12" }), chain)).status).toBe(400);
+      const other = fakeApproverChain("0x00000000000000000000000000000000000000cc");
+      const mismatch = await h.handleSetApprover(post({ address: NEW }), other);
+      expect(mismatch.status).toBe(409);
+      expect(await mismatch.json()).toEqual({ error: "payer_mismatch" });
+      chain.fail = new TxRevertedError("setApprover", "ZeroApprover");
+      const failed = await h.handleSetApprover(post({ address: NEW }), chain);
+      expect(failed.status).toBe(502);
+      expect(await failed.json()).toEqual({ error: "chain_error", code: "ZeroApprover" });
+      expect(chain.sent).toHaveLength(0);
     });
   });
 });

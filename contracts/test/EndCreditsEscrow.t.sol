@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {EndCreditsEscrow} from "../src/EndCreditsEscrow.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
+import {Mock1271Wallet} from "./mocks/Mock1271Wallet.sol";
 
 contract EndCreditsEscrowTest is Test {
     EndCreditsEscrow internal escrow;
@@ -15,6 +16,8 @@ contract EndCreditsEscrowTest is Test {
     address internal stranger = makeAddr("stranger");
     address internal maintainerA = makeAddr("maintainerA");
     address internal maintainerB = makeAddr("maintainerB");
+    address internal approver;
+    uint256 internal approverKey;
 
     uint64 internal constant DELAY = 3 days;
     uint64 internal constant TTL = 1 days;
@@ -33,8 +36,11 @@ contract EndCreditsEscrowTest is Test {
         usdc = new MockUSDC();
         escrow = new EndCreditsEscrow(usdc, recorder, DELAY);
         usdc.mint(payer, START);
-        vm.prank(payer);
+        (approver, approverKey) = makeAddrAndKey("approver");
+        vm.startPrank(payer);
         usdc.approve(address(escrow), type(uint256).max);
+        escrow.setApprover(approver);
+        vm.stopPrank();
     }
 
     function _hold() internal returns (uint64 expiresAt) {
@@ -101,6 +107,19 @@ contract EndCreditsEscrowTest is Test {
         escrow.hold(TIP, PKG, payee, AMOUNT, REASON, above);
     }
 
+    function test_hold_revertsWithoutApprover() public {
+        usdc.mint(stranger, AMOUNT);
+        vm.startPrank(stranger);
+        usdc.approve(address(escrow), AMOUNT);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NoApprover.selector, stranger));
+        escrow.hold(TIP, PKG, payee, AMOUNT, REASON, TTL);
+
+        escrow.setApprover(approver);
+        escrow.hold(TIP, PKG, payee, AMOUNT, REASON, TTL);
+        vm.stopPrank();
+        assertEq(escrow.tipOf(TIP).payer, stranger);
+    }
+
     function test_hold_acceptsTtlBounds() public {
         vm.startPrank(payer);
         escrow.hold(keccak256("min"), PKG, payee, AMOUNT, REASON, escrow.MIN_TTL());
@@ -111,13 +130,59 @@ contract EndCreditsEscrowTest is Test {
 
     // ------------------------------------------------------------- release
 
+    bytes32 internal constant DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 internal constant RELEASE_TYPEHASH =
+        keccak256("Release(bytes32 tipId,address payee,uint256 amount,bytes32 approvalRef,uint256 deadline)");
+
+    /// Built here from the spec strings, not from the contract, so a wrong typehash or domain fails.
+    function _digest(bytes32 tipId, address to, uint256 amount, bytes32 ref, uint256 deadline)
+        internal
+        view
+        returns (bytes32)
+    {
+        bytes32 domain = keccak256(
+            abi.encode(DOMAIN_TYPEHASH, keccak256("EndCreditsEscrow"), keccak256("2"), block.chainid, address(escrow))
+        );
+        bytes32 structHash = keccak256(abi.encode(RELEASE_TYPEHASH, tipId, to, amount, ref, deadline));
+        return keccak256(abi.encodePacked("\x19\x01", domain, structHash));
+    }
+
+    function _signDigest(uint256 key, bytes32 digest) internal pure returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _sig(uint256 key, bytes32 tipId, bytes32 ref, uint256 deadline) internal view returns (bytes memory) {
+        return _signDigest(key, _digest(tipId, payee, AMOUNT, ref, deadline));
+    }
+
+    function _release(bytes32 tipId) internal {
+        uint256 deadline = block.timestamp;
+        bytes memory sig = _sig(approverKey, tipId, APPROVAL, deadline);
+        vm.prank(recorder);
+        escrow.release(tipId, APPROVAL, deadline, sig);
+    }
+
+    function test_releaseDigest_matchesTypedData() public {
+        _hold();
+        uint256 deadline = block.timestamp + 1 hours;
+        assertEq(escrow.releaseDigest(TIP, APPROVAL, deadline), _digest(TIP, payee, AMOUNT, APPROVAL, deadline));
+        assertEq(escrow.RELEASE_TYPEHASH(), RELEASE_TYPEHASH);
+
+        (, string memory name, string memory version, uint256 chainId, address verifying,,) = escrow.eip712Domain();
+        assertEq(name, "EndCreditsEscrow");
+        assertEq(version, "2");
+        assertEq(chainId, block.chainid);
+        assertEq(verifying, address(escrow));
+    }
+
     function test_release_paysFixedPayee() public {
         _hold();
         vm.expectEmit(true, true, true, true, address(escrow));
         emit EndCreditsEscrow.Released(TIP, payee, AMOUNT, APPROVAL);
 
-        vm.prank(recorder);
-        escrow.release(TIP, APPROVAL);
+        _release(TIP);
 
         assertEq(usdc.balanceOf(payee), AMOUNT);
         assertEq(usdc.balanceOf(recorder), 0);
@@ -128,53 +193,285 @@ contract EndCreditsEscrowTest is Test {
 
     function test_release_revertsForNonRecorder() public {
         _hold();
+        uint256 deadline = block.timestamp;
+        bytes memory sig = _sig(approverKey, TIP, APPROVAL, deadline);
+
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
         vm.prank(payee);
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, deadline, sig);
 
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
         vm.prank(payer);
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, deadline, sig);
+
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotRecorder.selector));
+        vm.prank(approver);
+        escrow.release(TIP, APPROVAL, deadline, sig);
     }
 
     function test_release_revertsAfterExpiry() public {
         uint64 expiresAt = _hold();
         vm.warp(expiresAt);
+        bytes memory sig = _sig(approverKey, TIP, APPROVAL, expiresAt);
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.TipExpired.selector, TIP));
         vm.prank(recorder);
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, expiresAt, sig);
     }
 
     function test_release_succeedsJustBeforeExpiry() public {
         uint64 expiresAt = _hold();
         vm.warp(expiresAt - 1);
-        vm.prank(recorder);
-        escrow.release(TIP, APPROVAL);
+        _release(TIP);
         assertEq(usdc.balanceOf(payee), AMOUNT);
     }
 
     function test_release_revertsTwice() public {
         _hold();
+        uint256 deadline = block.timestamp;
+        bytes memory sig = _sig(approverKey, TIP, APPROVAL, deadline);
         vm.startPrank(recorder);
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, deadline, sig);
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, deadline, sig);
         vm.stopPrank();
     }
 
     function test_release_revertsAfterRefund() public {
         _hold();
+        uint256 deadline = block.timestamp;
+        bytes memory sig = _sig(approverKey, TIP, APPROVAL, deadline);
         vm.startPrank(recorder);
         escrow.refund(TIP);
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, deadline, sig);
         vm.stopPrank();
     }
 
     function test_release_revertsForUnknownTip() public {
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
         vm.prank(recorder);
-        escrow.release(TIP, APPROVAL);
+        escrow.release(TIP, APPROVAL, block.timestamp, "");
+    }
+
+    function test_release_revertsAfterDeadline() public {
+        _hold();
+        uint256 deadline = block.timestamp + 10 minutes;
+        bytes memory sig = _sig(approverKey, TIP, APPROVAL, deadline);
+
+        vm.warp(deadline + 1);
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.SignatureExpired.selector, deadline));
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL, deadline, sig);
+
+        vm.warp(deadline);
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL, deadline, sig);
+        assertEq(usdc.balanceOf(payee), AMOUNT);
+    }
+
+    function _expectBadApproval(bytes32 ref, uint256 deadline, bytes memory sig) internal {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.BadApproval.selector));
+        vm.prank(recorder);
+        escrow.release(TIP, ref, deadline, sig);
+    }
+
+    function test_release_revertsOnOtherSigner() public {
+        _hold();
+        (, uint256 otherKey) = makeAddrAndKey("other");
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(otherKey, TIP, APPROVAL, deadline));
+    }
+
+    function test_release_revertsWhenRecorderSigns() public {
+        _hold();
+        (, uint256 recorderKey) = makeAddrAndKey("recorder");
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(recorderKey, TIP, APPROVAL, deadline));
+    }
+
+    function test_release_revertsOnEmptyOrGarbageSignature() public {
+        _hold();
+        _expectBadApproval(APPROVAL, block.timestamp, "");
+        _expectBadApproval(
+            APPROVAL, block.timestamp, abi.encodePacked(bytes32(uint256(1)), bytes32(uint256(2)), uint8(27))
+        );
+    }
+
+    function test_release_revertsOnSignatureOverOtherAmount() public {
+        _hold();
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(
+            APPROVAL, deadline, _signDigest(approverKey, _digest(TIP, payee, AMOUNT + 1, APPROVAL, deadline))
+        );
+    }
+
+    function test_release_revertsOnSignatureOverOtherPayee() public {
+        _hold();
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(
+            APPROVAL, deadline, _signDigest(approverKey, _digest(TIP, stranger, AMOUNT, APPROVAL, deadline))
+        );
+    }
+
+    function test_release_revertsOnSignatureOverOtherTip() public {
+        _hold();
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(approverKey, keccak256("tip-2"), APPROVAL, deadline));
+    }
+
+    function test_release_revertsOnSignatureOverOtherApprovalRef() public {
+        _hold();
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(approverKey, TIP, keccak256("other-ref"), deadline));
+    }
+
+    function test_release_revertsOnSignatureOverOtherDeadline() public {
+        _hold();
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(approverKey, TIP, APPROVAL, deadline + 1));
+    }
+
+    function test_release_revertsOnOtherDomain() public {
+        _hold();
+        EndCreditsEscrow other = new EndCreditsEscrow(usdc, recorder, DELAY);
+        uint256 deadline = block.timestamp;
+        bytes32 structHash = keccak256(abi.encode(RELEASE_TYPEHASH, TIP, payee, AMOUNT, APPROVAL, deadline));
+        bytes32 domain = keccak256(
+            abi.encode(DOMAIN_TYPEHASH, keccak256("EndCreditsEscrow"), keccak256("2"), block.chainid, address(other))
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domain, structHash));
+        _expectBadApproval(APPROVAL, deadline, _signDigest(approverKey, digest));
+    }
+
+    function test_release_oldApproverSignsUntilActiveAt() public {
+        (address next, uint256 nextKey) = makeAddrAndKey("next");
+        bytes32 tip2 = keccak256("tip-2");
+        vm.startPrank(payer);
+        escrow.hold(TIP, PKG, payee, AMOUNT, REASON, escrow.MAX_TTL());
+        escrow.hold(tip2, PKG, payee, AMOUNT, REASON, escrow.MAX_TTL());
+        escrow.setApprover(next);
+        vm.stopPrank();
+        uint64 activeAt = uint64(block.timestamp) + DELAY;
+
+        vm.warp(activeAt - 1);
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(nextKey, TIP, APPROVAL, deadline));
+        _release(TIP);
+        assertEq(usdc.balanceOf(payee), AMOUNT);
+
+        vm.warp(activeAt);
+        deadline = block.timestamp;
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.BadApproval.selector));
+        vm.prank(recorder);
+        escrow.release(tip2, APPROVAL, deadline, _sig(approverKey, tip2, APPROVAL, deadline));
+
+        vm.prank(recorder);
+        escrow.release(tip2, APPROVAL, deadline, _sig(nextKey, tip2, APPROVAL, deadline));
+        assertEq(usdc.balanceOf(payee), 2 * AMOUNT);
+        (address current, address pending,) = escrow.approvers(payer);
+        assertEq(current, next);
+        assertEq(pending, address(0));
+    }
+
+    function _useWallet() internal returns (Mock1271Wallet wallet, uint256 ownerKey) {
+        address owner;
+        (owner, ownerKey) = makeAddrAndKey("wallet-owner");
+        wallet = new Mock1271Wallet(owner);
+        address walletPayer = makeAddr("wallet-payer");
+        usdc.mint(walletPayer, AMOUNT);
+        vm.startPrank(walletPayer);
+        usdc.approve(address(escrow), AMOUNT);
+        escrow.setApprover(address(wallet));
+        escrow.hold(TIP, PKG, payee, AMOUNT, REASON, TTL);
+        vm.stopPrank();
+    }
+
+    function test_release_acceptsErc1271Wallet() public {
+        (, uint256 ownerKey) = _useWallet();
+        uint256 deadline = block.timestamp;
+        vm.prank(recorder);
+        escrow.release(TIP, APPROVAL, deadline, _sig(ownerKey, TIP, APPROVAL, deadline));
+        assertEq(usdc.balanceOf(payee), AMOUNT);
+    }
+
+    function test_release_revertsOnErc1271WrongMagic() public {
+        (Mock1271Wallet wallet, uint256 ownerKey) = _useWallet();
+        wallet.setWrongMagic(true);
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(ownerKey, TIP, APPROVAL, deadline));
+    }
+
+    function test_release_revertsOnErc1271OtherSigner() public {
+        _useWallet();
+        uint256 deadline = block.timestamp;
+        _expectBadApproval(APPROVAL, deadline, _sig(approverKey, TIP, APPROVAL, deadline));
+    }
+
+    // ---------------------------------------------------------- setApprover
+
+    function test_setApprover_revertsOnZero() public {
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.ZeroApprover.selector));
+        vm.prank(stranger);
+        escrow.setApprover(address(0));
+    }
+
+    function test_setApprover_firstSetIsImmediate() public {
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.ApproverSet(stranger, approver, uint64(block.timestamp));
+        vm.prank(stranger);
+        escrow.setApprover(approver);
+
+        assertEq(escrow.approverOf(stranger), approver);
+        (address current, address pending, uint64 activeAt) = escrow.approvers(stranger);
+        assertEq(current, approver);
+        assertEq(pending, address(0));
+        assertEq(activeAt, 0);
+    }
+
+    function test_setApprover_changeIsPendingUntilActiveAt() public {
+        address next = makeAddr("next");
+        uint64 activeAt = uint64(block.timestamp) + DELAY;
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.ApproverSet(payer, next, activeAt);
+        vm.prank(payer);
+        escrow.setApprover(next);
+
+        (address current, address pending, uint64 storedAt) = escrow.approvers(payer);
+        assertEq(current, approver);
+        assertEq(pending, next);
+        assertEq(storedAt, activeAt);
+
+        vm.warp(activeAt - 1);
+        assertEq(escrow.approverOf(payer), approver);
+        vm.warp(activeAt);
+        assertEq(escrow.approverOf(payer), next);
+    }
+
+    function test_setApprover_sameAddressIsNoop() public {
+        vm.recordLogs();
+        vm.prank(payer);
+        escrow.setApprover(approver);
+        assertEq(vm.getRecordedLogs().length, 0);
+
+        (address current, address pending, uint64 activeAt) = escrow.approvers(payer);
+        assertEq(current, approver);
+        assertEq(pending, address(0));
+        assertEq(activeAt, 0);
+    }
+
+    function test_setApprover_changeAfterDueChangeStartsFromPromoted() public {
+        address next = makeAddr("next");
+        address third = makeAddr("third");
+        vm.prank(payer);
+        escrow.setApprover(next);
+        vm.warp(block.timestamp + DELAY);
+
+        vm.prank(payer);
+        escrow.setApprover(third);
+        (address current, address pending,) = escrow.approvers(payer);
+        assertEq(current, next);
+        assertEq(pending, third);
+        assertEq(escrow.approverOf(payer), next);
     }
 
     // -------------------------------------------------------------- refund
@@ -191,6 +488,26 @@ contract EndCreditsEscrowTest is Test {
         assertEq(usdc.balanceOf(payee), 0);
         assertEq(escrow.totalPending(), 0);
         assertEq(uint8(_status(TIP)), uint8(EndCreditsEscrow.TipStatus.Refunded));
+    }
+
+    function test_refund_byPayerBeforeExpiry() public {
+        _hold();
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit EndCreditsEscrow.Refunded(TIP, payer, AMOUNT, false);
+
+        vm.prank(payer);
+        escrow.refund(TIP);
+
+        assertEq(usdc.balanceOf(payer), START);
+        assertEq(escrow.totalPending(), 0);
+        assertEq(uint8(_status(TIP)), uint8(EndCreditsEscrow.TipStatus.Refunded));
+    }
+
+    function test_refund_revertsForApproverBeforeExpiry() public {
+        _hold();
+        vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotExpired.selector, TIP));
+        vm.prank(approver);
+        escrow.refund(TIP);
     }
 
     function test_refund_revertsForStrangerBeforeExpiry() public {
@@ -226,8 +543,7 @@ contract EndCreditsEscrowTest is Test {
 
     function test_refund_revertsAfterRelease() public {
         uint64 expiresAt = _hold();
-        vm.prank(recorder);
-        escrow.release(TIP, APPROVAL);
+        _release(TIP);
         vm.warp(expiresAt);
         vm.expectRevert(abi.encodeWithSelector(EndCreditsEscrow.NotPending.selector, TIP));
         vm.prank(stranger);
@@ -409,6 +725,7 @@ contract EndCreditsEscrowTest is Test {
         usdc.mint(funder, amount);
         vm.startPrank(funder);
         usdc.approve(address(escrow), amount);
+        escrow.setApprover(approver);
         escrow.hold(TIP, PKG, payee, amount, REASON, ttl);
         vm.stopPrank();
         assertEq(usdc.balanceOf(funder), 0);

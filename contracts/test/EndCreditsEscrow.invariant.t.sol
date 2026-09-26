@@ -20,6 +20,8 @@ contract EscrowHandler is CommonBase, StdCheats, StdUtils {
     bytes32[3] internal pkgs = [keccak256("npm:a"), keccak256("npm:b"), keccak256("npm:c")];
 
     bytes32[] public tipIds;
+    address[4] internal approverAddrs;
+    mapping(address => uint256) internal keyOf;
     uint256 internal nonce;
 
     uint256 public ghostPending;
@@ -30,6 +32,15 @@ contract EscrowHandler is CommonBase, StdCheats, StdUtils {
         escrow = escrow_;
         usdc = usdc_;
         recorder = recorder_;
+        for (uint256 i; i < 4; i++) {
+            (address approver, uint256 key) = makeAddrAndKey(string(abi.encode("approver", i)));
+            approverAddrs[i] = approver;
+            keyOf[approver] = key;
+        }
+        for (uint256 i; i < 3; i++) {
+            vm.prank(payers[i]);
+            escrow.setApprover(approverAddrs[i]);
+        }
     }
 
     function _fund(address who, uint256 amount) internal {
@@ -58,23 +69,34 @@ contract EscrowHandler is CommonBase, StdCheats, StdUtils {
         EndCreditsEscrow.Tip memory t = escrow.tipOf(tipId);
         if (t.status != EndCreditsEscrow.TipStatus.Pending || block.timestamp >= t.expiresAt) return;
 
+        bytes32 ref = bytes32(tipSeed);
+        uint256 deadline = block.timestamp;
+        uint256 key = keyOf[escrow.approverOf(t.payer)];
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, escrow.releaseDigest(tipId, ref, deadline));
         vm.prank(recorder);
-        escrow.release(tipId, bytes32(tipSeed));
+        escrow.release(tipId, ref, deadline, abi.encodePacked(r, s, v));
         ghostPending -= t.amount;
         calls["release"]++;
     }
 
-    function refund(uint256 tipSeed, bool asRecorder) external {
+    function refund(uint256 tipSeed, uint256 callerSeed) external {
         if (tipIds.length == 0) return;
         bytes32 tipId = tipIds[tipSeed % tipIds.length];
         EndCreditsEscrow.Tip memory t = escrow.tipOf(tipId);
         if (t.status != EndCreditsEscrow.TipStatus.Pending) return;
-        if (!asRecorder && block.timestamp < t.expiresAt) return;
+        uint256 who = callerSeed % 3; // 0 recorder, 1 payer, 2 stranger
+        if (who == 2 && block.timestamp < t.expiresAt) return;
 
-        vm.prank(asRecorder ? recorder : address(0xC0FFEE));
+        vm.prank(who == 0 ? recorder : who == 1 ? t.payer : address(0xC0FFEE));
         escrow.refund(tipId);
         ghostPending -= t.amount;
         calls["refund"]++;
+    }
+
+    function setApprover(uint256 actorSeed, uint256 approverSeed) external {
+        vm.prank(payers[actorSeed % 3]);
+        escrow.setApprover(approverAddrs[approverSeed % 4]);
+        calls["setApprover"]++;
     }
 
     function reserve(uint256 actorSeed, uint256 pkgSeed, uint256 amount) external {
@@ -123,7 +145,7 @@ contract EndCreditsEscrowInvariantTest is StdInvariant, Test {
         escrow = new EndCreditsEscrow(usdc, recorder, 3 days);
         handler = new EscrowHandler(escrow, usdc, recorder);
 
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = EscrowHandler.hold.selector;
         selectors[1] = EscrowHandler.release.selector;
         selectors[2] = EscrowHandler.refund.selector;
@@ -131,6 +153,7 @@ contract EndCreditsEscrowInvariantTest is StdInvariant, Test {
         selectors[4] = EscrowHandler.setClaim.selector;
         selectors[5] = EscrowHandler.claim.selector;
         selectors[6] = EscrowHandler.warp.selector;
+        selectors[7] = EscrowHandler.setApprover.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }

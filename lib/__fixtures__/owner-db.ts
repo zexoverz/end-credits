@@ -1,6 +1,9 @@
 // Test-only helpers for the owner / approve / history integration tests (real Postgres).
 import { createHash, randomUUID } from "node:crypto";
-import { keccak256, stringToBytes, type Hex } from "viem";
+import { keccak256, stringToBytes, verifyTypedData, type Address, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import type { ReleaseCall } from "@/lib/approve/actions";
+import type { ReleaseTypedData } from "@/lib/approve/typed-data";
 
 export const TEST_DB = process.env.TEST_DATABASE_URL;
 export const SECRET = "s".repeat(40);
@@ -20,12 +23,46 @@ export async function connect(): Promise<{ db: Db; s: Schema }> {
   return { db: db(), s: await import("@/lib/db/schema") };
 }
 
-export async function makeOwner(db: Db, s: Schema): Promise<string> {
+/** The owner's approver wallet in tests: a local key that signs releases. */
+export const APPROVER = privateKeyToAccount(`0x${"42".repeat(32)}`);
+export const ESCROW: Address = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+/** An owner; with an approver wallet (APPROVER) unless `approver: null`. */
+export async function makeOwner(db: Db, s: Schema, opts: { approver?: Address | null } = {}): Promise<string> {
+  const approverAddress = opts.approver === undefined ? APPROVER.address : opts.approver;
   const [row] = await db
     .insert(s.owners)
-    .values({ displayName: "t", payerAddress: "0x00000000000000000000000000000000000000aa" })
+    .values({ displayName: "t", payerAddress: "0x00000000000000000000000000000000000000aa", approverAddress })
     .returning({ id: s.owners.id });
   return row.id;
+}
+
+/** Signs the JSON typed data `prepare` returns, as the browser wallet would. */
+export function signPrepared(
+  typedData: { domain: ReleaseTypedData["domain"]; message: Record<string, string> },
+  signer = APPROVER,
+): Promise<Hex> {
+  const m = typedData.message;
+  return signer.signTypedData({
+    domain: typedData.domain,
+    types: {
+      Release: [
+        { name: "tipId", type: "bytes32" },
+        { name: "payee", type: "address" },
+        { name: "amount", type: "uint256" },
+        { name: "approvalRef", type: "bytes32" },
+        { name: "deadline", type: "uint256" },
+      ],
+    },
+    primaryType: "Release",
+    message: {
+      tipId: m.tipId as Hex,
+      payee: m.payee as Address,
+      amount: BigInt(m.amount),
+      approvalRef: m.approvalRef as Hex,
+      deadline: BigInt(m.deadline),
+    },
+  });
 }
 
 /** The owner the dev token signs in as (the first row), created when the table is empty. */
@@ -122,9 +159,9 @@ export async function seedHold(
   return { tipId, creditId: credit.id, holdId: hold.id, sessionId, packageName };
 }
 
-/** A chain double that records calls. */
+/** A chain double that records calls; signatures are checked as EOA signatures (no RPC). */
 export function fakeChain() {
-  const calls = { release: [] as [Hex, Hex][], refund: [] as Hex[] };
+  const calls = { release: [] as ReleaseCall[], refund: [] as Hex[], verify: 0 };
   let n = 0;
   const tx = () => `0x${(++n).toString(16).padStart(64, "0")}` as Hex;
   const chain = {
@@ -132,16 +169,21 @@ export function fakeChain() {
     fail: null as Error | null,
     /** Simulated mining time, so concurrent callers overlap. */
     delayMs: 0,
-    async release(tipId: Hex, approvalRef: Hex): Promise<Hex> {
+    async release(a: ReleaseCall): Promise<Hex> {
       if (chain.fail) throw chain.fail;
       await new Promise((r) => setTimeout(r, chain.delayMs));
-      calls.release.push([tipId, approvalRef]);
+      calls.release.push(a);
       return tx();
     },
     async refund(tipId: Hex): Promise<Hex> {
       if (chain.fail) throw chain.fail;
       calls.refund.push(tipId);
       return tx();
+    },
+    releaseDomain: () => ({ escrow: ESCROW, chainId: 84532 }),
+    async verifyRelease(approver: Address, typedData: ReleaseTypedData, signature: Hex): Promise<boolean> {
+      calls.verify++;
+      return verifyTypedData({ address: approver, ...typedData, signature }).catch(() => false);
     },
   };
   return chain;

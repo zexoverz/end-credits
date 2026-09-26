@@ -6,7 +6,9 @@ import { eq } from "drizzle-orm";
 import type { Address, Hash, Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { beforeAll, describe, expect, it } from "vitest";
+import { TxRevertedError } from "../chain/txqueue";
 import type { Screen } from "../decision/types";
+import { msg } from "../messages";
 import type { Resolution } from "../payee/resolve";
 import type { NpmPackageWithDownloads } from "../registry/npm";
 
@@ -252,6 +254,24 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
     expect(c.outcome).toBe("capped");
     expect(c.txHash).toBeNull();
     expect(c.reasons).toEqual(expect.arrayContaining([expect.objectContaining({ code: "EXECUTION_FAILED" })]));
+  });
+
+  it("a hold without an approver on chain stays held with NO_APPROVER and no hold row", async () => {
+    const name = `noapprover-${suffix()}`;
+    const payee = randomAddress();
+    const { id } = await seedSession({ [name]: { import: 1 } });
+    const { deps } = fakes({ [name]: payee }, { [payee]: "throw" });
+    deps.escrow.hold = async () => {
+      throw new TxRevertedError("hold", "NoApprover");
+    };
+    await mod.settleSession(id, deps);
+    const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
+    expect(c.outcome).toBe("held");
+    expect(c.txHash).toBeNull();
+    expect(c.reasons).toEqual(
+      expect.arrayContaining([{ source: "policy", code: "NO_APPROVER", text: msg("NO_APPROVER") }]),
+    );
+    expect(await database.select().from(s.holds).where(eq(s.holds.creditId, c.id))).toHaveLength(0);
   });
 
   it("refuses without paying when the payee lookup fails twice", async () => {
