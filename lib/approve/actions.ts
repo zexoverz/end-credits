@@ -10,6 +10,7 @@ import { db } from "../db/client";
 import { approvals, credits, holds } from "../db/schema";
 import { msg } from "../messages";
 import { formatUsdc } from "../money";
+import { returnHold, type ReturnFn } from "../settle/return";
 import { lockHold, type HoldRow } from "./hold";
 import { appendOwnerReason } from "./reasons";
 import type { ReleaseTypedData } from "./typed-data";
@@ -30,6 +31,9 @@ export interface ApproveChain {
   releaseDomain(): { escrow: Address; chainId: number };
   /** EOA, ERC-1271 or ERC-6492 check of the approver's signature over `typedData`. */
   verifyRelease(approver: Address, typedData: ReleaseTypedData, signature: Hex): Promise<boolean>;
+  /** Hot key USDC transfer back to the owner's budget wallet after a refund; omitted → none. */
+  returnToOwner?: ReturnFn;
+  log?: (line: string) => void;
 }
 
 /** A prepared approval row with a stored signature, ready to release. */
@@ -179,6 +183,10 @@ export async function denyHold(
         .update(credits)
         .set({ reasons: appendOwnerReason(row.reasons, "DENIED", message) })
         .where(eq(credits.id, row.creditId));
+      // Still under the hold lock, so the expirer's retry cannot send the same return.
+      if (chain.returnToOwner) {
+        await returnHold(tx, row.holdId, { returnToOwner: chain.returnToOwner, log: chain.log });
+      }
       return { ok: true as const, refundTx, message };
     }),
   );
