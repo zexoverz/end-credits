@@ -2,13 +2,15 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { keccak256, stringToBytes, zeroAddress, type Address } from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { APPROVER, connect, makeOwner, req, signInCookie, TEST_DB } from "../__fixtures__/owner-db";
-import type { OnboardingDeps } from "./onboarding";
+import type { Onboarding, OnboardingDeps } from "./onboarding";
 
 type Conn = Awaited<ReturnType<typeof connect>>;
 
-const WALLET: Address = "0x00000000000000000000000000000000000000Bb";
+// A fresh wallet per run: `wallet_address` is unique and the test DB is reused.
+const WALLET = privateKeyToAccount(generatePrivateKey()).address;
 
 describe.skipIf(!TEST_DB)("owner onboarding (integration)", () => {
   let h: typeof import("./handlers");
@@ -32,12 +34,12 @@ describe.skipIf(!TEST_DB)("owner onboarding (integration)", () => {
     delete process.env.BUDGET_ADDRESS;
   });
 
-  const get = async (d: OnboardingDeps = deps) => {
+  const get = async (d: OnboardingDeps = deps): Promise<Onboarding> => {
     const res = await h.handleOnboarding(req("/api/owner/onboarding", { cookie }), d);
     expect(res.status).toBe(200);
     return res.json();
   };
-  const step = (body: { steps: { id: string }[] }, id: string) => body.steps.find((x) => x.id === id);
+  const step = (body: Onboarding, id: string) => body.steps.find((x) => x.id === id);
 
   it("401 without an owner session", async () => {
     expect((await h.handleOnboarding(req("/api/owner/onboarding"), deps)).status).toBe(401);
