@@ -167,3 +167,12 @@ cache. A MultiBaas failure is still a 503 with no numbers at all.
 
 Where to show them: **`/dashboard`**, actions as a list above the cards (each row links to `href`),
 and the timeline as a 48 h chart under the cards. Hours with no events are present with zeros.
+
+## Claim view: transaction hashes (26 Sep)
+
+Every claim endpoint (`/api/claim/<name>/{wallet,pr,status}` and `claim` in `/api/npm/<name>`) now
+also returns `setClaimTx: string | null` (the escrow `setClaim` tx) and `claimTxs: string[]` (one
+`claim` tx per package of the repo). Link them as `https://sepolia.basescan.org/tx/<hash>` on the
+claimed state. A full claim was run live on 26 Sep on `@endcredits-demo/unclaimed-rehearsal-1`:
+GitHub sign-in, wallet, PR, merge, then `setClaim` `0x982155da…fea1` and `claim` `0xf0bce1f1…921d`
+(0.25 USDC to the maintainer wallet).
