@@ -5,6 +5,7 @@ import { formatUnits, zeroAddress, type Hex } from "viem";
 import { isValidPackageName } from "../attribution/specifier";
 import { msg } from "../messages";
 import { packageKey } from "../payee/keys";
+import type { RiskProfile } from "../risk/profile";
 import type { ClaimDeps } from "./deps";
 import { maintSession } from "./session";
 import type { PackageRow } from "./store";
@@ -25,7 +26,8 @@ export type PackageSummary = {
   cooling: { until: string; message: string } | null;
   maintainer: { login: string } | null;
   claim: ClaimView | null;
-  errors: ("chain" | "payee")[];
+  payeeRisk: RiskProfile | null; // our DB's profile of the current payee (GET /api/risk/<address>)
+  errors: ("chain" | "payee" | "risk")[];
 };
 
 function nameFrom(slug: string[]): string | null {
@@ -94,6 +96,9 @@ export async function packageSummary(req: Request, slug: string[], deps: ClaimDe
 
   const reserved = onChain ? formatUnits(onChain.reserved, 6) : null;
   const found = payee?.address ? { address: payee.address, source: payee.source } : null;
+  const payeeRisk =
+    found && deps.riskOf ? await deps.riskOf(found.address).catch(() => (errors.push("risk"), null)) : null;
+
   const state: SummaryState =
     claimRow?.status === "claimed" || claimRow?.status === "refused"
       ? claimRow.status
@@ -119,6 +124,7 @@ export async function packageSummary(req: Request, slug: string[], deps: ClaimDe
     cooling: onChain?.cooling ? { until: onChain.cooling, message: msg("COOLING", { time: onChain.cooling }) } : null,
     maintainer: maintainer ? { login: maintainer.githubLogin } : null,
     claim: claimRow && pkg.repoFullName ? claimView(pkg.repoFullName, claimRow) : null,
+    payeeRisk,
     errors,
   };
   return Response.json(body, { headers });

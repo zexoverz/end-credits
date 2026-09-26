@@ -56,6 +56,8 @@ const dash: Dashboard = {
   packages: [],
   sessions: { count: 2 },
   recent: [],
+  actions: [],
+  timeline: [],
 };
 
 describe("cardsView", () => {

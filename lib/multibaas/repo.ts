@@ -35,6 +35,21 @@ export function drizzleDashboardRepo(database: Database = db()): DashboardRepo {
       return row?.n ?? 0;
     },
 
+    async holdsByTip(tipIds) {
+      const rows = await database
+        .select({ tipId: holds.tipId, package: packages.name, payee: credits.payee, reasons: credits.reasons })
+        .from(holds)
+        .innerJoin(credits, eq(credits.id, holds.creditId))
+        .innerJoin(packages, eq(packages.id, credits.packageId))
+        .where(inArray(sql`lower(${holds.tipId})`, tipIds.map((t) => t.toLowerCase())));
+      return rows.map((r) => ({
+        tipId: r.tipId.toLowerCase(),
+        package: r.package,
+        payee: r.payee,
+        reasons: Array.isArray(r.reasons) ? (r.reasons as { text: string }[]) : [],
+      }));
+    },
+
     async lastDecisions(keys) {
       const rows = await database
         .select({ packageKey: packages.packageKey, outcome: credits.outcome, decidedAt: credits.decidedAt })

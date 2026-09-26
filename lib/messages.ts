@@ -61,6 +61,9 @@ export const MESSAGES = {
   NOT_A_PAYWALL:
     "End Credits is opt-in for whoever runs the agent. Packages stay free for everyone.",
   ROLL_TITLE: "This session was made possible by",
+  ACTION_APPROVE: "Approve or deny {amount} USDC held for {package}.",
+  ACTION_EXPIRING: "{amount} USDC for {package} expires at {time}. Not approved by then, it returns to you.",
+  ACTION_RESERVE: "{amount} USDC reserved for {package} from {sessions} sessions, waiting for the maintainer to claim.",
 } as const;
 
 export type MessageCode = keyof typeof MESSAGES;

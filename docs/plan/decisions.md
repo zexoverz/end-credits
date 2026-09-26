@@ -1095,3 +1095,37 @@ substituted sender, not our payment. Showing it would mislead, so the settler ru
 only when `SIMULATE_PAYMENTS=true` (for a mainnet payer). Screening the x402 payer on the paid side
 stays on. This is also API feedback: simulation cannot cover a testnet agent's payment, and
 signature analysis does not cover EIP-3009 `TransferWithAuthorization`, the message x402 signs.
+## Risk profile and dashboard actions (26 Sep)
+
+- **`GET /api/risk/<address>`** (`lib/risk/profile.ts`) reads only our DB: `screens`,
+  `payee_observations`, `credits`. No Intercepta call, so a page view costs no API quota and cannot
+  hold anything up. Latest verdict per kind is the newest reusable row (200, or the no-history 404);
+  failed calls count in `screens.count` but are never a verdict. Addresses are matched with
+  `lower()` because `credits.payee` and observations are stored checksummed. A checksum that does not
+  validate is a 400; an address we never saw is an empty 200.
+- **`payeeOf[].addresses`** lists every address the package ever named, so a moved payout shows both
+  sides whichever address is asked about. `current` is the package's latest observation.
+- **`/api/npm/<name>` `payeeRisk`**: the same profile for the resolved payee, through an optional
+  `ClaimDeps.riskOf`. A failed read reports `errors: ["risk"]` and `null`, like `chain` and `payee`.
+- **Dashboard `actions`**: pending holds are Held tips with no Released/Refunded row in
+  `held_status`, expiry from `Held.expiresAt` (the `detail` column). A hold past its expiry is left
+  out: `release` would revert `TipExpired`. Warnings (expiry within 2 h) first, then holds by soonest
+  expiry, then reserves > 0 largest first. Titles are three new message codes (`ACTION_APPROVE`,
+  `ACTION_EXPIRING`, `ACTION_RESERVE`), 52 codes now.
+- **Dashboard `timeline`**: 48 UTC hours. `paid` from `paid_totals` (escrow excluded, as the card);
+  the escrow series from `recent`, which now pages on while its last row is inside the window
+  instead of stopping at 50. `held_status` has no `triggered_at`, and changing a saved query means a
+  re-run of `multibaas-setup.ts`, so `recent` was the one query to extend. Same 6 calls per refresh
+  unless more than 50 escrow events happened in 48 h.
+- `triggered_at` is Postgres text (`2026-09-26 10:38:38+00`); `parseTriggeredAt` reads it and ISO.
+- Live check, 26 Sep (read-only, 10 MultiBaas calls in total, no DB): `held_status` 8 rows (4 tips,
+  all resolved, so no hold actions), `reserved_by_package` 3 packages at 0.25 USDC each (3
+  `reserve_waiting` actions), `paid_totals` 0 rows on v2. Timeline hour 10:00 UTC: held 0.75,
+  released 0.25, refunded 0.5, reserved 0.75, matching the raw rows. The dashboard build made 6 calls.
+
+## MultiBaas address filters are case-sensitive (26 Sep)
+
+`paid_totals` returned 0 rows although the x402 payments were indexed: MultiBaas stores event
+address inputs in lowercase and compares filter values as strings. Filtering on the checksummed
+payer matched nothing; the lowercase payer matches. The saved query is re-saved by
+`scripts/multibaas-setup.ts`.

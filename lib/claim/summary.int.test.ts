@@ -139,6 +139,23 @@ describe.skipIf(!DB_URL)("GET /api/npm/<name> summary (integration)", () => {
     expect(r.body.payee).toEqual({ address: FUNDED, source: "drips" });
   });
 
+  it("payeeRisk: our profile of the current payee, null without one", async () => {
+    deps.riskOf = (await import("../risk/profile")).riskProfile;
+    expect((await get()).body.payeeRisk).toBeNull();
+    payee = { address: FUNDED, source: "drips", sourceUrl: "x" };
+    const r = await get();
+    expect(r.body.payeeRisk).toMatchObject({ address: FUNDED, source: "db", screens: { count: 0 } });
+  });
+
+  it("payeeRisk failure is reported, not guessed", async () => {
+    deps.riskOf = async () => {
+      throw new Error("db down");
+    };
+    payee = { address: FUNDED, source: "drips", sourceUrl: "x" };
+    const r = await get();
+    expect(r.body).toMatchObject({ payeeRisk: null, errors: ["risk"] });
+  });
+
   it("COOLING while a changed claim is inside the delay", async () => {
     const changedAt = BigInt(NOW - 3600);
     chain.claims.set(packageKey(pkg), { payee: FUNDED, changed: true, changedAt });

@@ -15,7 +15,7 @@ export const K3 = k(0xa3);
 export const K4 = k(0xa4);
 export const S1 = k(0x51);
 export const S2 = k(0x52);
-const tip = (n: number) => k(0x700 + n);
+export const tip = (n: number) => k(0x700 + n);
 const tx = (n: number) => k(0x900 + n);
 export const T1 = tx(1);
 export const T3 = tx(3);
@@ -108,6 +108,16 @@ export function fakeDashboardRepo(): DashboardRepo {
       { txHash: T3, packageKey: K2, sessionKey: S2 },
     ]),
     refusedCount: vi.fn(async () => 3),
+    holdsByTip: vi.fn(async (tips: string[]) =>
+      tips
+        .filter((t) => t === tip(4))
+        .map((t) => ({
+          tipId: t,
+          package: "@endcredits-demo/moved-payout",
+          payee: B,
+          reasons: [{ text: "Held: the funding address for @endcredits-demo/moved-payout changed today. Waiting for the owner." }],
+        })),
+    ),
     lastDecisions: vi.fn(async () => [
       { packageKey: K1, outcome: "paid", decidedAt: new Date("2026-09-26T01:00:00Z") },
       { packageKey: K3, outcome: "reserved", decidedAt: new Date("2026-09-26T01:05:00Z") },

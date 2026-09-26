@@ -3,6 +3,16 @@
 // decision per package, and the refused count (refusals have no chain event; labelled as such).
 // Any MultiBaas failure propagates: the route answers 503 with the error, never a made-up number.
 import { formatUnits } from "viem";
+import {
+  buildActions,
+  buildTimeline,
+  parseTriggeredAt,
+  pendingHolds,
+  timelineStart,
+  type Action,
+  type HoldInfo,
+  type TimelineBucket,
+} from "./actions";
 import { MultiBaasError, type MultiBaasClient } from "./client";
 import { QUERY_LABELS, USDC_ALIAS } from "./queries";
 import {
@@ -23,6 +33,7 @@ export interface DashboardRepo {
   creditsByTx(txHashes: string[]): Promise<{ txHash: string; packageKey: string; sessionKey: string }[]>;
   refusedCount(): Promise<number>;
   lastDecisions(keys: string[]): Promise<{ packageKey: string; outcome: string | null; decidedAt: Date | null }[]>;
+  holdsByTip(tipIds: string[]): Promise<HoldInfo[]>;
 }
 
 export interface DashboardDeps {
@@ -72,6 +83,8 @@ export interface Dashboard {
   packages: PackageRow[];
   sessions: { count: number };
   recent: RecentEvent[];
+  actions: Action[];
+  timeline: TimelineBucket[];
 }
 
 export const CACHE_TTL_MS = 60_000;
@@ -85,6 +98,7 @@ interface Transfer {
   recipient: string;
   amount: bigint;
   tx: string;
+  at: unknown;
 }
 
 function paidTransfers(rows: Row[], payer: string, escrow: string): Transfer[] {
@@ -96,6 +110,7 @@ function paidTransfers(rows: Row[], payer: string, escrow: string): Transfer[] {
       recipient: toAddress(field(r, "recipient")),
       amount: toMicro(field(r, "amount")),
       tx: toBytes32(field(r, "tx")),
+      at: r.at,
     }))
     .filter((t) => t.recipient !== esc);
 }
@@ -136,13 +151,17 @@ function recentEvents(rows: Row[]): RecentEvent[] {
 
 export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
   const { mb, repo } = deps;
+  const now = deps.now?.() ?? Date.now();
+  // `recent` is newest first: read further pages only while they are still inside the timeline.
+  const start = timelineStart(now);
+  const beforeTimeline = (r: Row) => (parseTriggeredAt(r.at) ?? 0) < start;
   const [paidRows, heldRows, reservedRows, reserveRows, sessionRows, recentRows] = await Promise.all([
     queryRows(mb, QUERY_LABELS.paid),
     queryRows(mb, QUERY_LABELS.held),
     queryRows(mb, QUERY_LABELS.reserved),
     queryRows(mb, QUERY_LABELS.reservedSessions),
     queryRows(mb, QUERY_LABELS.sessions),
-    queryRows(mb, QUERY_LABELS.recent, { limit: RECENT_LIMIT, all: false }),
+    queryRows(mb, QUERY_LABELS.recent, { limit: RECENT_LIMIT, until: beforeTimeline }),
   ]);
 
   const transfers = paidTransfers(paidRows, deps.payer, deps.escrow);
@@ -166,10 +185,12 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
   }
 
   const keys = [...new Set([...paidByPkg.keys(), ...reservedBalance.keys(), ...sessionsByPkg.keys()])];
-  const [names, decisions, refused] = await Promise.all([
+  const pending = pendingHolds(heldRows);
+  const [names, decisions, refused, holdInfo] = await Promise.all([
     keys.length ? repo.packageNames(keys) : new Map<string, string>(),
     keys.length ? repo.lastDecisions(keys) : [],
     repo.refusedCount(),
+    pending.length ? repo.holdsByTip(pending.map((h) => h.tipId)) : [],
   ]);
   const decisionByKey = new Map(decisions.map((d) => [d.packageKey.toLowerCase(), d]));
 
@@ -188,7 +209,7 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
 
   return {
     source: "multibaas",
-    generatedAt: new Date(deps.now?.() ?? Date.now()).toISOString(),
+    generatedAt: new Date(now).toISOString(),
     escrow: deps.escrow,
     payer: deps.payer,
     cards: {
@@ -204,6 +225,18 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
     packages,
     sessions: { count: sessionRows.length },
     recent: recentEvents(recentRows),
+    actions: buildActions({
+      pending,
+      holds: new Map(holdInfo.map((h) => [h.tipId.toLowerCase(), h])),
+      reserves: waiting.map(([k, amount]) => ({
+        packageKey: k,
+        name: names.get(k) ?? null,
+        amount,
+        sessions: sessionsByPkg.get(k)?.size ?? 0,
+      })),
+      now,
+    }),
+    timeline: buildTimeline(transfers, recentRows, now),
   };
 }
 

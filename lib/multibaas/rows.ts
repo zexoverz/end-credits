@@ -15,7 +15,8 @@ const bad = (what: string, v: unknown) =>
 export async function queryRows(
   mb: MultiBaasClient,
   label: string,
-  opts: { limit?: number; all?: boolean } = {},
+  // `until`: stop after the first page whose last row satisfies it (pages are in query order).
+  opts: { limit?: number; all?: boolean; until?: (row: Row) => boolean } = {},
 ): Promise<Row[]> {
   const limit = opts.limit ?? PAGE_SIZE;
   const out: Row[] = [];
@@ -27,6 +28,7 @@ export async function queryRows(
     if (!Array.isArray(rows)) throw bad(`result for ${label}`, result);
     out.push(...(rows as Row[]));
     if (opts.all === false || rows.length < limit) return out;
+    if (opts.until && opts.until(rows[rows.length - 1] as Row)) return out;
   }
   throw new MultiBaasError(`MultiBaas ${label}: more than ${MAX_PAGES * limit} rows`, "parse");
 }
