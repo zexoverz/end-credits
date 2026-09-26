@@ -136,14 +136,14 @@ describe("txqueue", () => {
     expect(write).toHaveBeenNthCalledWith(2, A, call, 8);
   });
 
-  it("retries already known with a higher nonce", async () => {
+  it("does not resend on already known, so the same call is never sent twice", async () => {
     const write = vi
       .fn<TxIo["write"]>()
       .mockRejectedValueOnce(new Error("already known"))
       .mockResolvedValueOnce(`0x${"ab".repeat(32)}`);
     const io = fakeIo({ write });
-    await createTxQueue(io).submit(A, call);
-    expect(write).toHaveBeenNthCalledWith(2, A, call, 8);
+    await expect(createTxQueue(io).submit(A, call)).rejects.toThrow("already known");
+    expect(write).toHaveBeenCalledTimes(1);
   });
 
   it("throws after 3 underpriced sends", async () => {
