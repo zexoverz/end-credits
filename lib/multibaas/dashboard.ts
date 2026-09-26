@@ -34,6 +34,8 @@ export interface DashboardRepo {
   refusedCount(): Promise<number>;
   lastDecisions(keys: string[]): Promise<{ packageKey: string; outcome: string | null; decidedAt: Date | null }[]>;
   holdsByTip(tipIds: string[]): Promise<HoldInfo[]>;
+  /** Every owner's payer address (multi-owner); omitted → only `DashboardDeps.payer`. */
+  payers?(): Promise<string[]>;
 }
 
 export interface DashboardDeps {
@@ -101,11 +103,11 @@ interface Transfer {
   at: unknown;
 }
 
-function paidTransfers(rows: Row[], payer: string, escrow: string): Transfer[] {
-  const from = payer.toLowerCase();
+function paidTransfers(rows: Row[], payers: readonly string[], escrow: string): Transfer[] {
+  const from = new Set(payers.map((p) => p.toLowerCase()));
   const esc = escrow.toLowerCase();
   return rows
-    .filter((r) => field(r, "contract") === USDC_ALIAS && toAddress(field(r, "sender")) === from)
+    .filter((r) => field(r, "contract") === USDC_ALIAS && from.has(toAddress(field(r, "sender"))))
     .map((r) => ({
       recipient: toAddress(field(r, "recipient")),
       amount: toMicro(field(r, "amount")),
@@ -164,7 +166,8 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
     queryRows(mb, QUERY_LABELS.recent, { limit: RECENT_LIMIT, until: beforeTimeline }),
   ]);
 
-  const transfers = paidTransfers(paidRows, deps.payer, deps.escrow);
+  const payers = [deps.payer, ...((await repo.payers?.()) ?? [])];
+  const transfers = paidTransfers(paidRows, payers, deps.escrow);
   const reservedBalance = new Map(
     reservedRows.map((r) => [toBytes32(field(r, "package_key")), toMicro(field(r, "amount"))] as const),
   );

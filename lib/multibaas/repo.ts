@@ -11,6 +11,10 @@ type Queryable = Pick<Database, "select" | "insert">;
 
 export function drizzleDashboardRepo(database: Database = db()): DashboardRepo {
   return {
+    async payers() {
+      const rows = await database.select({ payer: owners.payerAddress }).from(owners);
+      return rows.map((r) => r.payer);
+    },
     async packageNames(keys) {
       const rows = await database
         .select({ key: packages.packageKey, name: packages.name })
