@@ -25,6 +25,7 @@ export interface PendingHold {
 /** GET /api/owner (lib/owner/summary.ts). */
 export interface OwnerSummary {
   owner: { id: string; displayName: string };
+  approver?: string | null;
   settings: SettingsView;
   payer: { address: string; usdcBalance: string | null; error: string | null };
   pendingHolds: PendingHold[];
