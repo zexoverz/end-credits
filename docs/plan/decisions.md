@@ -991,3 +991,29 @@ reserve twice). It throws; the settler records an execution error and nothing mo
 - Live check, 26 Sep (script deleted): `@endcredits-demo/moved-payout` → registry 404 → declared
   `zexoverz/endcredits-fixture-moved-payout` → `repoPublishes` true (false for another name) →
   `0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551` from `FUNDING.json` (drips).
+
+## Intercepta: no history is not an error (26 Sep)
+
+- **Why:** quick-scan answers HTTP 404 with `errors[].message` "An Externally Owned Account with this
+  address doesn't exist." for an address it has never seen on mainnet (probe on `e4-probe`). We
+  treated every non-200 as `HTTP`, so a fresh payee held as `SCREEN_UNAVAILABLE` (or fell back to
+  simulation) and a new passkey wallet failed the claim screen.
+- **Client:** `lib/intercepta/no-history.ts` matches only that case: status 404 and an error message
+  containing "Externally Owned Account" and "doesn't exist", case-insensitive. The quick scan then
+  returns `{ toxicScore: 0, traits: [], noHistory: true }`, no simulation fallback. The row is stored
+  with status 404 and the raw body, so it stays auditable. Any other 404 or error is still an error.
+  Other routes never read the 404 this way.
+- **Reuse:** a no-history row counts as a successful address screen for the 5 min cache and for the
+  x402 freshness check (`latestAddressScreenAt` takes the newer of a 200 and a no-history 404).
+- **Matrix:** after medium, before no-code: `noHistory` → held `HELD_NO_HISTORY`, `holdReason`
+  `MEDIUM` (on-chain 2). A changed fresh address stays `HELD_CHANGED`; refusals and medium still win.
+  Never paid unscreened.
+- **Claims:** a no-history wallet is accepted (new passkey wallets are fresh). Critical traits and a
+  score above 50 still refuse; a real error still fails closed.
+- **Known gap:** the probe's ScamSniffer phishing receiver `0x3da0…e155` also has no history. As a
+  payee it holds; as a claim wallet it would pass the screen. The claim is still gated by repo
+  write access and the funding file.
+- Live check, 26 Sep (script not committed, nothing stored): `0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551`
+  (moved-payout address A) now answers **200** `{toxicScore: 0, traits: []}`, not the 404, so it is a
+  normal clean screen. `0x3da02e1f29bcbed185eca0d3299efd46e6e7e155` answers the 404, and the client
+  returns `noHistory: true` with the raw body stored at status 404.
