@@ -247,9 +247,70 @@ fixed hostname, not a preview URL.
 | `wallet_bound` | a wallet is bound | the wallet address | null |
 | `budget_set` | always (defaults exist) | `"2 USDC per session, 0.25 per package, 20 per day"` from the saved values | `/app/owner#budget` |
 | `approver_set` | on-chain `approverOf(payer)` is set | the approver address; `"chain unavailable"` on a failed read | `/app/owner#approver` |
-| `spend_allowance` | the budget wallet has an allowance > 0 | `"coming soon"` for now, later `"<n> USDC"` | `/app/owner#allowance` |
+| `spend_allowance` | the budget wallet (`budget_owner`, else the sign-in wallet) gives our agent key an allowance with something left this period, and its USDC approval to the budget contract covers a full period | `"coming soon"` without `BUDGET_ADDRESS`; else `"20 USDC per day, 12.5 left"` (plus `", only 5 USDC approved"` when short), null when none | `/app/owner#allowance` |
 | `agent_key` | a non-revoked agent key exists | null | `/app/owner#keys` |
 | `first_session` | a session was uploaded | null | `/app/credits/<latest session id>`, null before |
 
 `next` is the id of the first step not done (null when all are). The page needs the anchors `#budget`,
 `#approver`, `#allowance` and `#keys`.
+
+## Budget wallet (spend limits)
+
+The owner's USDC stays in the owner's own wallet. From that wallet the owner approves USDC to
+`EndCreditsBudget` and gives our agent key (`spender`) an allowance per period. Each settlement pulls
+exactly what the session will pay, hold or reserve, once, before anything moves. All three wallet
+transactions are sent by the browser from the owner's wallet; the server never signs them.
+
+`GET /api/owner/budget` (owner) →
+
+```json
+{
+  "budgetAddress": "0x1429…0b36",
+  "usdc": "0x036C…CF7e",
+  "budgetOwner": "0xAbC…",
+  "spender": "0x9ebd…",
+  "usdcBalance": "12.5",
+  "usdcAllowanceToBudget": "20",
+  "allowance": {
+    "perPeriod": "20",
+    "period": 86400,
+    "periodStart": "2026-09-26T00:00:00.000Z",
+    "spentInPeriod": "1.5",
+    "remaining": "18.5"
+  },
+  "error": null
+}
+```
+
+- USDC amounts are decimal strings; `period` is seconds; `periodStart` is ISO.
+- `budgetAddress: null` means spend limits are off on this server (`BUDGET_ADDRESS` unset): hide the
+  card or show "not switched on". Settlement then pays from the agent key's own balance, as before.
+- `budgetOwner: null` means no wallet named yet: the chain fields are null and nothing was read.
+- `allowance: null` means no allowance for our `spender`; nothing can be pulled.
+- `error: "rpc_unavailable"` when a chain read failed or took over 5 s; the chain fields are null.
+
+`POST /api/owner/budget` `{ address }` stores the budget wallet (checksummed) and answers as GET.
+`400 { error: "invalid_body" }` on a bad address.
+
+`GET /api/owner` now carries the same object as `budget`.
+
+The browser then sends, from the budget wallet on Base Sepolia (84532):
+
+| step | to | call |
+|---|---|---|
+| approve | `usdc` | `approve(budgetAddress, amount)` |
+| allowance | `budgetAddress` | `setAllowance(spender, perPeriod, period)`, period 3600 to 2592000 s |
+| revoke | `budgetAddress` | `revoke(spender)` |
+
+`components/budget/budget-wallet.tsx` does all of this (MetaMask via `window.ethereum` first, Base
+Account otherwise), defaults the cap to the owner's daily limit per day, and sits next to the approver
+card on `/owner` with `id="allowance"`. Copy is in `lib/copy/budget.ts`. Restyle freely.
+
+Two new credit reasons can appear:
+
+| code | text |
+|---|---|
+| `BUDGET_PULL_FAILED` | "Not sent: the owner's budget wallet refused the pull ({error})." on every credit that would have moved; `{error}` is the revert name, e.g. `OverPeriodCap`, `NoAllowance`, `ERC20InsufficientAllowance` or USDC's revert string. The decisions stay; nothing moved. |
+| `BUDGET_CAP` | "The owner's on-chain budget has nothing left this period. Nothing was sent." on every credit (dust) when the allowance has nothing left |
+
+The session row has a new `budget_pull_tx` (the pull's tx hash, null when there was no pull).

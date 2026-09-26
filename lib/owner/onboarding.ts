@@ -2,6 +2,8 @@
 // in the order the UI renders them, and `next` = the first step not done.
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { zeroAddress, type Address } from "viem";
+import { allowanceOf, remaining, usdcAllowanceToBudget } from "../chain/budget";
+import { chain } from "../chain/keys";
 import { db } from "../db/client";
 import { agentKeys, sessions } from "../db/schema";
 import { formatUsdc } from "../money";
@@ -33,12 +35,37 @@ export interface Onboarding {
 export interface OnboardingDeps {
   /** The escrow approver in force for `payer` (zero address when none). */
   approverOf(payer: Address): Promise<Address>;
-  /** The budget wallet's spend allowance in micro-USDC; null when unknown. */
-  readSpendAllowance?(wallet: Address | null): Promise<bigint | null>;
+  /** The budget wallet's allowance for our hot key (EndCreditsBudget); null when none is set. */
+  readSpendAllowance?(wallet: Address | null): Promise<SpendAllowance | null>;
 }
 
-/** Stub until the budget contract lands: another change reads the allowance here. */
-export const readSpendAllowance: NonNullable<OnboardingDeps["readSpendAllowance"]> = async () => null;
+/** Micro-USDC, and the period in seconds. */
+export interface SpendAllowance {
+  perPeriod: bigint;
+  period: bigint;
+  /** What the hot key can still pull this period. */
+  remaining: bigint;
+  /** USDC the wallet has approved to the budget contract. */
+  approved: bigint;
+}
+
+/** EndCreditsBudget on Base Sepolia: `wallet`'s allowance for our payer (hot) key. */
+export const readSpendAllowance: NonNullable<OnboardingDeps["readSpendAllowance"]> = async (wallet) => {
+  if (!wallet) return null;
+  const ctx = chain();
+  const spender = ctx.payer.account.address;
+  const [a, left, approved] = await Promise.all([
+    allowanceOf(wallet, spender, ctx),
+    remaining(wallet, spender, ctx),
+    usdcAllowanceToBudget(wallet, ctx),
+  ]);
+  return a && { perPeriod: a.perPeriod, period: a.period, remaining: left, approved };
+};
+
+const PERIOD_NAMES: Record<string, string> = { "3600": "hour", "86400": "day", "604800": "week" };
+
+const perPeriodLabel = (seconds: bigint) =>
+  PERIOD_NAMES[seconds.toString()] ?? `${Number(seconds) / 3600} hours`;
 
 const OWNER_PAGE = "/app/owner";
 
@@ -53,19 +80,27 @@ async function approverStep(payer: Address, deps: OnboardingDeps): Promise<Step>
   }
 }
 
+// Done when the hot key can pull now and the USDC approval covers a full period.
 async function allowanceStep(wallet: Address | null, deps: OnboardingDeps): Promise<Step> {
   const step = { id: "spend_allowance" as const, href: `${OWNER_PAGE}#allowance` };
   if (!process.env.BUDGET_ADDRESS) return { ...step, done: false, detail: "coming soon" };
   const read = deps.readSpendAllowance ?? readSpendAllowance;
   const allowance = await read(wallet).catch(() => null);
   if (allowance === null) return { ...step, done: false, detail: null };
-  return { ...step, done: allowance > BigInt(0), detail: `${formatUsdc(allowance)} USDC` };
+  const covered = allowance.approved >= allowance.perPeriod;
+  const detail =
+    `${formatUsdc(allowance.perPeriod)} USDC per ${perPeriodLabel(allowance.period)}, ` +
+    `${formatUsdc(allowance.remaining)} left` +
+    (covered ? "" : `, only ${formatUsdc(allowance.approved)} USDC approved`);
+  return { ...step, done: allowance.remaining > BigInt(0) && covered, detail };
 }
 
 export async function ownerOnboarding(ownerId: string, deps: OnboardingDeps): Promise<Onboarding | null> {
   const row = await ownerRow(ownerId);
   if (!row) return null;
   const wallet = (row.walletAddress as Address | null) ?? null;
+  // The funding wallet the budget pulls from; the sign-in wallet until one is named.
+  const funder = ((row.budgetOwner ?? row.walletAddress) as Address | null) ?? null;
   const [key] = await db()
     .select({ id: agentKeys.id })
     .from(agentKeys)
@@ -86,7 +121,7 @@ export async function ownerOnboarding(ownerId: string, deps: OnboardingDeps): Pr
     { id: "wallet_bound", done: wallet !== null, detail: wallet, href: null },
     { id: "budget_set", done: true, detail: budget, href: `${OWNER_PAGE}#budget` },
     await approverStep(row.payerAddress as Address, deps),
-    await allowanceStep(wallet, deps),
+    await allowanceStep(funder, deps),
     { id: "agent_key", done: Boolean(key), detail: null, href: `${OWNER_PAGE}#keys` },
     {
       id: "first_session",

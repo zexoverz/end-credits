@@ -2,6 +2,7 @@
 // faked here), the escrow through the tx queue, and the x402 client paying our own credit route.
 import { zeroAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { budgetAddress, pull, remaining } from "../chain/budget";
 import { claimOf, hold, recordSession, reserve } from "../chain/escrow";
 import { chain } from "../chain/keys";
 import { db } from "../db/client";
@@ -29,6 +30,7 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
   const githubToken = env.GITHUB_TOKEN_READ || undefined;
   const observations = dbObservations(database);
   const intercepta = interceptaFromEnv(drizzleScreenRepo(database));
+  const budget = budgetAddress(env);
 
   return {
     database,
@@ -58,6 +60,15 @@ export function settleDepsFromEnv(env: Env = process.env, log?: (line: string) =
       hold: (a) => hold(a, ctx),
       recordSession: (s) => recordSession(s, ctx),
     },
+    // Spend limits: pull from the owner's own wallet when BUDGET_ADDRESS is set (decisions.md).
+    ...(budget
+      ? {
+          budget: {
+            remaining: (owner: Address) => remaining(owner, undefined, ctx, budget),
+            pull: (owner: Address, amount: bigint) => pull(owner, amount, ctx, budget),
+          },
+        }
+      : {}),
     payCredit: (credit) =>
       payCredit(credit, {
         account,

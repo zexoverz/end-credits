@@ -34,6 +34,8 @@ export const owners = pgTable(
     holdTtlSeconds: integer("hold_ttl_seconds").notNull().default(86400),
     settleMode: text("settle_mode").notNull().default("auto"),
     approverAddress: text("approver_address"),
+    /** The owner's own funding wallet: EndCreditsBudget pulls each session's spend from it. */
+    budgetOwner: text("budget_owner"),
     walletAddress: text("wallet_address").unique(),
     createdAt: createdAt(),
   },
@@ -79,6 +81,7 @@ export const sessions = pgTable(
     settleRequestedAt: ts("settle_requested_at"),
     manifestHash: text("manifest_hash"),
     recordTx: text("record_tx"),
+    budgetPullTx: text("budget_pull_tx"),
     createdAt: createdAt(),
   },
   (t) => [

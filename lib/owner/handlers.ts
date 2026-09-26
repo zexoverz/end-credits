@@ -3,6 +3,7 @@ import { isAddress, type Address } from "viem";
 import { z } from "zod";
 import { withOwner } from "../auth/owner";
 import { getApprover, setOwnerApprover, type ApproverChain } from "./approver";
+import { getBudget, setBudgetOwner, type BudgetChain } from "./budget";
 import { createKey, keyInput, listKeys, revokeKey } from "./keys";
 import { ownerOnboarding, type OnboardingDeps } from "./onboarding";
 import { ownerRow, settingsInput, settingsView, updateSettings } from "./settings";
@@ -83,6 +84,26 @@ export function handleSetApprover(req: Request, chain: ApproverChain): Promise<R
     const parsed = approverInput.safeParse(await body(req));
     if (!parsed.success) return invalid(z.flattenError(parsed.error).fieldErrors);
     return result(await setOwnerApprover(ownerId, parsed.data.address as Address, chain));
+  });
+}
+
+const budgetInput = z.object({ address: z.string().refine((a) => isAddress(a, { strict: false })) });
+
+/** GET /api/owner/budget → the budget wallet and its on-chain allowance for our hot key. */
+export function handleGetBudget(req: Request, chain: BudgetChain): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => {
+    const view = await getBudget(ownerId, chain);
+    return view ? Response.json(view, { headers: noStore }) : notFound();
+  });
+}
+
+/** POST /api/owner/budget { address } → stores the owner's funding wallet, answers as GET. */
+export function handleSetBudget(req: Request, chain: BudgetChain): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => {
+    const parsed = budgetInput.safeParse(await body(req));
+    if (!parsed.success) return invalid(z.flattenError(parsed.error).fieldErrors);
+    const view = await setBudgetOwner(ownerId, parsed.data.address, chain);
+    return view ? Response.json(view, { headers: noStore }) : notFound();
   });
 }
 

@@ -29,6 +29,8 @@ export const MESSAGES = {
   DAILY_LIMIT: "Daily limit reached. Nothing was sent.",
   RESOLVE_FAILED: "Not sent: the payee lookup failed ({error}). Nothing was paid.",
   EXECUTION_FAILED: "Decided, but the transfer did not go through ({error}). Nothing was sent.",
+  BUDGET_PULL_FAILED: "Not sent: the owner's budget wallet refused the pull ({error}).",
+  BUDGET_CAP: "The owner's on-chain budget has nothing left this period. Nothing was sent.",
   NO_APPROVER: "Held, but the owner has no approver wallet yet. Set one on /owner.",
   PAYEE_INVALID: "The funding file names an invalid address.",
   SPOOF_REPO: "Reserved: {repo} does not publish {package}.",
