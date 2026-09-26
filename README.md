@@ -519,9 +519,12 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
    across a window edge). It still pays from its own address, so it is the escrow payer: it could
    call `setApprover` as the payer; the 3-day delay makes that change public before it counts, and
    holds with the default 24 h TTL expire and refund before then.
-6. USDC that was pulled but not spent stays on the agent key: if an x402 or escrow call fails after
-   the pull, the amount is not swept back to the owner, and escrow refunds also go to the agent key.
-   The next session still pulls its full spend.
+6. USDC pulled but not spent passes through the agent key on its way back: a share whose x402 or
+   escrow call fails after the pull, and a denied or expired tip the escrow refunds to the agent key,
+   are transferred back to the owner's budget wallet by the agent key. A failed transfer is retried
+   every 30 s by the expirer, so until it goes through the money sits on the agent key. An x402
+   payment that errors on our side but settles later could make that return spend the agent key's
+   own balance.
 7. The claim needs a merged PR; orgs that restrict OAuth apps use the prefilled "new file" link, whose
    `filename` and `value` parameters are known from use, not from GitHub's docs. We ask for
    `public_repo`, which GitHub's docs contradict each other on for writing contents.
