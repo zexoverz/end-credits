@@ -53,15 +53,30 @@ export function SetupCommands() {
     }
   }
   return (
-    <div className={s.terminal}>
+    <div className={s.terminal} data-setup-terminal data-motion-zone>
       <div className={s.terminalHeader}>
         <span>{C.terminalTitle}</span>
         <button onClick={copy}>
           {status === "copied" ? C.copied : C.copy}
         </button>
       </div>
-      <pre>
-        <code>{C.commands.join("\n")}</code>
+      <pre tabIndex={0}>
+        <code>
+          {C.commands.map((line, i) => (
+            <span
+              key={i}
+              data-terminal-line
+              style={{ animationDelay: `${i * 0.15}s` }}
+            >
+              {line}
+              {i === C.commands.length - 1 && (
+                <span data-terminal-cursor aria-hidden="true">
+                  ▌
+                </span>
+              )}
+            </span>
+          ))}
+        </code>
       </pre>
       <p aria-live="polite">{status === "error" ? C.copyError : C.setupHint}</p>
     </div>

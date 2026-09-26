@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { usePageMotion } from "./motion";
 import { TECHNICAL as T } from "@/lib/copy/technical";
 import s from "@/app/landing/technical.module.css";
 function PipelineIcon({ index }: { index: number }) {
@@ -46,28 +47,30 @@ function PipelineIcon({ index }: { index: number }) {
   );
 }
 export function TechnicalFlow() {
+  const { paused, toggle } = usePageMotion();
   const [active, setActive] = useState(0);
   const [playing, setPlaying] = useState(false);
   const stage = T.stages[active];
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || paused) return;
     const timer = setTimeout(() => {
       if (active === T.stages.length - 1) setPlaying(false);
       else setActive((a) => a + 1);
     }, 4200);
     return () => clearTimeout(timer);
-  }, [active, playing]);
+  }, [active, playing, paused]);
   function run() {
     if (playing) {
       setPlaying(false);
       return;
     }
+    if (paused) toggle();
     setActive(0);
     setPlaying(true);
   }
   return (
     <section className={s.section} id="how">
-      <div className={s.heading}>
+      <div className={s.heading} data-reveal>
         <div>
           <p>{T.eyebrow}</p>
           <h2>
@@ -78,7 +81,7 @@ export function TechnicalFlow() {
         </div>
         <p>{T.body}</p>
       </div>
-      <div className={s.theater}>
+      <div className={s.theater} data-reveal>
         <header className={s.toolbar}>
           <span>
             <i />
