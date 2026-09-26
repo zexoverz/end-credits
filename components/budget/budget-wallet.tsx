@@ -21,6 +21,11 @@ import { fill } from "@/lib/client/approve";
 import { WORKSPACE as W } from "@/lib/copy/workspace";
 import { BUDGET_COPY as C } from "@/lib/copy/budget";
 import { parseUsdc, USDC_PATTERN } from "@/lib/money";
+import {
+  spendingAmount,
+  approvalCovers,
+  spendingArguments,
+} from "./spending-limit";
 
 export interface BudgetView {
   budgetAddress: string | null;
@@ -47,7 +52,8 @@ const ABI = parseAbi([
 
 const DAY = 86400;
 const PERIOD_OPTIONS = [3600, DAY, 7 * DAY];
-const periodName = (s: number) => C.PERIODS[String(s)] ?? `${s / 3600} hours`;
+const periodName = (s: number) =>
+  C.PERIODS[String(s)] ?? fill(C.HOURS, { hours: String(s / 3600) });
 const same = (a: string | null, b: string | null) =>
   !!a && !!b && a.toLowerCase() === b.toLowerCase();
 const REFRESH_AFTER_MS = 4_000;
@@ -84,7 +90,7 @@ export function BudgetWallet() {
   const [browserWallet, setBrowserWallet] = useState(false);
   const [perPeriod, setPerPeriod] = useState("");
   const [period, setPeriod] = useState(DAY);
-  const [approveAmount, setApproveAmount] = useState("");
+  const [sliderMax, setSliderMax] = useState(100);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{
     kind: "ok" | "error";
@@ -105,7 +111,7 @@ export function BudgetWallet() {
     void api<{ dailyLimit: string }>("/api/owner/settings").then((r) => {
       if (r.ok) {
         setPerPeriod((v) => v || r.data.dailyLimit);
-        setApproveAmount((v) => v || r.data.dailyLimit);
+        setSliderMax((v) => Math.max(v, Number(r.data.dailyLimit)));
       }
     });
     const t = setTimeout(() => setBrowserWallet(hasInjectedWallet()), 0);
@@ -156,11 +162,6 @@ export function BudgetWallet() {
       return C.SENT;
     });
 
-  const amount = (v: string) => {
-    if (!USDC_PATTERN.test(v)) throw new Error(C.BAD_AMOUNT);
-    return parseUsdc(v);
-  };
-
   if (view && !view.budgetAddress) {
     return (
       <Card title={C.TITLE}>
@@ -171,6 +172,19 @@ export function BudgetWallet() {
 
   const isOwner = !!wallet && same(wallet.address, view?.budgetOwner ?? null);
   const a = view?.allowance;
+  const readable =
+    !!view &&
+    !view.error &&
+    !!view.spender &&
+    !!view.usdc &&
+    !!view.budgetAddress;
+  const validAmount = USDC_PATTERN.test(perPeriod) && parseUsdc(perPeriod) > 0n;
+  const approvalReady =
+    readable && approvalCovers(view.usdcAllowanceToBudget, perPeriod);
+  const selectLimit = (value: string) => {
+    setPerPeriod(value);
+    setNote(null);
+  };
 
   return (
     <Card title={C.TITLE}>
@@ -263,79 +277,159 @@ export function BudgetWallet() {
         )}
 
         {isOwner && view && (
-          <div className="allowance-controls">
-            <div className="allowance-control">
-              <h3>{C.APPROVE_STEP}</h3>
-              <p>{C.APPROVE_HELP}</p>
-              <label htmlFor="spend-approval">{C.APPROVE_AMOUNT}</label>
-              <input
-                id="spend-approval"
-                inputMode="decimal"
-                value={approveAmount}
-                onChange={(e) => setApproveAmount(e.target.value)}
-              />
-              <Button
-                type="button"
-                disabled={!!busy}
-                onClick={() =>
-                  sendFromOwner(C.APPROVE, view.usdc, () =>
-                    encodeFunctionData({
-                      abi: ABI,
-                      functionName: "approve",
-                      args: [view.budgetAddress as Hex, amount(approveAmount)],
-                    }),
-                  )
-                }
-              >
-                {C.APPROVE}
-              </Button>
-            </div>
-            <div className="allowance-control">
-              <h3>{C.ALLOWANCE_STEP}</h3>
-              <p>{C.ALLOWANCE_HELP}</p>
-              <label htmlFor="spend-period-amount">{C.PER_PERIOD}</label>
+          <div className="spending-setup">
+            <div className="spending-slider-panel">
+              <label htmlFor="spend-period-amount">{C.SLIDER}</label>
+              <div className="spending-amount">
+                <output htmlFor="spend-period-amount">
+                  {perPeriod || C.UNKNOWN}
+                </output>
+                <span>{W.unit}</span>
+                <label className="spending-period-label" htmlFor="spend-period">
+                  {C.PERIOD}
+                </label>
+                <select
+                  id="spend-period"
+                  value={period}
+                  disabled={!!busy}
+                  onChange={(e) => setPeriod(Number(e.target.value))}
+                >
+                  {PERIOD_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {periodName(s)}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <input
                 id="spend-period-amount"
-                inputMode="decimal"
-                value={perPeriod}
-                onChange={(e) => setPerPeriod(e.target.value)}
-              />
-              <label htmlFor="spend-period">{C.PERIOD}</label>
-              <select
-                id="spend-period"
-                value={period}
-                onChange={(e) => setPeriod(Number(e.target.value))}
-              >
-                {PERIOD_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {periodName(s)}
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                disabled={!!busy}
-                onClick={() =>
-                  sendFromOwner(C.SET_ALLOWANCE, view.budgetAddress, () =>
-                    encodeFunctionData({
-                      abi: ABI,
-                      functionName: "setAllowance",
-                      args: [
-                        view.spender as Hex,
-                        amount(perPeriod),
-                        BigInt(period),
-                      ],
-                    }),
-                  )
+                type="range"
+                min="0.000001"
+                max={sliderMax}
+                step="0.000001"
+                value={perPeriod || "0.000001"}
+                disabled={!!busy || !perPeriod}
+                aria-valuetext={fill(C.STEP_AMOUNT, {
+                  amount: perPeriod || C.UNKNOWN,
+                })}
+                aria-describedby="spending-help"
+                onChange={(e) =>
+                  selectLimit(String(Number(Number(e.target.value).toFixed(6))))
                 }
-              >
-                {C.SET_ALLOWANCE}
-              </Button>
+              />
+              <div className="spending-scale">
+                <span>0</span>
+                <span>
+                  {sliderMax} {W.unit}
+                </span>
+              </div>
+              <div className="spending-presets">
+                {[5, 20, 50, 100].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={!!busy}
+                    aria-pressed={perPeriod === String(value)}
+                    onClick={() => {
+                      setSliderMax((max) => Math.max(max, value));
+                      selectLimit(String(value));
+                    }}
+                  >
+                    {value} {W.unit}
+                  </button>
+                ))}
+              </div>
+              <div className="spending-range">
+                <span>
+                  {C.RANGE}: {sliderMax} {W.unit}
+                </span>
+                <button
+                  type="button"
+                  disabled={
+                    !!busy ||
+                    sliderMax <= 100 ||
+                    Number(perPeriod) > sliderMax / 10
+                  }
+                  onClick={() => setSliderMax((max) => Math.max(100, max / 10))}
+                >
+                  {C.RANGE_LESS}
+                </button>
+                <button
+                  type="button"
+                  disabled={!!busy || sliderMax >= 100_000_000}
+                  onClick={() =>
+                    setSliderMax((max) => Math.min(100_000_000, max * 10))
+                  }
+                >
+                  {C.RANGE_MORE}
+                </button>
+              </div>
+              <p id="spending-help">{C.SLIDER_HELP}</p>
+            </div>
+            <div className="allowance-controls">
+              <div className="allowance-control">
+                <h3>{C.APPROVE_STEP}</h3>
+                <p>{C.APPROVE_HELP}</p>
+                <strong className="spending-step-amount">
+                  {fill(C.STEP_AMOUNT, { amount: perPeriod || C.UNKNOWN })}
+                </strong>
+                <Button
+                  type="button"
+                  disabled={!!busy || !readable || !validAmount}
+                  onClick={() =>
+                    sendFromOwner(C.APPROVE, view.usdc, () => {
+                      if (!readable) throw new Error(C.NOT_READY);
+                      return encodeFunctionData({
+                        abi: ABI,
+                        functionName: "approve",
+                        args: [
+                          view.budgetAddress as Hex,
+                          spendingAmount(perPeriod),
+                        ],
+                      });
+                    })
+                  }
+                >
+                  {C.APPROVE}
+                </Button>
+              </div>
+              <div className="allowance-control">
+                <h3>{C.ALLOWANCE_STEP}</h3>
+                <p>{C.ALLOWANCE_HELP}</p>
+                <p className="spending-approval-state" role="status">
+                  {approvalReady ? C.APPROVAL_READY : C.APPROVAL_REQUIRED}
+                </p>
+                <Button
+                  type="button"
+                  disabled={!!busy || !approvalReady}
+                  onClick={() =>
+                    sendFromOwner(C.SET_ALLOWANCE, view.budgetAddress, () => {
+                      if (!readable) throw new Error(C.NOT_READY);
+                      const selected = spendingArguments(
+                        perPeriod,
+                        period,
+                        view.usdcAllowanceToBudget,
+                      );
+                      return encodeFunctionData({
+                        abi: ABI,
+                        functionName: "setAllowance",
+                        args: [
+                          view.spender as Hex,
+                          selected.amount,
+                          selected.period,
+                        ],
+                      });
+                    })
+                  }
+                >
+                  {C.SET_ALLOWANCE}
+                </Button>
+              </div>
             </div>
             {a && (
               <Button
                 type="button"
-                disabled={!!busy}
+                disabled={!!busy || !view.spender}
                 onClick={() =>
                   sendFromOwner(C.REVOKE, view.budgetAddress, () =>
                     encodeFunctionData({
