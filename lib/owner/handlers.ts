@@ -5,6 +5,7 @@ import { withOwner } from "../auth/owner";
 import { getApprover, setOwnerApprover, type ApproverChain } from "./approver";
 import { getBudget, setBudgetOwner, type BudgetChain } from "./budget";
 import { createKey, keyInput, listKeys, revokeKey } from "./keys";
+import { ownerOnboarding, type OnboardingDeps } from "./onboarding";
 import { ownerRow, settingsInput, settingsView, updateSettings } from "./settings";
 import { ownerSummary, type SummaryDeps } from "./summary";
 
@@ -103,5 +104,13 @@ export function handleSetBudget(req: Request, chain: BudgetChain): Promise<Respo
     if (!parsed.success) return invalid(z.flattenError(parsed.error).fieldErrors);
     const view = await setBudgetOwner(ownerId, parsed.data.address, chain);
     return view ? Response.json(view, { headers: noStore }) : notFound();
+  });
+}
+
+/** GET /api/owner/onboarding → { steps: [{ id, done, detail, href }], next }. */
+export function handleOnboarding(req: Request, deps: OnboardingDeps): Promise<Response> {
+  return withOwner(req, async ({ ownerId }) => {
+    const onboarding = await ownerOnboarding(ownerId, deps);
+    return onboarding ? Response.json(onboarding, { headers: noStore }) : notFound();
   });
 }

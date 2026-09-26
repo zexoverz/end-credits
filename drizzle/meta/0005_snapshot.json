@@ -1,5 +1,5 @@
 {
-  "id": "8bb2df75-15ee-4800-becb-d4a2db04b81c",
+  "id": "4753e297-3362-4cfb-b4fa-5e8ba92129b6",
   "prevId": "d21fb92a-9858-41f8-84ab-6df0b2dcb087",
   "version": "7",
   "dialect": "postgresql",
@@ -968,8 +968,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "budget_owner": {
-          "name": "budget_owner",
+        "wallet_address": {
+          "name": "wallet_address",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -986,6 +986,13 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "owners_wallet_address_unique": {
+          "name": "owners_wallet_address_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "wallet_address"
+          ]
+        },
         "owners_iss_sub_unique": {
           "name": "owners_iss_sub_unique",
           "nullsNotDistinct": false,
@@ -1415,12 +1422,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "budget_pull_tx": {
-          "name": "budget_pull_tx",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1476,6 +1477,32 @@
           "value": "\"sessions\".\"status\" in ('uploaded','settling','settled','failed')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.siwe_nonces": {
+      "name": "siwe_nonces",
+      "schema": "",
+      "columns": {
+        "nonce": {
+          "name": "nonce",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.usage": {

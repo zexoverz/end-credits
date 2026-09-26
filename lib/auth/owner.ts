@@ -16,7 +16,8 @@ export interface OwnerSession {
   ownerId: string;
 }
 
-type SessionData = Partial<OwnerSession>;
+/** The cookie also carries the live SIWE nonce between `/api/auth/wallet/nonce` and the sign-in. */
+export type OwnerSessionData = Partial<OwnerSession> & { siweNonce?: string; siweNonceExp?: number };
 
 export const worldRequired = () => process.env.WORLD_REQUIRED === "true";
 
@@ -52,11 +53,14 @@ export async function firstOwnerId(): Promise<string | null> {
   return row?.id ?? null;
 }
 
-async function ironSession(req?: Request, out: Headers = new Headers()) {
-  if (req) return getIronSession<SessionData>(webCookies(req, out), sessionOptions());
+/** The `ec_owner` iron session; `save()` writes the cookie to `out`. Without `req`, Next's cookies. */
+export async function ownerIronSession(req?: Request, out: Headers = new Headers()) {
+  if (req) return getIronSession<OwnerSessionData>(webCookies(req, out), sessionOptions());
   const { cookies } = await import("next/headers");
-  return getIronSession<SessionData>(await cookies(), sessionOptions());
+  return getIronSession<OwnerSessionData>(await cookies(), sessionOptions());
 }
+
+const ironSession = ownerIronSession;
 
 /** The signed-in owner from the cookie. Without `req`, reads Next's request cookies. */
 export async function getOwnerSession(req?: Request): Promise<OwnerSession | null> {

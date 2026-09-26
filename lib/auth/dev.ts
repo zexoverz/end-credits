@@ -23,6 +23,15 @@ export async function handleDevLogin(req: Request): Promise<Response> {
   return Response.json({ ownerId }, { headers });
 }
 
+/** GET /api/auth/methods: which sign-in buttons the UI shows. World sign-in is off unless opted in. */
+export function handleAuthMethods(): Response {
+  const dev = !worldRequired() && Boolean(process.env.OWNER_DEV_TOKEN);
+  return Response.json(
+    { wallet: true, dev, world: process.env.WORLD_SIGNIN === "true" },
+    { headers: { "cache-control": "no-store" } },
+  );
+}
+
 export async function handleLogout(req: Request): Promise<Response> {
   const headers = new Headers();
   await clearOwnerSession(req, headers);

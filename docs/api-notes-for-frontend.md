@@ -176,3 +176,80 @@ also returns `setClaimTx: string | null` (the escrow `setClaim` tx) and `claimTx
 claimed state. A full claim was run live on 26 Sep on `@endcredits-demo/unclaimed-rehearsal-1`:
 GitHub sign-in, wallet, PR, merge, then `setClaim` `0x982155da…fea1` and `claim` `0xf0bce1f1…921d`
 (0.25 USDC to the maintainer wallet).
+
+## Wallet sign-in and onboarding
+
+The owner signs in with the same wallet that is the escrow approver (MetaMask or the Base Account
+passkey wallet). World sign-in is off: `GET /api/auth/methods` returns `world: false`, so remove the
+World button from the UI. The dev-token login stays for scripts and as a demo fallback, shown only
+when `dev` is true.
+
+`GET /api/auth/methods` → `{ wallet: true, dev: boolean, world: boolean }`
+
+`POST /api/auth/wallet/nonce` (no body) → `{ nonce: string }`. Sets the `ec_owner` cookie holding the
+nonce for 10 minutes; send the sign-in from the same browser (`credentials: "same-origin"`).
+
+`POST /api/auth/wallet` `{ message: string, signature: "0x…" }` → `200 { ownerId, wallet }` and the
+owner cookie. Errors are `{ error }`:
+
+| status | `error` | meaning |
+|---|---|---|
+| 400 | `invalid_body` | missing message or a signature that is not hex |
+| 401 | `bad_nonce` | no nonce, a nonce not from this cookie, older than 10 min, or already used: get a new one |
+| 401 | `bad_domain` | `domain`, `uri` origin or `chainId` (must be 84532) not this app |
+| 401 | `bad_signature` | the signature does not match the address in the message |
+| 401 | `expired` | `issuedAt` older than 10 min (or in the future), or `expirationTime` passed |
+| 403 | `wrong_wallet` | not the owner's wallet (see below) |
+| 404 | `no_owner` | no owner row yet |
+| 502 | `chain_error` | the approver read failed on a first sign-in; retry |
+
+Which wallet: the first wallet to sign in is bound to the owner, but only if the owner has no wallet
+yet and the address is the owner's on-chain approver, or no approver is set. After that only that
+wallet signs in; any other gets `wrong_wallet`.
+
+Client flow:
+
+```ts
+import { createSiweMessage } from "viem/siwe";
+
+const { nonce } = await (await fetch("/api/auth/wallet/nonce", { method: "POST" })).json();
+const message = createSiweMessage({
+  domain: window.location.host,
+  address, // from eth_requestAccounts
+  statement: "Sign in to End Credits",
+  uri: window.location.origin,
+  version: "1",
+  chainId: 84532,
+  nonce,
+});
+const signature = await provider.request({ method: "personal_sign", params: [message, address] });
+const res = await fetch("/api/auth/wallet", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ message, signature }),
+});
+```
+
+`provider` is MetaMask (`window.ethereum`) or the Base Account provider already set up in
+`components/approver/connect-wallet.tsx`. A passkey wallet that is not deployed yet signs with an
+ERC-6492 envelope; the server verifies EOA, ERC-1271 and ERC-6492 signatures. `createSiweMessage`
+sets `issuedAt` to now; sign within 10 minutes. The app origin must be `APP_URL`, so sign in on the
+fixed hostname, not a preview URL.
+
+### Onboarding checklist
+
+`GET /api/owner/onboarding` (owner cookie) → `{ steps: Step[], next: string | null }` where
+`Step = { id, done: boolean, detail: string | null, href: string | null }`, always in this order:
+
+| `id` | done when | `detail` | `href` |
+|---|---|---|---|
+| `signed_in` | always | null | null |
+| `wallet_bound` | a wallet is bound | the wallet address | null |
+| `budget_set` | always (defaults exist) | `"2 USDC per session, 0.25 per package, 20 per day"` from the saved values | `/app/owner#budget` |
+| `approver_set` | on-chain `approverOf(payer)` is set | the approver address; `"chain unavailable"` on a failed read | `/app/owner#approver` |
+| `spend_allowance` | the budget wallet has an allowance > 0 | `"coming soon"` for now, later `"<n> USDC"` | `/app/owner#allowance` |
+| `agent_key` | a non-revoked agent key exists | null | `/app/owner#keys` |
+| `first_session` | a session was uploaded | null | `/app/credits/<latest session id>`, null before |
+
+`next` is the id of the first step not done (null when all are). The page needs the anchors `#budget`,
+`#approver`, `#allowance` and `#keys`.

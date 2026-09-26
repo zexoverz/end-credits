@@ -36,6 +36,7 @@ export const owners = pgTable(
     approverAddress: text("approver_address"),
     /** The owner's own funding wallet: EndCreditsBudget pulls each session's spend from it. */
     budgetOwner: text("budget_owner"),
+    walletAddress: text("wallet_address").unique(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -43,6 +44,12 @@ export const owners = pgTable(
     check("owners_settle_mode", sql`${t.settleMode} in ('auto','on_open')`),
   ],
 );
+
+/** SIWE nonces already spent: the cookie holds the live one, this row makes it single use. */
+export const siweNonces = pgTable("siwe_nonces", {
+  nonce: text().primaryKey(),
+  usedAt: ts("used_at").defaultNow().notNull(),
+});
 
 export const agentKeys = pgTable(
   "agent_keys",
