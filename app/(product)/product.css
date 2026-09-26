@@ -380,7 +380,7 @@
 }
 .dashboard-stats > .product-card:first-child .card-heading,
 .dashboard-stats > .product-card:first-child .text-muted {
-  color: #466e48;
+  color: #355d38;
 }
 .dashboard-stats > .product-card:nth-child(3) {
   grid-row: span 2;
@@ -1300,3 +1300,5 @@
   padding: 20px;
   background: #eaf3e3;
 }
+
+.owner-sections>.product-card:nth-last-child(2){grid-column:1/-1}
