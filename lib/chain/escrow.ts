@@ -11,7 +11,8 @@ export { TxRevertedError } from "./txqueue";
 
 const queues = new WeakMap<ChainContext, TxQueue>();
 
-function queueFor(ctx: ChainContext): TxQueue {
+/** The one tx queue per context, shared by every contract the payer and recorder keys write to. */
+export function queueFor(ctx: ChainContext): TxQueue {
   let q = queues.get(ctx);
   if (!q) {
     q = createTxQueue(viemIo(ctx.publicClient, [ctx.payer, ctx.recorder]));
