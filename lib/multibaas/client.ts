@@ -19,6 +19,7 @@ export interface MultiBaasClient {
   get<T = unknown>(path: string): Promise<T>;
   put<T = unknown>(path: string, body: unknown): Promise<T>;
   post<T = unknown>(path: string, body: unknown): Promise<T>;
+  delete<T = unknown>(path: string): Promise<T>;
 }
 
 export interface ClientOptions {
@@ -105,6 +106,7 @@ export function createMultiBaasClient(opts: ClientOptions): MultiBaasClient {
     get: (path) => call("GET", path),
     put: (path, body) => call("PUT", path, body),
     post: (path, body) => call("POST", path, body),
+    delete: (path) => call("DELETE", path),
   };
 }
 

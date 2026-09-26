@@ -87,6 +87,7 @@ export function fakeMultiBaas(overrides: Record<string, unknown> = {}): FakeMb {
     }),
     put: vi.fn(),
     post: vi.fn(),
+    delete: vi.fn(),
   } as FakeMb;
 }
 

@@ -8,6 +8,7 @@ function fakeMb(pages: unknown[]): MultiBaasClient & { get: ReturnType<typeof vi
     get: vi.fn(async () => pages[i++]),
     put: vi.fn(),
     post: vi.fn(),
+    delete: vi.fn(),
   } as never;
 }
 
