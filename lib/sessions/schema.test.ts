@@ -61,4 +61,28 @@ describe("uploadSchema", () => {
   it("rejects a bad session id", () => {
     expect(uploadSchema.safeParse({ ...ok, claudeSessionId: "../x" }).success).toBe(false);
   });
+
+  describe("declared repository and homepage", () => {
+    const declared = (extra: Record<string, unknown>) => withPackages([{ ...pkg("@endcredits-demo/moved-payout"), ...extra }]);
+
+    it("accepts a GitHub repository, string or object, and an https homepage", () => {
+      expect(uploadSchema.safeParse(declared({ repository: "github:zexoverz/endcredits-fixture-moved-payout" })).success).toBe(true);
+      expect(
+        uploadSchema.safeParse(
+          declared({ repository: { url: "https://github.com/a/b", directory: "packages/x" }, homepage: "https://b.dev" }),
+        ).success,
+      ).toBe(true);
+    });
+
+    it("rejects a non-GitHub repository", () => {
+      expect(uploadSchema.safeParse(declared({ repository: "https://gitlab.com/a/b" })).success).toBe(false);
+      expect(uploadSchema.safeParse(declared({ repository: "../secret-repo" })).success).toBe(false);
+      expect(uploadSchema.safeParse(declared({ repository: { url: "https://github.com/a/b", directory: "../x" } })).success).toBe(false);
+    });
+
+    it("rejects a non-https homepage", () => {
+      expect(uploadSchema.safeParse(declared({ homepage: "http://b.dev" })).success).toBe(false);
+      expect(uploadSchema.safeParse(declared({ homepage: "file:///Users/me" })).success).toBe(false);
+    });
+  });
 });
