@@ -22,3 +22,16 @@ export function inboxItems(actions: Action[]): InboxItem[] {
   }
   return out;
 }
+
+/** Unknown payers and public reserves never grant an account a signing action. */
+export function isAccountHold(
+  action: Action,
+  agentWallet: string | null,
+): boolean {
+  return (
+    (action.kind === "approve_hold" || action.kind === "hold_expiring") &&
+    !!action.payer &&
+    !!agentWallet &&
+    action.payer.toLowerCase() === agentWallet.toLowerCase()
+  );
+}

@@ -100,6 +100,8 @@ export const INSIGHTS = {
   source: "Source",
   review: "Review →",
   reviewHold: "Review & sign →",
+  accountApproval: "Awaiting account approval",
+  publicHold: "This contribution is waiting for its account to review it.",
   claimReserve: "View claim →",
   findPackage: "Find package →",
   actionsUnavailable: "Pending actions are not available in this response.",

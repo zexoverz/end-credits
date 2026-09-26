@@ -54,8 +54,22 @@ export function DashboardView({
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const inFlight = useRef(false);
+  const [agentWallet, setAgentWallet] = useState<string | null>(null);
+  const identityVersion = useRef(0);
+  const refreshIdentity = useCallback(async () => {
+    const version = ++identityVersion.current;
+    setAgentWallet(null);
+    // A public visitor's 401 is expected; any failed read leaves signing actions hidden.
+    const result = await api<{ spender: string | null }>("/api/owner/budget", {
+      cache: "no-store",
+    });
+    if (version === identityVersion.current) {
+      setAgentWallet(result.ok ? result.data.spender : null);
+    }
+  }, []);
 
   const load = useCallback(async () => {
+    void refreshIdentity();
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
@@ -83,18 +97,23 @@ export function DashboardView({
       setBusy(false);
       setNow(Date.now());
     }
-  }, []);
+  }, [refreshIdentity]);
 
   useEffect(() => {
+    const focus = () => void refreshIdentity();
+    window.addEventListener("focus", focus);
     const first = setTimeout(() => void load(), 0);
     const refresh = setInterval(() => void load(), REFRESH_MS);
     const tick = setInterval(() => setNow(Date.now()), 5_000);
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- invalidate the latest identity request, not the initial version
+      identityVersion.current++;
+      window.removeEventListener("focus", focus);
       clearTimeout(first);
       clearInterval(refresh);
       clearInterval(tick);
     };
-  }, [load]);
+  }, [load, refreshIdentity]);
 
   return (
     <div className="session-desk">
@@ -212,7 +231,10 @@ export function DashboardView({
         <div className="desk-action-column">
           {state.phase === "data" && (
             <>
-              <ActionQueue actions={state.data.actions} />
+              <ActionQueue
+                actions={state.data.actions}
+                agentWallet={agentWallet}
+              />
               <EscrowPanel data={state.data} />
             </>
           )}
