@@ -2,6 +2,11 @@
 
 ## Intercepta: payment simulation and payer screen (26 Sep)
 
+Note: the payment simulation is off in production (`SIMULATE_PAYMENTS` unset), so `SIMULATED`,
+`REFUSED_SIMULATION` and `HELD_SIMULATION` will not appear on live sessions. Render them if present,
+but do not design the page around them. The payer screen (`PAYER_*`, the extra address screen with
+`mappedFrom` "eip155:84532 x402 payer") is on.
+
 Backend branch `intercepta-sim-and-payer`. No new routes and no changed response shapes; new
 values appear in existing fields. Text always comes from `lib/messages.ts`, so render `text` as is.
 
