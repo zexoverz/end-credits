@@ -11,14 +11,23 @@ import { errorLabel } from "./settle";
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 type Db = ReturnType<typeof db> | Tx;
 
-export type ReturnFn = (owner: Address, amount: bigint) => Promise<Hash>;
+/** The payer key that holds the money: the session owner's (multi-owner, decisions.md). */
+export type ReturnPayer = { id: string; payerAddress: string };
+export type ReturnFn = (owner: Address, amount: bigint, payer: ReturnPayer) => Promise<Hash>;
 export type ReturnDeps = { returnToOwner: ReturnFn; log?: (line: string) => void };
 
 /** The owner's wallet and the tip's amount when the hold was refunded, funded by a pull and not
  *  returned yet; null otherwise. */
 async function holdTarget(d: Db, holdId: string) {
   const [row] = await d
-    .select({ owner: owners.budgetOwner, amount: credits.amountMicro, creditId: credits.id, reasons: credits.reasons })
+    .select({
+      owner: owners.budgetOwner,
+      ownerId: owners.id,
+      payerAddress: owners.payerAddress,
+      amount: credits.amountMicro,
+      creditId: credits.id,
+      reasons: credits.reasons,
+    })
     .from(holds)
     .innerJoin(credits, eq(credits.id, holds.creditId))
     .innerJoin(sessions, eq(sessions.id, credits.sessionId))
@@ -56,7 +65,7 @@ export async function returnHold(d: Db, holdId: string, deps: ReturnDeps): Promi
   if (!t) return null;
   let tx: Hash;
   try {
-    tx = await deps.returnToOwner(t.owner as Address, t.amount);
+    tx = await deps.returnToOwner(t.owner as Address, t.amount, { id: t.ownerId, payerAddress: t.payerAddress });
   } catch (err) {
     deps.log?.(`return: hold ${holdId} not returned: ${errorLabel(err)}`);
     if (!hasCode(t.reasons, "RETURN_PENDING")) {
@@ -103,14 +112,21 @@ export async function pendingSessionReturns(d: Db): Promise<string[]> {
 export async function returnSessionLeftover(d: ReturnType<typeof db>, sessionId: string, deps: ReturnDeps): Promise<Hash | null> {
   return d.transaction(async (tx) => {
     const [row] = await tx
-      .select({ owner: owners.budgetOwner, leftover: sessions.leftoverMicro, returnTx: sessions.returnTx })
+      .select({
+        owner: owners.budgetOwner,
+        ownerId: owners.id,
+        payerAddress: owners.payerAddress,
+        leftover: sessions.leftoverMicro,
+        returnTx: sessions.returnTx,
+      })
       .from(sessions)
       .innerJoin(owners, eq(owners.id, sessions.ownerId))
       .where(eq(sessions.id, sessionId))
       .for("update", { of: sessions, skipLocked: true });
     if (!row || row.returnTx || !row.owner || !row.leftover || row.leftover <= BigInt(0)) return null;
     try {
-      const hash = await deps.returnToOwner(row.owner as Address, row.leftover);
+      const payer = { id: row.ownerId, payerAddress: row.payerAddress };
+      const hash = await deps.returnToOwner(row.owner as Address, row.leftover, payer);
       await tx.update(sessions).set({ returnTx: hash }).where(eq(sessions.id, sessionId));
       return hash;
     } catch (err) {
