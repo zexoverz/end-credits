@@ -110,6 +110,8 @@ describe("decide: one test per step", () => {
     expect(d.holdReason).toBe("ADDRESS_CHANGED");
     expect(d.reasons[0]).toMatchObject({ source: "payee", code: "HELD_CHANGED" });
     expect(d.reasons[0].text).toContain("changed 3 days ago");
+    expect(decide(input({ change: { changed: true, days: 0 } })).reasons[0].text).toContain("changed today");
+    expect(decide(input({ change: { changed: true, days: 1 } })).reasons[0].text).toContain("changed 1 day ago");
   });
 
   it("6. toxic score 20..50 -> held HELD_MEDIUM; 19 is paid", () => {
