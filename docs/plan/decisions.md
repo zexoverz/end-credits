@@ -1370,3 +1370,24 @@ server-set): a payout file appearing on an established project is what a takeove
 project listing funding from its first days is a first listing, screened by Intercepta like any
 payee, with the spam rule for farms. A change we observed ourselves (address A, then B) still holds,
 and an unknown repository age stays conservative (held).
+
+## Multi-owner: one payer key per owner (27 Sep)
+
+The deployment was single-tenant: one owner row from `pnpm seed`, one payer key, and wallet sign-in
+only bound that first owner. Anyone else (a judge, a second user) could not become an owner. Now:
+
+- **Sign-up is sign-in.** A wallet no owner has becomes a new owner on its first SIWE sign-in, with the
+  default limits. Its wallet is also its approver and its budget wallet until it names others. The
+  first owner still binds only its on-chain approver, as before.
+- **One payer key per owner, no new secret.** `keccak256(PAYER_PRIVATE_KEY ‖ "endcredits-payer:" ‖
+  ownerId)`. The first owner keeps the master key itself. The escrow keys approvers by payer, so each
+  owner's holds are released only by that owner's approver; `EndCreditsBudget` keys allowances by
+  `(owner wallet, spender)`, so each owner allows its own payer. No contract changes.
+- **Provisioning.** The worker, every 5 s, gets a new payer ready: 0.0005 ETH gas from the master key
+  when under 0.0002, `setApprover(owner wallet)` from the payer when none is set (the first set is
+  immediate), and a max USDC approval to the escrow. Each step reads first, so it is idempotent.
+- **Signing.** Settlement, returns to the owner's wallet, the approver route and the budget views all
+  use the session owner's payer. All keys share one tx queue per RPC client, so the recorder and each
+  payer keep one nonce sequence each.
+- **Limit:** the MultiBaas `paid_totals` query still filters USDC transfers from the master payer, so
+  the dashboard's Paid card counts only the first owner's payments until it filters every payer.
