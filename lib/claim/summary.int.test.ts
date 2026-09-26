@@ -216,6 +216,17 @@ describe.skipIf(!DB_URL)("GET /api/npm/<name> summary (integration)", () => {
     expect(r.body.state).toBe("in_progress");
   });
 
+  it("a maintainer whose token was dropped after a finished claim reads as signed out", async () => {
+    const maintainerId = await store.upsertMaintainer({
+      githubId: Math.floor(Math.random() * 1e9),
+      githubLogin: "octo",
+      tokenEnc: seal("t", SECRET),
+    });
+    await store.dropToken(maintainerId);
+    const cookie = `${MAINT_COOKIE}=${await sealData({ maintainerId }, { password: SECRET })}`;
+    expect((await get(pkg, cookie)).body.maintainer).toBeNull();
+  });
+
   it("reports a chain read failure instead of inventing an amount", async () => {
     chain.chain.reserved = async () => {
       throw new Error("rpc down");
