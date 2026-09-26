@@ -5,6 +5,7 @@ import {
   loadPackage,
   parseRegistryDoc,
   parseRepository,
+  RegistryNotFound,
   registryUrl,
 } from "./npm";
 
@@ -98,6 +99,18 @@ describe("parseRegistryDoc", () => {
     const p = parseRegistryDoc(doc, "1.0.0");
     expect(p.repoFullName).toBe("old/demo");
     expect(p.fundingLinks).toEqual(["https://github.com/sponsors/old"]);
+  });
+});
+
+describe("loadPackage errors", () => {
+  const status = (code: number) => (async () => new Response("{}", { status: code })) as unknown as typeof fetch;
+
+  it("throws RegistryNotFound on a 404 only", async () => {
+    clearRegistryCache();
+    await expect(loadPackage("@endcredits-demo/nope", { fetch: status(404) })).rejects.toBeInstanceOf(RegistryNotFound);
+    const other = await loadPackage("@endcredits-demo/nope", { fetch: status(503) }).catch((e) => e);
+    expect(other).toBeInstanceOf(Error);
+    expect(other).not.toBeInstanceOf(RegistryNotFound);
   });
 });
 
