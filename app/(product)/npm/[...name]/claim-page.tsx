@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { RiskProfile } from "./risk-profile";
 import { Page } from "@/components/ui";
 import { api, type ApiResult } from "@/components/product/request";
 import {
@@ -166,6 +167,11 @@ export function ClaimPage({
   return (
     <Page>
       <Header s={summary} />
+      <RiskProfile
+        profile={summary.payeeRisk ?? null}
+        failed={summary.errors.includes("risk")}
+        hasPayee={!!summary.payee}
+      />
       {stop && stop !== "ALREADY_PAYABLE" && stop !== "NO_REPO" && (
         <NoticeLine
           notice={{

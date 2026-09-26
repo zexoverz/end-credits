@@ -1,16 +1,12 @@
+import { ReasonEvidence } from "@/components/product/reason-evidence";
 import { Badge } from "@/components/ui";
 import { txUrl, usdc } from "@/lib/client/format";
-import { firstReason, signalLine } from "@/lib/client/roll";
+import { signalLine } from "@/lib/client/roll";
 import { ROLL_COPY } from "@/lib/copy/roll";
 import { EXPERIENCE as E } from "@/lib/copy/experience";
 import type { CreditView } from "@/lib/sessions/view";
 export function CreditRow({ credit }: { credit: CreditView }) {
   const signal = signalLine(credit.signal);
-  const reasons = Array.isArray(credit.reasons)
-    ? credit.reasons
-        .map((r) => firstReason([r]))
-        .filter((r): r is string => !!r)
-    : [];
   return (
     <li className="credit-row">
       <div>
@@ -22,17 +18,7 @@ export function CreditRow({ credit }: { credit: CreditView }) {
         <Badge outcome={credit.outcome} />
       </div>
       <div className="credit-reasons">
-        {reasons[0]}
-        {reasons.length > 1 && (
-          <details>
-            <summary>{E.reason}</summary>
-            <ul>
-              {reasons.slice(1).map((reason, i) => (
-                <li key={i}>{reason}</li>
-              ))}
-            </ul>
-          </details>
-        )}
+        <ReasonEvidence reasons={credit.reasons} />
         {credit.txHash ? (
           <a href={txUrl(credit.txHash)} target="_blank" rel="noreferrer">
             {ROLL_COPY.TX_LINK} ↗
