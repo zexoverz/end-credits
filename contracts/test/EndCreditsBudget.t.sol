@@ -360,4 +360,39 @@ contract EndCreditsBudgetTest is Test {
         vm.prank(otherAgent);
         budget.pull(owner, 1);
     }
+
+    // ---------------------------------------------------------------- fuzz
+
+    /// Random pulls at random times: the sum pulled in any one window never exceeds the cap, and
+    /// the windows stay on the grid of the first one.
+    function testFuzz_pullsInOneWindowNeverExceedCap(uint128 cap, uint64 period, uint256 seed) public {
+        cap = uint128(bound(cap, 1, 1e12));
+        period = uint64(bound(period, 1 hours, 30 days));
+        usdc.mint(owner, 1e15);
+        _allow(cap, period);
+
+        uint256 lastWindow;
+        uint256 pulledInWindow;
+        for (uint256 i; i < 40; i++) {
+            seed = uint256(keccak256(abi.encode(seed, i)));
+            skip(seed % (uint256(period) / 2 + 1));
+            uint256 window = (block.timestamp - T0) / period;
+            if (window != lastWindow) {
+                lastWindow = window;
+                pulledInWindow = 0;
+            }
+
+            uint256 amount = bound(seed >> 64, 1, uint256(cap) * 2);
+            vm.prank(agent);
+            try budget.pull(owner, amount) {
+                pulledInWindow += amount;
+                assertEq(budget.allowanceOf(owner, agent).periodStart, T0 + window * period);
+            } catch {
+                assertGt(pulledInWindow + amount, cap);
+            }
+            assertLe(pulledInWindow, cap);
+            assertEq(budget.remaining(owner, agent), cap - pulledInWindow);
+        }
+        assertEq(usdc.balanceOf(address(budget)), 0);
+    }
 }
