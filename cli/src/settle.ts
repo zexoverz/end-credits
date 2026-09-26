@@ -16,6 +16,8 @@ export interface SettleDeps {
   open: (url: string) => void;
   say: (line: string) => void;
   now: () => Date;
+  /** Upload timeout; the MCP roll tool waits longer than the hook's child. */
+  timeoutMs?: number;
 }
 
 export type SettleResult = { ok: true; id: string; url: string } | { ok: false; error: string };
@@ -45,7 +47,7 @@ async function upload(apiUrl: string, key: string, body: unknown, deps: SettleDe
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+    signal: AbortSignal.timeout(deps.timeoutMs ?? UPLOAD_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return rollUrl(apiUrl, await res.json());

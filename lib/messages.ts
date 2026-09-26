@@ -59,7 +59,7 @@ export type MessageCode = keyof typeof MESSAGES;
 // The `endcredits` CLI's own output (E1). Kept apart from the §11 codes above.
 export const CLI_MESSAGES = {
   USAGE:
-    "Usage: endcredits init [--global] | key <token> [--api <url>] | login [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run]",
+    "Usage: endcredits init [--global] | key <token> [--api <url>] | login [--api <url>] | settle [--session <id>] | attribute --session <id> [--dry-run] | mcp",
   LOGIN_CODE: "Open {url} in World App and confirm the code {code}.",
   LOGIN_SAVED: "Signed in with World ID. Agent key saved to {path}.",
   LOGIN_DENIED: "Sign-in was cancelled in World App. No key was saved.",
@@ -69,6 +69,9 @@ export const CLI_MESSAGES = {
   INIT_ADDED: "End Credits hooks added to {path}.",
   INIT_UNCHANGED: "End Credits hooks are already in {path}.",
   INIT_INVALID: "Could not read {path} as JSON. Left it unchanged.",
+  MCP_ADDED: "End Credits MCP server added to {path}. Approve it the next time you start claude here.",
+  MCP_UNCHANGED: "An end-credits MCP server is already in {path}. Left it unchanged.",
+  MCP_GLOBAL: "To give every project the End Credits MCP server, run: {command}",
   KEY_SAVED: "Agent key saved to {path}.",
   KEY_INVALID: "Could not save the agent key: {error}",
   KEY_MISSING: "No agent key yet. Run: endcredits key <token>",
