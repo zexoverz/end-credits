@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionNotice, useFeedback } from "@/components/product/feedback";
+import { CONTROL as U } from "@/lib/copy/control-room";
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, ErrorBox, Mono } from "@/components/ui";
 import { api } from "@/components/product/request";
@@ -9,19 +11,25 @@ import { OWNER_COPY as C } from "@/lib/copy/owner";
 const when = (iso: string) => new Date(iso).toLocaleString();
 
 function CopyButton({ text }: { text: string }) {
+  const [copyError, setCopyError] = useState(false);
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      setCopyError(false);
     } catch {
       setCopied(false);
+      setCopyError(true);
     }
   }
   return (
-    <Button type="button" onClick={copy} className="shrink-0">
-      {copied ? C.COPIED : C.COPY}
-    </Button>
+    <div>
+      <Button type="button" onClick={copy} className="shrink-0">
+        {copied ? C.COPIED : C.COPY}
+      </Button>
+      {copyError && <p role="alert">{U.keyCopyFailed}</p>}
+    </div>
   );
 }
 
@@ -41,7 +49,11 @@ function NewKey({ token, onDone }: { token: string; onDone: () => void }) {
         <CopyButton text={command} />
       </div>
       <div>
-        <Button type="button" onClick={onDone} className="bg-transparent text-foreground ring-1 ring-line">
+        <Button
+          type="button"
+          onClick={onDone}
+          className="bg-transparent text-foreground ring-1 ring-line"
+        >
           {C.KEY_DONE}
         </Button>
       </div>
@@ -50,6 +62,7 @@ function NewKey({ token, onDone }: { token: string; onDone: () => void }) {
 }
 
 export function AgentKeys() {
+  const notify = useFeedback();
   const [keys, setKeys] = useState<KeyView[] | null>(null);
   const [label, setLabel] = useState("");
   const [token, setToken] = useState<string | null>(null);
@@ -84,6 +97,7 @@ export function AgentKeys() {
     setBusy(false);
     if (!r.ok) return fail(r.error);
     setToken(r.data.token);
+    notify(U.keyCreated, C.KEY_CREATED);
     setLabel("");
     await refresh();
   }
@@ -91,9 +105,12 @@ export function AgentKeys() {
   async function revoke(id: string) {
     setBusy(true);
     setError(null);
-    const r = await api(`/api/owner/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const r = await api(`/api/owner/keys/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
     setBusy(false);
     if (!r.ok) return fail(r.error);
+    notify(U.keyRevoked, U.keyRevokeBody);
     await refresh();
   }
 
@@ -119,14 +136,22 @@ export function AgentKeys() {
             {C.KEY_CREATE}
           </Button>
         </form>
+        {busy && <ActionNotice tone="pending">{U.working}</ActionNotice>}
         {error && <ErrorBox>{error}</ErrorBox>}
-        {keys && keys.length === 0 && <p className="text-sm text-muted">{C.KEY_NONE}</p>}
+        {keys && keys.length === 0 && (
+          <p className="text-sm text-muted">{C.KEY_NONE}</p>
+        )}
         {keys && keys.length > 0 && (
           <ul className="divide-y divide-line text-sm">
             {keys.map((k) => (
-              <li key={k.id} className="flex items-center justify-between gap-2 py-2">
+              <li
+                key={k.id}
+                className="flex items-center justify-between gap-2 py-2"
+              >
                 <div>
-                  <div className={k.revokedAt ? "text-muted line-through" : ""}>{k.label}</div>
+                  <div className={k.revokedAt ? "text-muted line-through" : ""}>
+                    {k.label}
+                  </div>
                   <div className="text-xs text-muted">
                     {k.boundVia} ·{" "}
                     {k.revokedAt

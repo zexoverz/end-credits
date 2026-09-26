@@ -4,6 +4,8 @@
 // a button is pressed, same SDK setup as the claim page (app/npm/.../passkey.ts). Signing uses
 // `eth_signTypedData_v4` with params [address, typedData], as the SDK itself calls it. A wallet not
 // yet deployed signs with an ERC-6492 envelope; the server checks and unwraps it.
+import { ActionNotice, useFeedback } from "@/components/product/feedback";
+import { CONTROL as U } from "@/lib/copy/control-room";
 import { useEffect, useState } from "react";
 import type { ProviderInterface } from "@base-org/account/browser";
 import { baseSepolia } from "viem/chains";
@@ -15,7 +17,9 @@ import { APPROVER_COPY as C } from "@/lib/copy/approver";
 /** "base": Base Account passkey wallet. "injected": a browser extension wallet (MetaMask, Rabby…). */
 export type WalletKind = "base" | "injected";
 
-type Eip1193 = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
+type Eip1193 = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
 
 let baseProvider: ProviderInterface | null = null;
 
@@ -39,7 +43,10 @@ async function walletProvider(kind: WalletKind): Promise<Eip1193> {
   }
   if (!baseProvider) {
     const { createBaseAccountSDK } = await import("@base-org/account/browser");
-    baseProvider = createBaseAccountSDK({ appName: "End Credits", appChainIds: [baseSepolia.id] }).getProvider();
+    baseProvider = createBaseAccountSDK({
+      appName: "End Credits",
+      appChainIds: [baseSepolia.id],
+    }).getProvider();
   }
   return baseProvider as unknown as Eip1193;
 }
@@ -50,7 +57,9 @@ export async function walletKindFor(approver: string): Promise<WalletKind> {
   if (!p) return "base";
   try {
     const accounts = await p.request({ method: "eth_accounts" });
-    const list = Array.isArray(accounts) ? accounts.map((a) => String(a).toLowerCase()) : [];
+    const list = Array.isArray(accounts)
+      ? accounts.map((a) => String(a).toLowerCase())
+      : [];
     return list.includes(approver.toLowerCase()) ? "injected" : "base";
   } catch {
     return "base";
@@ -58,7 +67,9 @@ export async function walletKindFor(approver: string): Promise<WalletKind> {
 }
 
 /** Asks the wallet for its account; null when it returns none. */
-export async function connectWallet(kind: WalletKind = "base"): Promise<string | null> {
+export async function connectWallet(
+  kind: WalletKind = "base",
+): Promise<string | null> {
   const p = await walletProvider(kind);
   return firstAccount(await p.request({ method: "eth_requestAccounts" }));
 }
@@ -68,7 +79,10 @@ const CHAIN_HEX = `0x${baseSepolia.id.toString(16)}`;
 /** Browser wallets refuse typed data whose chainId is not the active chain; switch (or add) first. */
 async function onBaseSepolia(p: Eip1193): Promise<void> {
   try {
-    await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
+    await p.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: CHAIN_HEX }],
+    });
   } catch {
     await p.request({
       method: "wallet_addEthereumChain",
@@ -86,20 +100,37 @@ async function onBaseSepolia(p: Eip1193): Promise<void> {
 }
 
 /** EIP-712 signature from `address` over the JSON typed data the server prepared. */
-export async function signTypedData(address: string, typedData: unknown, kind: WalletKind = "base"): Promise<string> {
+export async function signTypedData(
+  address: string,
+  typedData: unknown,
+  kind: WalletKind = "base",
+): Promise<string> {
   const p = await walletProvider(kind);
   if (kind === "injected") await onBaseSepolia(p);
   // Extension wallets take the typed data as a JSON string; the Base Account SDK takes the object.
   const payload = kind === "injected" ? JSON.stringify(typedData) : typedData;
-  const sig = await p.request({ method: "eth_signTypedData_v4", params: [address, payload] });
-  if (typeof sig !== "string" || !sig.startsWith("0x")) throw new Error("no signature");
+  const sig = await p.request({
+    method: "eth_signTypedData_v4",
+    params: [address, payload],
+  });
+  if (typeof sig !== "string" || !sig.startsWith("0x"))
+    throw new Error("no signature");
   return sig;
 }
 
 export const errorName = (e: unknown) =>
-  e instanceof Error ? e.message.slice(0, 80) : typeof e === "string" ? e.slice(0, 80) : "error";
+  e instanceof Error
+    ? e.message.slice(0, 80)
+    : typeof e === "string"
+      ? e.slice(0, 80)
+      : "error";
 
-export function ConnectWallet({ onConnected }: { onConnected: (address: string) => void }) {
+export function ConnectWallet({
+  onConnected,
+}: {
+  onConnected: (address: string) => void;
+}) {
+  const notify = useFeedback();
   const [busy, setBusy] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +149,7 @@ export function ConnectWallet({ onConnected }: { onConnected: (address: string) 
       if (!a) throw new Error("no account");
       setAddress(a);
       onConnected(a);
+      notify(U.connectedTitle, U.connectedBody);
     } catch (e) {
       setError(fill(C.CONNECT_FAILED, { error: errorName(e) }));
     } finally {
@@ -128,22 +160,26 @@ export function ConnectWallet({ onConnected }: { onConnected: (address: string) 
   return (
     <div className="flex flex-col gap-2 text-sm">
       {address ? (
-        <span>
-          {C.CONNECTED}{" "}
-          <Mono>{address}</Mono>
-        </span>
+        <ActionNotice>
+          {C.CONNECTED} <Mono>{address}</Mono>
+        </ActionNotice>
       ) : (
         <div className="flex flex-wrap gap-2">
           <Button type="button" disabled={busy} onClick={() => connect("base")}>
             {busy ? C.CONNECTING : C.CONNECT}
           </Button>
           {browserWallet && (
-            <Button type="button" disabled={busy} onClick={() => connect("injected")}>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() => connect("injected")}
+            >
               {busy ? C.CONNECTING : C.CONNECT_BROWSER}
             </Button>
           )}
         </div>
       )}
+      {busy && <ActionNotice tone="pending">{C.CONNECTING}</ActionNotice>}
       {error && <ErrorBox>{error}</ErrorBox>}
     </div>
   );

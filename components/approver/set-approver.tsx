@@ -2,6 +2,8 @@
 
 // /owner: the approver wallet as stored, as in force on chain, and any pending change with the time
 // it takes over (a change is timelocked on chain; shown, never hidden). Connect a wallet and name it.
+import { ActionNotice, useFeedback } from "@/components/product/feedback";
+import { CONTROL as U } from "@/lib/copy/control-room";
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, ErrorBox, Mono } from "@/components/ui";
 import { api } from "@/components/product/request";
@@ -15,18 +17,24 @@ export interface ApproverView {
   pending: { address: string; activeAt: string } | null;
 }
 
-const addr = (a: string | null) => (a ? <Mono>{a}</Mono> : <span className="text-muted">{C.NONE}</span>);
+const addr = (a: string | null) =>
+  a ? <Mono>{a}</Mono> : <span className="text-muted">{C.NONE}</span>;
 
 export function SetApprover() {
+  const notify = useFeedback();
   const [view, setView] = useState<ApproverView | null>(null);
   const [wallet, setWallet] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [note, setNote] = useState<{
+    kind: "ok" | "error";
+    text: string;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     const r = await api<ApproverView>("/api/owner/approver");
     if (r.ok) setView(r.data);
-    else setNote({ kind: "error", text: fill(C.LOAD_FAILED, { error: r.error }) });
+    else
+      setNote({ kind: "error", text: fill(C.LOAD_FAILED, { error: r.error }) });
   }, []);
 
   useEffect(() => {
@@ -45,11 +53,21 @@ export function SetApprover() {
     setBusy(false);
     if (r.ok) {
       setView(r.data);
-      setNote({ kind: "ok", text: C.SET_DONE });
+      setNote({
+        kind: "ok",
+        text: r.data.pending ? U.approverWait : U.approverSaved,
+      });
+      notify(
+        r.data.pending ? U.approverPending : U.approverTitle,
+        r.data.pending ? U.approverWait : U.approverSaved,
+      );
       return;
     }
     const code = (r.body as { error?: string; code?: string } | null) ?? {};
-    const text = code.error === "payer_mismatch" ? C.PAYER_MISMATCH : fill(C.SET_FAILED, { error: code.code ?? r.error });
+    const text =
+      code.error === "payer_mismatch"
+        ? C.PAYER_MISMATCH
+        : fill(C.SET_FAILED, { error: code.code ?? r.error });
     setNote({ kind: "error", text });
   }
 
@@ -68,7 +86,9 @@ export function SetApprover() {
             {view.pending && (
               <div>
                 <Mono>{view.pending.address}</Mono>{" "}
-                {fill(C.PENDING, { time: new Date(view.pending.activeAt).toLocaleString() })}
+                {fill(C.PENDING, {
+                  time: new Date(view.pending.activeAt).toLocaleString(),
+                })}
                 <p className="text-muted">{C.PENDING_NOTE}</p>
               </div>
             )}
@@ -81,7 +101,12 @@ export function SetApprover() {
           </Button>
         )}
         {note?.kind === "error" && <ErrorBox>{note.text}</ErrorBox>}
-        {note?.kind === "ok" && <p>{note.text}</p>}
+        {busy && <ActionNotice tone="pending">{C.SETTING}</ActionNotice>}
+        {note?.kind === "ok" && (
+          <ActionNotice tone={view?.pending ? "info" : "success"}>
+            {note.text}
+          </ActionNotice>
+        )}
       </div>
     </Card>
   );

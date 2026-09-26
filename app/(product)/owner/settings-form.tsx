@@ -1,8 +1,9 @@
 "use client";
-
-import { useState } from "react";
-import { Button, Card, ErrorBox } from "@/components/ui";
+import { useState, type ReactNode } from "react";
+import { Button, ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
+import { ActionNotice, useFeedback } from "@/components/product/feedback";
+import { ControlArt } from "@/components/product/control-art";
 import {
   parseSettingsForm,
   settingsErrors,
@@ -12,11 +13,8 @@ import {
   type SettingsView,
 } from "@/lib/client/owner";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
-
+import { CONTROL as U } from "@/lib/copy/control-room";
 type Errors = Partial<Record<SettingsField, string>>;
-
-const input = "w-full rounded border border-line bg-background px-2 py-1.5 text-sm";
-
 function Field({
   id,
   label,
@@ -28,33 +26,48 @@ function Field({
   label: string;
   error?: string;
   hint?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm">
-        {label}
-      </label>
+    <div className="control-field">
+      <label htmlFor={id}>{label}</label>
       {children}
-      {hint && <span className="text-xs text-muted">{hint}</span>}
-      {error && <span className="text-xs text-refused">{error}</span>}
+      {hint && <p id={`${id}-hint`}>{hint}</p>}
+      {error && (
+        <p id={`${id}-error`} className="control-field-error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
-
-export function SettingsForm({ initial, onSaved }: { initial: SettingsView; onSaved: (s: SettingsView) => void }) {
+export function SettingsForm({
+  initial,
+  onSaved,
+}: {
+  initial: SettingsView;
+  onSaved: (s: SettingsView) => void;
+}) {
   const [form, setForm] = useState<Form>(() => settingsToForm(initial));
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
-
-  const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [k]: e.target.value });
-    setStatus("idle");
-  };
-
+  const notify = useFeedback();
+  const dirty =
+    JSON.stringify(form) !== JSON.stringify(settingsToForm(initial));
+  const set =
+    (k: keyof Form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setForm({ ...form, [k]: e.target.value });
+      setStatus("idle");
+      setErrors((old) => ({
+        ...old,
+        [k === "holdTtlMinutes" ? "holdTtlSeconds" : k]: undefined,
+      }));
+    };
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (status === "saving") return;
     setError(null);
     const parsed = parseSettingsForm(form);
     if (!parsed.ok) {
@@ -63,52 +76,131 @@ export function SettingsForm({ initial, onSaved }: { initial: SettingsView; onSa
     }
     setErrors({});
     setStatus("saving");
-    const r = await api<SettingsView>("/api/owner/settings", { method: "PUT", body: JSON.stringify(parsed.body) });
+    const r = await api<SettingsView>("/api/owner/settings", {
+      method: "PUT",
+      body: JSON.stringify(parsed.body),
+    });
     if (!r.ok) {
       setStatus("idle");
       const fields = settingsErrors(r.body);
       setErrors(fields);
-      if (Object.keys(fields).length === 0) setError(C.ERR_SAVE.replace("{error}", r.error));
+      if (!Object.keys(fields).length)
+        setError(C.ERR_SAVE.replace("{error}", r.error));
       return;
     }
     setForm(settingsToForm(r.data));
     setStatus("saved");
     onSaved(r.data);
+    notify(U.savedTitle, U.savedDetail);
   }
-
+  const moneyFields = [
+    {
+      id: "budget",
+      key: "sessionBudget",
+      label: C.BUDGET,
+      hint: U.sessionHint,
+    },
+    { id: "cap", key: "packageCap", label: C.CAP, hint: U.capHint },
+    { id: "daily", key: "dailyLimit", label: C.DAILY, hint: U.dailyHint },
+  ] as const;
   return (
-    <Card title={C.SETTINGS}>
-      <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
-        <Field id="budget" label={C.BUDGET} error={errors.sessionBudget}>
-          <input id="budget" inputMode="decimal" className={input} value={form.sessionBudget} onChange={set("sessionBudget")} />
-        </Field>
-        <Field id="cap" label={C.CAP} error={errors.packageCap}>
-          <input id="cap" inputMode="decimal" className={input} value={form.packageCap} onChange={set("packageCap")} />
-        </Field>
-        <Field id="daily" label={C.DAILY} error={errors.dailyLimit}>
-          <input id="daily" inputMode="decimal" className={input} value={form.dailyLimit} onChange={set("dailyLimit")} />
-        </Field>
-        <Field id="ttl" label={C.TTL} error={errors.holdTtlSeconds} hint={C.TTL_HINT}>
-          <input id="ttl" inputMode="numeric" className={input} value={form.holdTtlMinutes} onChange={set("holdTtlMinutes")} />
-        </Field>
-        <Field id="mode" label={C.SETTLE_MODE} error={errors.settleMode}>
-          <select id="mode" className={input} value={form.settleMode} onChange={set("settleMode")}>
-            <option value="on_open">{C.SETTLE_ON_OPEN}</option>
-            <option value="auto">{C.SETTLE_AUTO}</option>
-          </select>
-        </Field>
-        <div className="flex items-center gap-3 sm:col-span-2">
-          <Button type="submit" disabled={status === "saving"}>
-            {status === "saving" ? C.SAVING : C.SAVE}
-          </Button>
-          {status === "saved" && <span className="text-sm text-paid">{C.SAVED}</span>}
+    <section className="budget-editor">
+      <header>
+        <div>
+          <p className="control-eyebrow">{C.SETTINGS}</p>
+          <h2>{U.budgetTitle}</h2>
+          <p>{U.budgetBody}</p>
         </div>
-        {error && (
-          <div className="sm:col-span-2">
-            <ErrorBox>{error}</ErrorBox>
+        <ControlArt />
+      </header>
+      <form onSubmit={save} aria-busy={status === "saving"}>
+        <fieldset disabled={status === "saving"}>
+          <div className="money-fields">
+            {moneyFields.map((f) => (
+              <Field
+                key={f.id}
+                id={f.id}
+                label={f.label}
+                error={errors[f.key]}
+                hint={f.hint}
+              >
+                <div className="money-input">
+                  <input
+                    id={f.id}
+                    inputMode="decimal"
+                    value={form[f.key]}
+                    onChange={set(f.key)}
+                    aria-invalid={!!errors[f.key]}
+                    aria-describedby={`${f.id}-hint${errors[f.key] ? ` ${f.id}-error` : ""}`}
+                  />
+                  <span>{U.unit}</span>
+                </div>
+              </Field>
+            ))}
           </div>
-        )}
+          <div className="control-schedule">
+            <Field
+              id="mode"
+              label={U.timing}
+              error={errors.settleMode}
+              hint={U.modeHint}
+            >
+              <select
+                id="mode"
+                value={form.settleMode}
+                onChange={set("settleMode")}
+                aria-describedby="mode-hint"
+              >
+                <option value="on_open">{C.SETTLE_ON_OPEN}</option>
+                <option value="auto">{C.SETTLE_AUTO}</option>
+              </select>
+            </Field>
+            <Field
+              id="ttl"
+              label={C.TTL}
+              error={errors.holdTtlSeconds}
+              hint={`${U.holdHint} ${C.TTL_HINT}`}
+            >
+              <input
+                id="ttl"
+                inputMode="numeric"
+                value={form.holdTtlMinutes}
+                onChange={set("holdTtlMinutes")}
+                aria-invalid={!!errors.holdTtlSeconds}
+                aria-describedby={`ttl-hint${errors.holdTtlSeconds ? " ttl-error" : ""}`}
+              />
+            </Field>
+          </div>
+        </fieldset>
+        {error && <ErrorBox>{error}</ErrorBox>}
+        <footer className="control-save">
+          <div>
+            <i data-dirty={dirty} />
+            <span>{dirty ? U.unsaved : U.upToDate}</span>
+          </div>
+          <div>
+            {dirty && (
+              <button
+                type="button"
+                className="control-reset"
+                disabled={status === "saving"}
+                onClick={() => {
+                  setForm(settingsToForm(initial));
+                  setErrors({});
+                  setError(null);
+                  setStatus("idle");
+                }}
+              >
+                {U.discard}
+              </button>
+            )}
+            <Button type="submit" disabled={status === "saving" || !dirty}>
+              {status === "saving" ? C.SAVING : C.SAVE}
+            </Button>
+          </div>
+        </footer>
+        {status === "saved" && <ActionNotice>{U.savedDetail}</ActionNotice>}
       </form>
-    </Card>
+    </section>
   );
 }

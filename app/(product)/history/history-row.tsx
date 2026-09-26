@@ -1,3 +1,5 @@
+import { ReasonEvidence } from "@/components/product/reason-evidence";
+import { INSIGHTS as U } from "@/lib/copy/control-room";
 import { PackageGlyph } from "@/components/product/artwork";
 import Link from "next/link";
 import { Badge, Mono } from "@/components/ui";
@@ -23,10 +25,24 @@ function Screen({ s }: { s: ScreenView }) {
   return (
     <li>
       {fill(C.SCREEN_LINE, {
-        kind: s.kind,
+        kind:
+          s.kind === "address" && s.mappedFrom === "eip155:84532 x402 payer"
+            ? U.payerScreen
+            : s.kind === "simulation"
+              ? U.simulationScreen
+              : s.kind,
         status: s.status,
         latency: s.latencyMs,
       })}
+      {s.mappedFrom && (
+        <div className="screen-context">
+          <span>{U.screenMapping}: </span>
+          <code>{s.mappedFrom}</code>
+        </div>
+      )}
+      {s.kind === "address" &&
+        s.mappedFrom === "eip155:84532 x402 payer" &&
+        s.status === 404 && <p>{U.payerNoHistory}</p>}
       {s.screenedAs && <div className="text-muted">{s.screenedAs}</div>}
       <div className="text-muted">{time(s.fetchedAt)}</div>
     </li>
@@ -52,6 +68,7 @@ export function HistoryRow({ item }: { item: HistoryItem }) {
       {item.reasons[0] && (
         <p className="decision-reason">{item.reasons[0].text}</p>
       )}
+      <ReasonEvidence reasons={item.reasons} featuredOnly />
       <div className="decision-links">
         <Link href={`/app/credits/${item.sessionId}`}>{C.SESSION_LINK}</Link>
         {item.txUrl ? (
@@ -68,13 +85,7 @@ export function HistoryRow({ item }: { item: HistoryItem }) {
         <div className="decision-detail-grid">
           <div>
             <h3>{C.COLS.reasons}</h3>
-            <ul>
-              {item.reasons.map((r, i) => (
-                <li key={i}>
-                  {r.text} <code>({r.source})</code>
-                </li>
-              ))}
-            </ul>
+            <ReasonEvidence reasons={item.reasons} />
           </div>
           <div>
             <h3>{C.COLS.screens}</h3>

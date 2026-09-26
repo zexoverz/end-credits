@@ -6,6 +6,7 @@ import { DESK as D } from "@/lib/copy/desk";
 import { Arrow, BrandMark } from "@/components/landing/artwork";
 import { Header, SetupCommands } from "@/components/landing/experience";
 import { LandingMotion, MotionToggle } from "@/components/landing/motion";
+import { Integrations } from "@/components/landing/integrations";
 import { TechnicalFlow } from "@/components/landing/technical-flow";
 import s from "./landing.module.css";
 
@@ -277,6 +278,7 @@ export default function Landing() {
             </div>
           </section>
           <TechnicalFlow />
+          <Integrations />
           <section className={s.controls}>
             <p className={s.eyebrow}>{C.controlsLabel}</p>
             <h2 data-reveal="headline">{C.controlsTitle}</h2>

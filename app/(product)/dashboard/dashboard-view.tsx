@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DESK as D } from "@/lib/copy/desk";
+import { ActionQueue, ActivityTimeline } from "./insights";
 import { Sessions } from "../app/sessions/sessions";
 import { History } from "../history/history";
 import { SessionOpen } from "@/components/product/session-open";
@@ -146,7 +147,13 @@ export function DashboardView({
         </p>
       )}
       {state.phase === "error" && <ErrorPanel error={state.error} />}
-      {state.phase === "data" && <Cards data={state.data} />}
+      {state.phase === "data" && (
+        <>
+          <ActionQueue actions={state.data.actions ?? []} />
+          <Cards data={state.data} />
+          <ActivityTimeline buckets={state.data.timeline ?? []} />
+        </>
+      )}
       <div className="desk-work-area">
         <section className="desk-records" aria-label={D.activity}>
           <nav className="desk-view-nav" aria-label={D.viewsLabel}>
