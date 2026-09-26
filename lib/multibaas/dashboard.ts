@@ -175,6 +175,9 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
 
   const credits = transfers.length ? await repo.creditsByTx(transfers.map((t) => t.tx)) : [];
   const creditByTx = new Map(credits.map((c) => [c.txHash.toLowerCase(), c]));
+  // Only transfers a credit points to are payments to maintainers; smoke tests and manual transfers
+  // from the payer are indexed by MultiBaas too and must not inflate the card.
+  const credited = transfers.filter((t) => creditByTx.has(t.tx));
   const paidByPkg = new Map<string, bigint>();
   for (const t of transfers) {
     const c = creditByTx.get(t.tx);
@@ -213,7 +216,7 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
     escrow: deps.escrow,
     payer: deps.payer,
     cards: {
-      paid: tally(transfers.length, sum(transfers.map((t) => t.amount))),
+      paid: tally(credited.length, sum(credited.map((t) => t.amount))),
       projects: { count: new Set([...paidByPkg.keys(), ...reservedBalance.keys()]).size },
       held: heldCard(heldRows),
       refused: { count: refused, source: "decision_log" },
@@ -236,7 +239,7 @@ export async function buildDashboard(deps: DashboardDeps): Promise<Dashboard> {
       })),
       now,
     }),
-    timeline: buildTimeline(transfers, recentRows, now),
+    timeline: buildTimeline(credited, recentRows, now),
   };
 }
 

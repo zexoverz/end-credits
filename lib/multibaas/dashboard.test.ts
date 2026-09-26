@@ -25,7 +25,7 @@ function deps(overrides: Record<string, unknown> = {}, now = () => 1_000_000): D
 beforeEach(() => invalidateDashboardCache());
 
 describe("dashboard cards", () => {
-  it("paid counts payer transfers to anyone but the escrow, on the usdc contract only", async () => {
+  it("paid counts payer transfers that belong to a credit, to anyone but the escrow, on the usdc contract only", async () => {
     const d = await buildDashboard(deps());
     expect(d.cards.paid).toEqual({ amount: { micro: "300000", usdc: "0.3" }, count: 2 });
   });
@@ -76,11 +76,11 @@ describe("dashboard table and lists", () => {
     expect(d.sessions).toEqual({ count: 2 });
   });
 
-  it("asks for the paid transactions only, to map them to packages", async () => {
+  it("asks for every usdc payer transfer (not the escrow), to map them to packages", async () => {
     const x = deps();
     await buildDashboard(x);
     const txs = (x.repo.creditsByTx as unknown as { mock: { calls: string[][][] } }).mock.calls[0][0];
-    expect(txs).toHaveLength(2);
+    expect(txs).toHaveLength(3);
   });
 });
 
