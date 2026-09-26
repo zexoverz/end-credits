@@ -1129,3 +1129,83 @@ signature analysis does not cover EIP-3009 `TransferWithAuthorization`, the mess
 address inputs in lowercase and compares filter values as strings. Filtering on the checksummed
 payer matched nothing; the lowercase payer matches. The saved query is re-saved by
 `scripts/multibaas-setup.ts`.
+
+## EndCreditsBudget (spend limits)
+
+**Why.** The payer key that holds the USDC budget lives on our server, so a compromised server can
+spend all of it. `EndCreditsBudget` moves the money to the owner's own wallet (any EOA, or a smart
+wallet) and lets the server's agent key pull only up to a cap per period. The owner approves the
+contract on USDC once and calls `setAllowance(agent, perPeriod, period)`; the agent calls
+`pull(owner, amount)` and the USDC goes straight from the owner to the agent. The contract never
+holds funds, has no admin, no owner and no upgrade path.
+
+- **Allowance per (owner, spender).** `setAllowance` is called by the owner. `ZeroSpender`,
+  `PeriodOutOfRange(period)` outside `[1 hours, 30 days]`, `ZeroAmount` on a zero cap. A new
+  allowance, or a different period length, starts a fresh window at `now` with nothing spent. The
+  same period with another cap keeps the window and the spent amount, so lowering the cap (or
+  re-saving settings) never resets what was spent; spent can then exceed the new cap and nothing
+  is left until the window ends. `revoke(spender)` deletes the allowance; a later `setAllowance`
+  starts fresh. A missing allowance has `period == 0`, so the one `a.period != period` check covers
+  both cases.
+- **`pull`** checks `NoAllowance(owner, spender)`, then `ZeroAmount`, then the cap:
+  `OverPeriodCap(remaining)` with the exact amount left. The comparison is `amount > left`, so a
+  `type(uint256).max` amount reverts with the cap error and never overflows. State is written, then
+  `Pulled(owner, spender, amount, spentInPeriod, periodStart)`, then `safeTransferFrom`. A missing
+  or short USDC approval or balance reverts with OZ's `ERC20InsufficientAllowance` /
+  `ERC20InsufficientBalance`, and the state write reverts with it.
+- **Windows.** Once `now >= periodStart + period`, `periodStart` moves forward by whole periods
+  (`start + floor((now - start) / period) * period`) and spent resets. Windows stay on the grid of
+  the first one, whenever the pull lands. The roll is lazy: `remaining(owner, spender)` applies it in
+  the view, `allowanceOf` returns storage as it is.
+- **Threat model: a stolen spender key.** It can pull what is left in the current window, and then
+  up to `perPeriod` in each later window until the owner revokes, always to the spender's own
+  address. Because windows are fixed, a thief who pulls at the end of one window and again at the
+  start of the next takes up to `2 x perPeriod` in a short span; that is the worst burst. It cannot
+  raise its cap, change the period, undo a revoke, pull from an owner who did not name it, use
+  another spender's allowance, touch any token but the pinned USDC, or take more than the owner's
+  USDC approval to this contract or the owner's balance. The owner has two kill switches, each one
+  tx and neither needing our server: `revoke(agent)` here, or `approve(budget, 0)` on USDC. A
+  stolen owner key is out of scope: it controls the money directly anyway.
+- **Owner setup.** Two calls: `usdc.approve(budget, amount)` and `setAllowance(agent, cap,
+  period)`. A smart wallet can batch them; an EOA sends two txs. The USDC approval is shared by all
+  of that owner's spenders; each spender is still held to its own allowance.
+- Gas (forge `--isolate`, call gas, OZ `ERC20` mock): `setAllowance` 49,532 (new), `pull` 85,433
+  for the first pull (spender's USDC balance from zero), 51,233 for a later pull in the same window,
+  54,443 for a pull that rolls the window. Real USDC is a proxy and costs more.
+- **Deploy** (not yet deployed): `contracts/script/DeployBudget.s.sol`, env `USDC_ADDRESS`; with
+  `MULTIBAAS_URL` set and `--broadcast` it links the address as `endcredits_budget` `1.0` at alias
+  `budget`, same rules as `Deploy.s.sol`. `budgetAbi` is in `lib/chain/abi.ts`.
+
+### EndCreditsBudget mutation pass
+
+Each row: the guard deleted (or the value swapped) in `contracts/src/EndCreditsBudget.sol`, then
+`forge test --match-path 'test/EndCreditsBudget*'`, then the source restored (scripted, the file
+rewritten from the saved original). Run on 2026-09-26; `git diff` on `src/` was clean afterwards.
+An earlier run found one surviving mutant: `a.perPeriod == 0 ||` in the reset condition was
+redundant (a missing allowance already has `period == 0`), so it was removed from the contract.
+
+| Guard removed or changed | Tests that fail |
+|---|---|
+| setAllowance: `ZeroSpender` | `test_setAllowance_revertsOnZeroSpender` |
+| setAllowance: `PeriodOutOfRange` (whole check) | `test_setAllowance_revertsOnPeriodTooLong`, `test_setAllowance_revertsOnPeriodTooShort` |
+| setAllowance: `PeriodOutOfRange` (MIN side only) | `test_setAllowance_revertsOnPeriodTooShort` |
+| setAllowance: `PeriodOutOfRange` (MAX side only) | `test_setAllowance_revertsOnPeriodTooLong` |
+| setAllowance: `ZeroAmount` | `test_setAllowance_revertsOnZeroAmount` |
+| setAllowance: fresh window on a new allowance or new period (branch removed) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_allowancesAreSeparatePerSpender`, `test_pull_exactCapThenNothingLeft`, `test_pull_movesFundsWithinCap`, `test_pull_revertsAfterRevoke`, `test_pull_revertsOnHugeAmountWithoutOverflow`, `test_pull_revertsOverCapOnFirstPull`, `test_pull_revertsOverCapWithRemaining`, `test_pull_revertsWithoutUsdcApproval`, `test_pull_revertsWithoutUsdcBalance`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow`, `test_revoke_deletesAndEmits`, `test_revoke_onlyTouchesCallersAllowance`, `test_setAllowance_acceptsPeriodBounds`, `test_setAllowance_afterRevokeStartsFresh`, `test_setAllowance_loweringCapKeepsSpent`, `test_setAllowance_periodChangeResets`, `test_setAllowance_raisingCapKeepsWindow`, `test_setAllowance_storesAndEmits` |
+| setAllowance: period change resets (only a new allowance does) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `test_setAllowance_acceptsPeriodBounds`, `test_setAllowance_periodChangeResets` |
+| setAllowance: cap change keeps spent (swapped to always reset) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `test_setAllowance_loweringCapKeepsSpent`, `test_setAllowance_raisingCapKeepsWindow` |
+| revoke: `delete` | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `invariant_spendersHoldExactlyWhatWasPulled`, `test_pull_revertsAfterRevoke`, `test_revoke_deletesAndEmits`, `test_setAllowance_afterRevokeStartsFresh` |
+| pull: `NoAllowance` | `test_pull_revertsAfterRevoke`, `test_pull_revertsForOtherSpender`, `test_pull_revertsFromOwnerWhoNeverSetOne`, `test_pull_revertsWithoutAllowance` |
+| pull: `ZeroAmount` | `test_pull_revertsOnZeroAmount` |
+| pull: `OverPeriodCap` | `invariant_pullsMatchTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_allowancesAreSeparatePerSpender`, `test_pull_exactCapThenNothingLeft`, `test_pull_revertsOnHugeAmountWithoutOverflow`, `test_pull_revertsOverCapOnFirstPull`, `test_pull_revertsOverCapWithRemaining`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_setAllowance_loweringCapKeepsSpent`, `test_setAllowance_raisingCapKeepsWindow` |
+| pull: `OverPeriodCap` `>` swapped to `>=` | `invariant_pullsMatchTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_allowancesAreSeparatePerSpender`, `test_pull_exactCapThenNothingLeft`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow`, `test_setAllowance_afterRevokeStartsFresh`, `test_setAllowance_periodChangeResets`, `test_setAllowance_raisingCapKeepsWindow` |
+| pull: spent written before transfer (removed) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_allowancesAreSeparatePerSpender`, `test_pull_exactCapThenNothingLeft`, `test_pull_movesFundsWithinCap`, `test_pull_revertsOnHugeAmountWithoutOverflow`, `test_pull_revertsOverCapWithRemaining`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow`, `test_setAllowance_loweringCapKeepsSpent`, `test_setAllowance_raisingCapKeepsWindow` |
+| pull: window start written (removed) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge` |
+| pull: pays the caller (swapped to `address(this)`) | `invariant_contractHoldsNoUsdc`, `invariant_spendersHoldExactlyWhatWasPulled`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_allowancesAreSeparatePerSpender`, `test_pull_movesFundsWithinCap`, `test_pull_rollsAfterOnePeriod` |
+| pull: allowance keyed by caller (swapped to `owner`) | `invariant_pullsMatchTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_allowancesAreSeparatePerSpender`, `test_pull_exactCapThenNothingLeft`, `test_pull_movesFundsWithinCap`, `test_pull_revertsAfterRevoke`, `test_pull_revertsOnHugeAmountWithoutOverflow`, `test_pull_revertsOnZeroAmount`, `test_pull_revertsOverCapOnFirstPull`, `test_pull_revertsOverCapWithRemaining`, `test_pull_revertsWithoutUsdcApproval`, `test_pull_revertsWithoutUsdcBalance`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow`, `test_revoke_deletesAndEmits`, `test_revoke_onlyTouchesCallersAllowance`, `test_setAllowance_afterRevokeStartsFresh`, `test_setAllowance_loweringCapKeepsSpent`, `test_setAllowance_periodChangeResets`, `test_setAllowance_raisingCapKeepsWindow` |
+| _window: roll at the edge, `>=` swapped to `>` | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge` |
+| _window: whole periods (swapped to `start = now`, drifts) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift` |
+| _window: spent reset on roll (removed) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow` |
+| _window: roll (branch removed) | `invariant_pullsMatchTheModel`, `invariant_remainingMatchesTheModel`, `testFuzz_pullsInOneWindowNeverExceedCap`, `test_pull_rollsAfterOnePeriod`, `test_pull_rollsAfterSeveralPeriodsWithoutDrift`, `test_pull_windowEdge`, `test_remaining_accountsForRolledWindow` |
+| _left: clamp at zero (removed) | `invariant_remainingMatchesTheModel`, `test_setAllowance_loweringCapKeepsSpent` |
+| remaining: zero for a missing allowance (short-circuit removed) | `invariant_remainingMatchesTheModel`, `test_remaining_zeroWithoutAllowance`, `test_revoke_deletesAndEmits` |
