@@ -148,6 +148,9 @@ describe.skipIf(!ready)("settleSession on anvil", () => {
         return { address: HELD_PAYEE, source: "drips", sourceUrl: "x" };
       },
       screenPayee: async () => medium,
+      simulatePayment: async () => {
+        throw new Error("no simulation expected");
+      },
       escrow: {
         reserve: (k, a, sk) => reserve(k, a, sk, ctx),
         hold: (a) => hold(a, ctx),

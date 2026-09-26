@@ -9,6 +9,7 @@ import type { HoldArgs, SessionTotals } from "../chain/escrow";
 import { TxRevertedError } from "../chain/txqueue";
 import { findLookalike } from "../decision/lookalike";
 import { decide } from "../decision/matrix";
+import { applySimulation, type SimulationOutcome } from "../decision/simulation";
 import { spamCount, type SessionPackage } from "../decision/spam";
 import { HOLD_REASON_CODE, type Decision, type Reason, type Screen } from "../decision/types";
 import { msg, type MessageCode } from "../messages";
@@ -33,6 +34,9 @@ export type SettleDeps = {
   /** GitHub push time of a funding file (T2.6); omitted → our own observations only. */
   pushedAt?(repo: string, file: string, since: Date): Promise<Date | null>;
   screenPayee(payee: Address, opts: { from: Address; amount: bigint }): Promise<Screen>;
+  /** Intercepta simulation of this exact payment; only for a paid or capped decision. Off unless
+   *  SIMULATE_PAYMENTS=true: the API needs the payer's mainnet balance (decisions.md). */
+  simulatePayment?(payee: Address, amount: bigint): Promise<SimulationOutcome & { screenId?: string }>;
   /** P1, only when CHECK_NO_CODE=true. */
   noCodeOnBase?(payee: Address): Promise<boolean>;
   escrow: {
@@ -247,7 +251,7 @@ async function decideAndExecute(
 
   const payee = w.resolution.address;
   const screen = payee ? await screenSafely(payee, w.amount, deps) : null;
-  const decision = decide({
+  const matrix = decide({
     pkg: w.name,
     payee,
     paymentToken: deps.usdc,
@@ -259,12 +263,19 @@ async function decideAndExecute(
     spam: payee ? spamCount(payee, sessionPackages(all), deps.now()) : null,
     noCodeOnBase: w.noCode ?? false,
   });
+  // One simulation per credit about to be paid, read before the decision is stored.
+  const sim =
+    deps.simulatePayment && payee && (matrix.outcome === "paid" || matrix.outcome === "capped")
+      ? await simulateSafely(payee, w.amount, deps)
+      : null;
+  const decision = sim && payee ? applySimulation(matrix, sim, { payee, amount: w.amount }) : matrix;
+  const screenIds = [...(screen?.screenIds ?? []), ...(sim?.screenId ? [sim.screenId] : [])];
   const reasons = [...decision.reasons, ...payeeReason(w.resolution), ...declaredReason(w)];
   w.outcome = decision.outcome;
   await store.recordDecision(
     database,
     w.creditId,
-    { outcome: decision.outcome, reasons, screenIds: screen?.screenIds ?? [] },
+    { outcome: decision.outcome, reasons, screenIds },
     deps.now(),
   );
 
@@ -333,6 +344,15 @@ async function screenSafely(payee: Address, amount: bigint, deps: SettleDeps): P
     return await deps.screenPayee(payee, { from: deps.payer, amount });
   } catch {
     return { toxicScore: 0, traits: [], tokenAction: "info", tokenDetectors: [], error: "HTTP", screenIds: [] };
+  }
+}
+
+// A simulation that throws is a simulation error: held, never paid (AGENTS rule 7).
+async function simulateSafely(payee: Address, amount: bigint, deps: SettleDeps): Promise<SimulationOutcome & { screenId?: string }> {
+  try {
+    return await deps.simulatePayment!(payee, amount);
+  } catch {
+    return { ok: false, error: "HTTP" };
   }
 }
 

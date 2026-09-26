@@ -20,6 +20,15 @@ const PAYER: Address = "0x9ebd000000000000000000000000000000000001";
 const randomAddress = () => privateKeyToAccount(generatePrivateKey()).address;
 const suffix = () => randomUUID().slice(0, 8);
 
+const SIM_SCREEN = "00000000-0000-4000-8000-00000000517a";
+
+// Intercepta's answer for a clean transfer of exactly `amount` Base USDC (live shape, decisions.md).
+function exactSimulation(amount: bigint, detectors: { code: string; description: string }[] = []) {
+  const usdc = (Number(amount) / 1e6).toString();
+  const send = [{ symbol: "USDC", address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", type: "ERC20", amount: usdc }];
+  return { ok: true as const, data: { detectors, assetsMovement: { send, receive: [] } }, screenId: SIM_SCREEN };
+}
+
 const clean: Screen = { toxicScore: 0, traits: [], tokenAction: "info", tokenDetectors: [], impersonation: null, screenIds: [] };
 
 describe.skipIf(!DB_URL)("settleSession (integration)", () => {
@@ -80,7 +89,7 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
     (await database.select().from(s.credits).where(eq(s.credits.id, creditId)))[0];
 
   function fakes(payees: Record<string, Address | null>, screens: Record<string, Screen | "throw">) {
-    const calls = { pay: [] as string[], hold: [] as Hex[], reserve: [] as Hex[], resolve: [] as string[], record: 0 };
+    const calls = { pay: [] as string[], hold: [] as Hex[], reserve: [] as Hex[], resolve: [] as string[], record: 0, simulate: [] as string[], reasonsAtPay: [] as string[][] };
     const decidedBefore: string[] = [];
     const creditByTip = async (tip: Hex) =>
       (await database.select().from(s.credits).where(eq(s.credits.tipId, tip)))[0];
@@ -121,6 +130,10 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
         if (sc === "throw") throw new Error("screens insert failed");
         return sc ?? clean;
       },
+      simulatePayment: async (payee, amount) => {
+        calls.simulate.push(payee);
+        return exactSimulation(amount);
+      },
       escrow: {
         reserve: async (pkgKey, _amount, _sessionKey): Promise<Hash> => {
           assertDecided(await creditByKey({ pkgKey }), "reserve");
@@ -138,7 +151,9 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
         },
       },
       payCredit: async (credit) => {
-        assertDecided(await creditRow(credit.id), "pay");
+        const row = await creditRow(credit.id);
+        assertDecided(row, "pay");
+        calls.reasonsAtPay.push((row.reasons as { code: string }[]).map((r) => r.code));
         calls.pay.push(credit.id);
         return { tx: `0x${"04".repeat(32)}`, receipt: { creditId: credit.id } };
       },
@@ -386,6 +401,87 @@ describe.skipIf(!DB_URL)("settleSession (integration)", () => {
       const { c } = await declaredSetup({ declare: false });
       expect(c.outcome).toBe("refused");
       expect(c.reasons).toEqual([expect.objectContaining({ code: "RESOLVE_FAILED" })]);
+    });
+  });
+
+  describe("the payment simulation", () => {
+    async function simulated(sim: (amount: bigint) => Promise<unknown>) {
+      const name = `sim-${suffix()}`;
+      const payee = randomAddress();
+      const { id } = await seedSession({ [name]: { import: 1 } });
+      const { deps, calls } = fakes({ [name]: payee }, {});
+      deps.simulatePayment = (_payee, amount) => sim(amount) as ReturnType<NonNullable<import("./settle").SettleDeps["simulatePayment"]>>;
+      await mod.settleSession(id, deps);
+      const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
+      return { c, calls, payee };
+    }
+
+    it("is skipped when the simulation is off (the default), and the credit is still paid", async () => {
+      const name = `nosim-${suffix()}`;
+      const { id } = await seedSession({ [name]: { import: 1 } });
+      const { deps, calls } = fakes({ [name]: randomAddress() }, {});
+      delete deps.simulatePayment;
+      await mod.settleSession(id, deps);
+      const [c] = await database.select().from(s.credits).where(eq(s.credits.sessionId, id));
+      expect(c.outcome === "paid" || c.outcome === "capped").toBe(true);
+      expect((c.reasons as { code: string }[]).map((r) => r.code)).not.toContain("SIMULATED");
+      expect(calls.pay.length).toBe(1);
+    });
+
+    it("refuses on a malicious detector and never signs", async () => {
+      const { c, calls } = await simulated(async (amount) =>
+        exactSimulation(amount, [{ code: "MALICIOUS_ADDRESS", description: "Malicious address" }]),
+      );
+      expect(c.outcome).toBe("refused");
+      expect(c.reasons).toEqual(
+        expect.arrayContaining([{ source: "intercepta", code: "REFUSED_SIMULATION", text: msg("REFUSED_SIMULATION", { description: "Malicious address" }) }]),
+      );
+      expect(calls.pay).toEqual([]);
+      expect(calls.hold).toEqual([]);
+      expect(c.screenIds).toContain(SIM_SCREEN);
+    });
+
+    it("holds when the simulated payment moves the wrong amount", async () => {
+      const { c, calls, payee } = await simulated(async () => exactSimulation(BigInt(1)));
+      expect(c.outcome).toBe("held");
+      expect(c.reasons).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: "HELD_SIMULATION", text: msg("HELD_SIMULATION", { moved: "-0.000001 USDC", amount: "0.25", payee }) })]),
+      );
+      expect(calls.pay).toEqual([]);
+      expect(calls.hold).toEqual([c.tipId]);
+    });
+
+    it("holds as SCREEN_UNAVAILABLE when the simulation errors or throws", async () => {
+      const failures = [
+        async () => ({ ok: false, error: "TIMEOUT" }),
+        async () => {
+          throw new Error("boom");
+        },
+      ];
+      for (const sim of failures) {
+        const { c, calls } = await simulated(sim);
+        expect(c.outcome).toBe("held");
+        expect(c.reasons).toEqual(expect.arrayContaining([expect.objectContaining({ code: "SCREEN_UNAVAILABLE" })]));
+        expect(calls.pay).toEqual([]);
+      }
+    });
+
+    it("pays a clean exact simulation with SIMULATED stored before the signature", async () => {
+      const { c, calls, payee } = await simulated(async (amount) => exactSimulation(amount));
+      expect(c.outcome).toBe("capped");
+      expect(calls.pay).toEqual([c.id]);
+      expect(c.reasons).toEqual(expect.arrayContaining([{ source: "intercepta", code: "SIMULATED", text: msg("SIMULATED", { amount: "0.25", payee }) }]));
+      expect(calls.reasonsAtPay).toEqual([expect.arrayContaining(["CAPPED", "SIMULATED"])]);
+      expect(c.screenIds).toContain(SIM_SCREEN);
+    });
+
+    it("simulates only credits about to be paid", async () => {
+      const name = `nosim-${suffix()}`;
+      const payee = randomAddress();
+      const { id } = await seedSession({ [name]: { import: 1 } });
+      const { deps, calls } = fakes({ [name]: payee }, { [payee]: "throw" });
+      await mod.settleSession(id, deps);
+      expect(calls.simulate).toEqual([]);
     });
   });
 });

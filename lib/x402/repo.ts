@@ -49,6 +49,13 @@ export function drizzleCreditRepo(database = db()): CreditRepo {
       return noHistory !== null && noHistory > at ? noHistory : at;
     },
 
+    async addScreenId(id: string, screenId: string): Promise<void> {
+      await database
+        .update(credits)
+        .set({ screenIds: sql`array_append(${credits.screenIds}, ${screenId}::uuid)` })
+        .where(and(eq(credits.id, id), sql`not (${screenId}::uuid = any(${credits.screenIds}))`));
+    },
+
     async saveSettlement(id: string, tx: string, receipt: Receipt): Promise<void> {
       await database
         .update(credits)

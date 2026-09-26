@@ -200,7 +200,9 @@ describe("payCredit happy path", () => {
       loadCredit: async () => row,
       latestAddressScreenAt: async () => new Date(),
       saveSettlement: async () => {},
+      addScreenId: async () => {},
     };
+    const screenPayer = async () => ({ ok: true as const, data: { toxicScore: 0, traits: [] }, screenId: "s1" });
     const facilitator = {
       verify: async () => ({ isValid: true }),
       settle: async () => ({ success: true, transaction: "0xbeef", network: "eip155:84532" as const }),
@@ -209,7 +211,7 @@ describe("payCredit happy path", () => {
       const req = new Request(input, init);
       return handleCreditRequest(
         { creditId: "c1", resourceUrl: URL_, paymentHeader: req.headers.get("PAYMENT-SIGNATURE") },
-        { repo, facilitator, usdc: USDC, receiptSigner: receiptKey },
+        { repo, facilitator, usdc: USDC, receiptSigner: receiptKey, screenPayer },
       );
     };
     const result = await payCredit(credit, {

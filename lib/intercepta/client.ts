@@ -23,6 +23,9 @@ import {
 
 export const TIMEOUT_MS = 8000;
 export const RETRY_DELAY_MS = 500;
+// A Base EOA holding USDC and ETH (79,178 USDC on 26 Sep), used as the sender of the payment
+// simulation because the payer has no mainnet balance. Same recipient, same amount.
+export const SIMULATION_FROM: Address = "0x3304E22DDaa22bCdC5fCa2269b418046aE7b566A";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -110,11 +113,12 @@ export function createIntercepta(cfg: InterceptaConfig) {
 
   const payeeFrom = mapChain(BASE_SEPOLIA).mappedFrom;
 
-  function quickScan(address: Address): Promise<CallResult<QuickScanResult>> {
+  // `note` replaces the mapped_from text (the x402 route marks its payer screen this way).
+  function quickScan(address: Address, note?: string): Promise<CallResult<QuickScanResult>> {
     const a = address.toLowerCase();
     return call(
       { kind: "address", subject: a, chainId: null },
-      payeeFrom,
+      note ?? payeeFrom,
       QuickScan,
       { method: "GET", path: `/api/public/v2/extension/account/${a}/quick-scan` },
       NO_HISTORY_SCAN,
@@ -140,16 +144,26 @@ export function createIntercepta(cfg: InterceptaConfig) {
 
   function simulateTransfer(tx: { from: Address; to: Address; amount: bigint }): Promise<CallResult<SimulationResult>> {
     const chain = mapChain(BASE_SEPOLIA);
-    const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [getAddress(tx.to.toLowerCase()), tx.amount] });
     return call(
       { kind: "simulation", subject: tx.to.toLowerCase(), chainId: chain.chainId },
       chain.mappedFrom,
       Simulation,
-      {
-        method: "POST",
-        path: `/api/public/v1/extension/simulation/transaction?chainId=${chain.chainId}`,
-        body: { transaction: { from: tx.from, to: BASE_USDC, value: "0x0", data }, mode: "short" },
-      },
+      transferRequest(tx.from, tx.to, tx.amount, chain.chainId),
+    );
+  }
+
+  // The exact x402 payment as USDC.transfer(payee, amount) on Base. Sent from SIMULATION_FROM, not
+  // the payer: the payer holds no mainnet USDC and Intercepta answers 400 "not enough funds"
+  // (decisions.md, simulate the payment). Keyed by payee and amount, so only this payment reuses it.
+  function simulatePayment(p: { payer: Address; payee: Address; amount: bigint }): Promise<CallResult<SimulationResult>> {
+    const chain = mapChain(BASE_SEPOLIA);
+    const token = mapToken(BASE_SEPOLIA_USDC, BASE_SEPOLIA);
+    const note = `${token.mappedFrom}; payer ${p.payer.toLowerCase()} simulated as ${SIMULATION_FROM.toLowerCase()}`;
+    return call(
+      { kind: "simulation", subject: `${p.payee.toLowerCase()}/${p.amount}`, chainId: chain.chainId },
+      note,
+      Simulation,
+      transferRequest(SIMULATION_FROM, p.payee, p.amount, chain.chainId),
     );
   }
 
@@ -197,7 +211,7 @@ export function createIntercepta(cfg: InterceptaConfig) {
     };
   }
 
-  return { quickScan, checkImpersonation, tokenRisks, simulateTransfer, screenPayee };
+  return { quickScan, checkImpersonation, tokenRisks, simulateTransfer, simulatePayment, screenPayee };
 }
 
 export type Intercepta = ReturnType<typeof createIntercepta>;
@@ -208,6 +222,15 @@ export function interceptaFromEnv(repo: ScreenRepo): Intercepta {
     apiKey: readEnv("INTERCEPTA_API_KEY"),
     repo,
   });
+}
+
+function transferRequest(from: Address, to: Address, amount: bigint, chainId: number): Request {
+  const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [getAddress(to.toLowerCase()), amount] });
+  return {
+    method: "POST",
+    path: `/api/public/v1/extension/simulation/transaction?chainId=${chainId}`,
+    body: { transaction: { from, to: BASE_USDC, value: "0x0", data }, mode: "short" },
+  };
 }
 
 function nameAndDescription(t: { name: string; description: string }) {

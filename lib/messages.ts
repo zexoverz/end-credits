@@ -10,6 +10,12 @@ export const MESSAGES = {
     "Held: {address} has no history on mainnet, so Intercepta has nothing to judge. Waiting for the owner.",
   SCREEN_UNAVAILABLE: "Held: screening unavailable ({error}). Nothing is paid without a screen.",
   REFUSED_TRAIT: "Refused. Intercepta: {description}",
+  REFUSED_SIMULATION: "Refused. Intercepta flagged the simulated payment: {description}",
+  HELD_SIMULATION: "Held: the simulated payment moves {moved} instead of {amount} USDC to {payee}.",
+  SIMULATED:
+    "Simulated on Base: −{amount} USDC from the payer to {payee}. x402 settles it by transferWithAuthorization, which moves the same USDC.",
+  PAYER_REFUSED: "Refused: Intercepta flags the paying wallet. {description}",
+  PAYER_SCREEN_UNAVAILABLE: "Not settled: the paying wallet could not be screened ({error}). Nothing was settled.",
   IMPERSONATION:
     "Refused. Intercepta: this address impersonates {original} (address poisoning).",
   TOKEN_PIN: "Refused: the payment token is not Base Sepolia USDC.",

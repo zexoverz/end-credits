@@ -1037,6 +1037,64 @@ reserve twice). It throws; the settler records an execution error and nothing mo
   simulation fallback after a failed quick scan can add the same again.
 - **Budget:** requests double only on failures.
 
+## Intercepta: simulate the payment, screen the payer (26 Sep)
+
+- **Why:** Intercepta's prize asks the paying agent to screen the payment authorization itself, and
+  the paid service to screen the payer's wallet. We already screened `payTo` and the token.
+- **API, confirmed** from `https://docs.web3antivirus.io/reference/scan-transaction.md` (26 Sep):
+  `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, body
+  `{transaction: {from, to, value, data, gas?, gasPrice?}, mode: "short"}` (also `url`,
+  `transactionHash`). Short response `{to, from, detectors: [{code, description}], assetsMovement:
+  {send: [{symbol, address, type, amount}], receive: [...]}, transactionType}`. `amount` is a
+  decimal string in token units (`"0.25"`), and the movement is from `from`'s side only; it does
+  not name the recipient. There is **no documented option to simulate regardless of balance**.
+- **Live, 4 requests** (key from `~/.config/dominion/intercepta-key`, never printed),
+  `USDC.transfer(0xF233…Eeb87, 250000)` on Base USDC:
+  1. from the payer `0xaf4C…9Bb6` → **HTTP 400** `{"errors":[{"message":"There are not enough funds
+     to perform this transaction"}]}`. The payer holds USDC only on Base Sepolia.
+  2. from `0x3304E22DDaa22bCdC5fCa2269b418046aE7b566A` (a Base EOA with 79,178 USDC and 39,057 ETH
+     on 26 Sep, read with `balanceOf`/`getBalance` on `mainnet.base.org`) → 200,
+     `send: [{USDC, 0x8335…2913, "0.25"}]`, `receive: []`, `transactionType: "transfer"`,
+     detectors `[WALLET_DRAINER "If you sign this transaction, you will send tokens or grant
+     approval to a scam address."]`.
+  3. same sender, prettier's payee `0x3A39…3141` → the same `WALLET_DRAINER`. It fires for two clean
+     payees (both quick-scan `{toxicScore: 0, traits: []}` in the T4.1 probe), so it describes this
+     sender or the call pattern, not the recipient. It is not in the refuse-on-sight set and does
+     not refuse; it is stored verbatim in the `screens` row.
+  4. through `scripts/simulate-payment.ts` (the client, nothing stored): the same answer, parsed,
+     and the credit stays `paid` with `SIMULATED`.
+- **Choice: simulate from that funded holder, same recipient and amount.** `SIMULATION_FROM` in
+  `lib/intercepta/client.ts`. The row's `mapped_from` says so:
+  `eip155:84532/0x036c…cf7e; payer 0xaf4c…9bb6 simulated as 0x3304…566a`. Cache key
+  `(simulation, "<payee>/<amount>", 8453)`, so only the same payment reuses a row (1 h).
+- **When:** in `decideAndExecute`, after the matrix and only for `paid`/`capped`, one simulation per
+  credit (`simulatePayment` dep). The result is folded into the decision by `applySimulation`
+  (`lib/decision/simulation.ts`) before `recordDecision`, so the stored decision already carries it
+  when the x402 client signs (AGENTS rule 6).
+- **Rules:** a detector in `CRITICAL` (matrix) → `refused`, `REFUSED_SIMULATION` per detector.
+  `assetsMovement` other than exactly one send of Base USDC equal to the amount and no receive →
+  `held` (`holdReason` `SCREEN`), `HELD_SIMULATION` with what moved (`-0.5 USDC`, `nothing`, or
+  `an unreadable asset movement`). Error or timeout after the one retry, or a throw → `held`,
+  `SCREEN_UNAVAILABLE`. Clean → `SIMULATED` appended. The simulation `screens` id joins the credit's
+  `screen_ids`. x402 `exact` settles by `transferWithAuthorization`, whose balance effect is this
+  same transfer; the `SIMULATED` text says so.
+- **Payer screen (paid side):** `handleCreditRequest` reads `payload.authorization.from` after the
+  challenge match and before `verify`. Not an address → 400 `INVALID_PAYMENT`. Quick scan through
+  the Intercepta client (5 min address cache, `mapped_from` `eip155:84532 x402 payer`; a cached row
+  keeps the note it was stored with). Its id is appended once to `credits.screen_ids`
+  (`addScreenId`). A `CRITICAL` trait or `toxicScore > 50` → 403 `{code: "PAYER_REFUSED", message}`;
+  an error → 503 `{code: "PAYER_SCREEN_UNAVAILABLE", message}`; neither reaches the facilitator.
+  No history → accepted (fresh payer wallets are normal), the 404 row is still recorded.
+- **Budget:** one simulation per paid credit, one payer quick scan per payer per 5 min.
+- **Gap:** the settler's x402 client maps our 403/503 to `EXECUTION_FAILED`, not a named refusal.
+
+**Simulation off by default.** Intercepta's simulation only runs with the sender's real mainnet
+balance; our payer holds testnet USDC only. Simulating from a substituted mainnet wallet returned a
+`WALLET_DRAINER` detector on a plain transfer to a payee that scans clean, a signal about the
+substituted sender, not our payment. Showing it would mislead, so the settler runs the simulation
+only when `SIMULATE_PAYMENTS=true` (for a mainnet payer). Screening the x402 payer on the paid side
+stays on. This is also API feedback: simulation cannot cover a testnet agent's payment, and
+signature analysis does not cover EIP-3009 `TransferWithAuthorization`, the message x402 signs.
 ## Risk profile and dashboard actions (26 Sep)
 
 - **`GET /api/risk/<address>`** (`lib/risk/profile.ts`) reads only our DB: `screens`,

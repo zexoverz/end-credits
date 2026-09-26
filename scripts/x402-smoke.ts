@@ -43,7 +43,10 @@ async function main() {
       credit.txHash = tx;
       credit.receipt = receipt;
     },
+    addScreenId: async () => {},
   };
+  // Stands in for Intercepta's payer screen: this script tests x402 settlement, not screening.
+  const screenPayer = async () => ({ ok: true as const, data: { toxicScore: 0, traits: [] }, screenId: randomUUID() });
   const facilitator = new HTTPFacilitatorClient({
     url: process.env.X402_FACILITATOR_URL || DEFAULT_FACILITATOR_URL,
   });
@@ -53,7 +56,7 @@ async function main() {
     const header = req.headers["payment-signature"];
     const out = await handleCreditRequest(
       { creditId: id, resourceUrl: url, paymentHeader: typeof header === "string" ? header : null },
-      { repo, facilitator, usdc, receiptSigner },
+      { repo, facilitator, usdc, receiptSigner, screenPayer },
     );
     res.writeHead(out.status, Object.fromEntries(out.headers.entries()));
     res.end(await out.text());
