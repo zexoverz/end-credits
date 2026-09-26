@@ -17,14 +17,14 @@ export const RELEASE_TYPES = {
   ],
 } as const;
 
-export interface ReleaseMessage {
+export type ReleaseMessage = {
   tipId: Hex;
   payee: Address;
   amount: bigint;
   approvalRef: Hex;
   /** Unix seconds (the hold's expiry). */
   deadline: bigint;
-}
+};
 
 export function releaseTypedData(m: ReleaseMessage, escrow: Address, chainId: number = BASE_SEPOLIA_ID) {
   return {
