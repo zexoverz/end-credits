@@ -169,19 +169,48 @@ For an address it has never seen on mainnet, quick scan answers HTTP 404 with
 message; the client turns it into `noHistory: true`, stores the raw 404, and the matrix holds it as
 `HELD_NO_HISTORY`. Any other 404 is still an error. A fresh address is never paid unscreened.
 
-### Paid, held and refused in the demo
+### Live results: first settlement, 26 Sep 2026
 
-The held and refused rows come from our own `@endcredits-demo/*` fixtures (see
-[Demo fixtures](#demo-fixtures)).
+Session `9233161f-1de0-4161-abc8-387379cc2b8b`, roll:
+https://end-credits.up.railway.app/credits/9233161f-1de0-4161-abc8-387379cc2b8b. Budget 2.00 USDC,
+cap 0.25 USDC per package, Base Sepolia. The held and refused rows are our own `@endcredits-demo/*`
+fixtures (see [Demo fixtures](#demo-fixtures)); the paid rows are real packages paid to the addresses
+their maintainers published.
 
-| Package | Payee | Outcome | Reason shown |
-|---|---|---|---|
-| TODO(live): a real package with a wallet | TODO(live) | `paid` / `capped` | TODO(live): tx link |
-| `@endcredits-demo/left-padder-pro` | `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (OFAC SDN) | `refused` | TODO(live): Intercepta's trait text, verbatim |
-| `@endcredits-demo/moved-payout` | `0xeF4509C258107F5A37fb7e76af4F99a7DD3c6aa2` | `held` | `HELD_CHANGED` |
-| `@endcredits-demo/unclaimed-utils` | none | `reserved` | `RESERVED` |
+| Package | Payee | Intercepta said | Outcome | Tx |
+|---|---|---|---|---|
+| `@tanstack/react-query` | `0xD5371B61b35E13F2ae354BE95081aD63FB383452` (Drips `FUNDING.json`) | `toxicScore` 0, no traits | `capped`, 0.25 USDC over x402 | [`0x9bdb46ae…`](https://sepolia.basescan.org/tx/0x9bdb46ae4da6a54f6adc446d9e69d2280116f6fecfd048ea477f112f6bfe5b1a) |
+| `zod` | `0xF233A42130Bcdd8b22FFB5D9593199f31C3Eeb87` (`tea.yaml`) | `toxicScore` 0, no traits | `capped`, 0.25 USDC over x402 | [`0x76fd328d…`](https://sepolia.basescan.org/tx/0x76fd328da02b645ad916d1b45a99cc77aa47e82b7560a8d5bea2f974a91fbe2c) |
+| `@endcredits-demo/left-padder-pro` | `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (OFAC SDN, Lazarus Group) | `toxicScore` 100: `sanction_address`, `known_scammer`, `blacklist` | `refused`, nothing sent | none |
+| `@endcredits-demo/moved-payout` | `0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551` | clean; the funding address changed during the hackathon | `held` (`HELD_CHANGED`), then released after the owner's MetaMask EIP-712 signature | hold [`0x6fa71613…`](https://sepolia.basescan.org/tx/0x6fa71613ea335e6ec578523522db58ad498e5e98360858f14e4abe7177e986ba), release [`0x4d799e1c…`](https://sepolia.basescan.org/tx/0x4d799e1c9ae1964528ce186aa46e531ce25b7106398b82f00e5ed2f975b5bed0) |
+| `date-fns` | none published | not screened (no payee) | `reserved` | [`0x188de0d5…`](https://sepolia.basescan.org/tx/0x188de0d5b6aa202f2d6e5ced162b14e53a4482966223c125f4eb859605018a55) |
+| `tailwindcss` | none published | not screened (no payee) | `reserved` | [`0xdc7153e8…`](https://sepolia.basescan.org/tx/0xdc7153e80bf140fe8157c00ac48f166293d2dd23f6972f621fa23c7da1139ae0) |
+| `@endcredits-demo/unclaimed-utils` | none published | not screened (no payee) | `reserved` | [`0x94abde52…`](https://sepolia.basescan.org/tx/0x94abde524e0f3bc6b444530fa3b19e576ecfb22cf8a0dbdf39150eeae4dbdafe) |
 
-TODO(live): session id and roll link for the recorded run.
+`recordSession`: [`0x85ddbcf9…`](https://sepolia.basescan.org/tx/0x85ddbcf94abd55c47244296223905698b3d47bd725ccc14b3410755721f11393).
+
+The reasons stored for the two non-paid fixture rows, as the roll shows them (from
+`GET /api/sessions/9233161f-1de0-4161-abc8-387379cc2b8b`). Intercepta's trait descriptions go in
+verbatim:
+
+```text
+@endcredits-demo/left-padder-pro  refused
+  Refused. Intercepta: The address has a confirmed history of malicious activity, including scams, phishing, or other harmful behavior.
+  Refused. Intercepta: The address is officially listed as sanctioned and poses significant legal and financial risks.
+  Refused. Intercepta: The address appears on external or internal blacklist sources due to prior involvement in high‑risk or malicious activity.
+  Screened as its mainnet equivalent (Base, chain 8453).
+
+@endcredits-demo/moved-payout  held, then paid
+  Held: the funding address for @endcredits-demo/moved-payout changed 0 days ago. Waiting for the owner.
+  Screened as its mainnet equivalent (Base, chain 8453).
+  Approved by the owner. Released 0.25 USDC to 0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551.
+```
+
+The released row also went through escrow v2's signature check on chain: in a separate run with a
+throwaway payer, a release signed by the wrong key reverted `BadApproval`, and the approver-signed
+release [`0xd8c70875…`](https://sepolia.basescan.org/tx/0xd8c7087528872b003879e215d7b515e46b20d6728ec26a28f28d9684c648d95d) paid.
+
+TODO(live): the final judged demo session id and its roll link.
 
 ### What we learned from the docs
 
