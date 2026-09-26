@@ -1,7 +1,7 @@
 // "Actions to take" and the hourly timeline for /api/dashboard. Pending holds, reserve balances and
 // every amount come from MultiBaas rows; our DB only adds package names, payees and reason texts.
 import { formatUnits } from "viem";
-import { msg } from "../messages";
+import { msg, sessionsLabel } from "../messages";
 import { eventName, field, toBytes32, toMicro, type Row } from "./rows";
 
 export const EXPIRING_SOON_MS = 2 * 60 * 60 * 1000;
@@ -98,7 +98,7 @@ export function buildActions({ pending, holds, reserves, now }: ActionInput): Ac
       const label = r.name ?? r.packageKey;
       return {
         kind: "reserve_waiting",
-        title: msg("ACTION_RESERVE", { amount: amount.usdc, package: label, sessions: r.sessions }),
+        title: msg("ACTION_RESERVE", { amount: amount.usdc, package: label, sessions: sessionsLabel(r.sessions) }),
         detail: null,
         href: r.name ? `/app/npm/${r.name}` : `/app/packages`,
         amount,

@@ -3,7 +3,7 @@
 // count from our credits. A failed read is reported in `errors`, never replaced by a number.
 import { formatUnits, zeroAddress, type Hex } from "viem";
 import { isValidPackageName } from "../attribution/specifier";
-import { msg } from "../messages";
+import { msg, sessionsLabel } from "../messages";
 import { packageKey } from "../payee/keys";
 import type { RiskProfile } from "../risk/profile";
 import type { ClaimDeps } from "./deps";
@@ -117,7 +117,7 @@ export async function packageSummary(req: Request, slug: string[], deps: ClaimDe
     reserved,
     sessions,
     headline:
-      onChain && onChain.reserved > 0n ? msg("CLAIM_HEADLINE", { amount: reserved!, package: name, sessions }) : null,
+      onChain && onChain.reserved > 0n ? msg("CLAIM_HEADLINE", { amount: reserved!, package: name, sessions: sessionsLabel(sessions) }) : null,
     alsoAccepts: pkg.fundingLinks,
     payee: found,
     alreadyPayable: found && found.source !== "claim" ? msg("ALREADY_PAYABLE", { package: name }) : null,
