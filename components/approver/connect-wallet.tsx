@@ -4,7 +4,7 @@
 // a button is pressed, same SDK setup as the claim page (app/npm/.../passkey.ts). Signing uses
 // `eth_signTypedData_v4` with params [address, typedData], as the SDK itself calls it. A wallet not
 // yet deployed signs with an ERC-6492 envelope; the server checks and unwraps it.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ProviderInterface } from "@base-org/account/browser";
 import { baseSepolia } from "viem/chains";
 import { Button, ErrorBox, Mono } from "@/components/ui";
@@ -19,8 +19,15 @@ type Eip1193 = { request: (args: { method: string; params?: unknown[] }) => Prom
 
 let baseProvider: ProviderInterface | null = null;
 
-const injected = (): Eip1193 | null =>
-  typeof window !== "undefined" ? ((window as unknown as { ethereum?: Eip1193 }).ethereum ?? null) : null;
+type Injected = Eip1193 & { isMetaMask?: boolean; providers?: Injected[] };
+
+/** The browser extension wallet; MetaMask first when several extensions share window.ethereum. */
+const injected = (): Eip1193 | null => {
+  if (typeof window === "undefined") return null;
+  const eth = (window as unknown as { ethereum?: Injected }).ethereum;
+  if (!eth) return null;
+  return eth.providers?.find((p) => p.isMetaMask) ?? eth;
+};
 
 export const hasInjectedWallet = () => injected() !== null;
 
@@ -96,6 +103,12 @@ export function ConnectWallet({ onConnected }: { onConnected: (address: string) 
   const [busy, setBusy] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Extensions exist only in the browser: detect after mount, never during the server render.
+  const [browserWallet, setBrowserWallet] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setBrowserWallet(hasInjectedWallet()), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   async function connect(kind: WalletKind) {
     setBusy(true);
@@ -124,7 +137,7 @@ export function ConnectWallet({ onConnected }: { onConnected: (address: string) 
           <Button type="button" disabled={busy} onClick={() => connect("base")}>
             {busy ? C.CONNECTING : C.CONNECT}
           </Button>
-          {hasInjectedWallet() && (
+          {browserWallet && (
             <Button type="button" disabled={busy} onClick={() => connect("injected")}>
               {busy ? C.CONNECTING : C.CONNECT_BROWSER}
             </Button>
