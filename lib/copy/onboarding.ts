@@ -143,7 +143,7 @@ export const ONBOARDING = {
   initHint:
     "Installs the Claude Code hooks for this project. Then run your next session as usual.",
   install: "CLI installation instructions ↗",
-  installHref: "https://github.com/zexoverz/end-credits#cli",
+  installHref: "https://github.com/zexoverz/end-credits/blob/main/docs/details.md#cli",
   keyInit: "Then, inside your project:",
   holdsLabel: "05 / NEEDS YOUR DECISION",
   holdsTitle: "Review before you release.",
