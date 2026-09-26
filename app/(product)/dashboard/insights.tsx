@@ -24,9 +24,18 @@ const hour = (iso: string) =>
     minute: "2-digit",
     hour12: false,
   });
-export function ActionQueue({ actions }: { actions: Action[] }) {
+export function ActionQueue({ actions }: { actions?: Action[] }) {
+  if (!actions)
+    return (
+      <section id="actions" className="action-queue">
+        <header>
+          <h2>{C.actions}</h2>
+        </header>
+        <p className="action-empty">{C.actionsUnavailable}</p>
+      </section>
+    );
   return (
-    <section className="action-queue">
+    <section id="actions" className="action-queue">
       <header>
         <div>
           <p className="control-eyebrow">{C.actions}</p>
@@ -61,7 +70,11 @@ export function ActionQueue({ actions }: { actions: Action[] }) {
                 </small>
               </div>
               <Link className="action-review" href={a.href}>
-                {C.review}
+                {a.kind === "reserve_waiting"
+                  ? a.package
+                    ? C.claimReserve
+                    : C.findPackage
+                  : C.reviewHold}
               </Link>
             </li>
           ))}
@@ -71,13 +84,17 @@ export function ActionQueue({ actions }: { actions: Action[] }) {
   );
 }
 export function ActivityTimeline({ buckets }: { buckets: TimelineBucket[] }) {
-  const [selected, setSelected] = useState<TimelineSeries>("paid");
+  const [selected, setSelected] = useState<TimelineSeries>(
+    () =>
+      series.find((k) => buckets.some((b) => BigInt(b[k].micro) > 0n)) ??
+      "paid",
+  );
   const [index, setIndex] = useState(Math.max(0, buckets.length - 1));
   const values = buckets.map((b) => BigInt(b[selected].micro));
   const max = values.reduce((a, b) => (a > b ? a : b), 0n);
   const current = buckets[Math.min(index, buckets.length - 1)];
   return (
-    <section className="activity-timeline">
+    <section id="timeline" className="activity-timeline">
       <header>
         <div>
           <p className="control-eyebrow">{C.timelineLabel}</p>

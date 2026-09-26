@@ -149,7 +149,7 @@ export function DashboardView({
       {state.phase === "error" && <ErrorPanel error={state.error} />}
       {state.phase === "data" && (
         <>
-          <ActionQueue actions={state.data.actions ?? []} />
+          <ActionQueue actions={state.data.actions} />
           <Cards data={state.data} />
           <ActivityTimeline buckets={state.data.timeline ?? []} />
         </>
