@@ -1033,5 +1033,6 @@ reserve twice). It throws; the settler records an execution error and nothing mo
 - **Still failing:** unchanged. `Screen.error` is set and the payee holds as `SCREEN_UNAVAILABLE`.
   Never paid without both screens.
 - **Latency:** quick scan, impersonation and token risks already ran in parallel in `screenPayee`, so
-  the worst case per payee is about 16.5 s rather than 8 s, and only when a call fails.
+  the worst case for that step is about 16.5 s rather than 8 s, and only when a call fails. The
+  simulation fallback after a failed quick scan can add the same again.
 - **Budget:** requests double only on failures.
