@@ -26,6 +26,7 @@ export function defaultBudgetChain(): BudgetChain {
   return {
     address: () => budget.budgetAddress(),
     spender: () => chain().payer.account.address,
+    usdc: () => chain().usdc,
     usdcBalance: (owner) => budget.usdcBalance(owner),
     usdcAllowanceToBudget: (owner) => budget.usdcAllowanceToBudget(owner, chain(), at()),
     allowanceOf: (owner, spender) => budget.allowanceOf(owner, spender, chain(), at()),

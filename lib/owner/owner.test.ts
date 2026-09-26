@@ -301,6 +301,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
   describe("budget wallet", () => {
     const BUDGET = "0x1429498c0e6f2f474a5bd3230e79a838e3590b36";
     const SPENDER = "0x00000000000000000000000000000000000000aa";
+    const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
     const FUNDER = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
     const FUNDER_SUM = "0xABcdEFABcdEFabcdEfAbCdefabcdeFABcDEFabCD";
 
@@ -314,6 +315,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
       const chain: import("./budget").BudgetChain = {
         address: () => (o.address === undefined ? BUDGET : o.address) as `0x${string}` | null,
         spender: () => SPENDER,
+        usdc: () => USDC,
         usdcBalance: read(BigInt(12_500_000)),
         usdcAllowanceToBudget: read(BigInt(20_000_000)),
         allowanceOf: read(
@@ -342,6 +344,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
       const res = await h.handleGetBudget(req("/api/owner/budget", { cookie: c }), chain);
       expect(await res.json()).toEqual({
         budgetAddress: BUDGET,
+        usdc: USDC,
         budgetOwner: null,
         spender: SPENDER,
         usdcBalance: null,
@@ -361,6 +364,7 @@ describe.skipIf(!TEST_DB)("owner API (integration)", () => {
       const body = await res.json();
       expect(body).toEqual({
         budgetAddress: BUDGET,
+        usdc: USDC,
         budgetOwner: FUNDER_SUM,
         spender: SPENDER,
         usdcBalance: "12.5",

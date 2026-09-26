@@ -15,6 +15,8 @@ export interface BudgetChain {
   address(): Address | null;
   /** The hot key the owner's allowance is for. */
   spender(): Address;
+  /** The USDC the owner approves to the budget contract. */
+  usdc(): Address;
   usdcBalance(owner: Address): Promise<bigint>;
   usdcAllowanceToBudget(owner: Address): Promise<bigint>;
   allowanceOf(owner: Address, spender: Address): Promise<BudgetAllowance | null>;
@@ -23,6 +25,8 @@ export interface BudgetChain {
 
 export interface BudgetView {
   budgetAddress: string | null;
+  /** The USDC token the wallet approves (for the browser's approve call). */
+  usdc: string | null;
   budgetOwner: string | null;
   spender: string | null;
   usdcBalance: string | null;
@@ -52,6 +56,7 @@ function withTimeout<T>(p: Promise<T>): Promise<T> {
 export async function budgetView(budgetOwner: string | null, chain: BudgetChain): Promise<BudgetView> {
   const empty: BudgetView = {
     budgetAddress: null,
+    usdc: null,
     budgetOwner,
     spender: null,
     usdcBalance: null,
@@ -61,13 +66,15 @@ export async function budgetView(budgetOwner: string | null, chain: BudgetChain)
   };
   let address: Address | null;
   let spender: Address;
+  let usdc: Address;
   try {
     address = chain.address();
     spender = chain.spender();
+    usdc = chain.usdc();
   } catch {
     return { ...empty, error: "rpc_unavailable" };
   }
-  const base = { ...empty, budgetAddress: address, spender };
+  const base = { ...empty, budgetAddress: address, usdc, spender };
   if (!address || !budgetOwner) return base;
   const owner = budgetOwner as Address;
   try {
