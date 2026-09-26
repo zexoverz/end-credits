@@ -38,6 +38,8 @@ function summary(over: Partial<PackageSummary> = {}): PackageSummary {
     maintainer: null,
     claim: null,
     payeeRisk: null,
+    payeeRefused: null,
+    claimed: null,
     errors: [],
     ...over,
   };
