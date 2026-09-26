@@ -1,0 +1,50 @@
+{
+  "title": "Coin Stack / Lettering studies",
+  "eyebrow": "END CREDITS / COIN STACK",
+  "heading": "A coin with its own character.",
+  "intro": "Empat E custom. Bentuk coin tetap sama, supaya yang dibandingkan benar-benar karakter hurufnya.",
+  "back": "← Semua 18 logo",
+  "download": "Download semua Coin Stack",
+  "recommendation": "Rekomendasi: A / Minted E",
+  "recommendationDetail": "Pahatan miring mengikuti rim coin. Lebih khas, tetap jelas di ukuran kecil.",
+  "before": "Sebelumnya",
+  "after": "Minted E",
+  "comparison": "Lama → baru",
+  "size": "Ukuran kecil",
+  "logo": "Logo 512 × 512",
+  "cover": "Cover 1920 × 1080",
+  "png": "PNG ↓",
+  "svg": "SVG ↓",
+  "transparent": "Transparent SVG ↓",
+  "footer": "Custom vector lettering. Tidak bergantung pada font.",
+  "variants": [
+    {
+      "slug": "minted",
+      "letter": "A",
+      "name": "Minted E",
+      "label": "Pilihan utama",
+      "description": "Terminal miring mengikuti guratan sisi coin. Batang lebih tebal, bagian tengah lebih pendek, dan ruang di dalam huruf lebih lega."
+    },
+    {
+      "slug": "soft",
+      "letter": "B",
+      "name": "Soft E",
+      "label": "Lebih ramah",
+      "description": "Sudut melengkung dan proporsi lebar. Lebih lembut, tapi tetap terbaca saat menjadi icon kecil."
+    },
+    {
+      "slug": "engraved",
+      "letter": "C",
+      "name": "Engraved E",
+      "label": "Lebih klasik",
+      "description": "Serif custom dengan kontras tebal-tipis. Lebih dekat ke lettering pada coin, dengan nuansa editorial."
+    },
+    {
+      "slug": "stencil",
+      "letter": "D",
+      "name": "Split E",
+      "label": "Lebih teknis",
+      "description": "Tiga pita terpotong membentuk satu E. Celah diagonal mengambil karakter mesin mint dan susunan ledger."
+    }
+  ]
+}
