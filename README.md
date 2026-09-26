@@ -302,8 +302,9 @@ paid. Design and the mutation table: [`docs/plan/decisions.md`](docs/plan/decisi
 
 ## Curvegrid MultiBaas
 
-**Summary.** MultiBaas deploys and indexes `EndCreditsEscrow`, and its event queries and webhook are
-the whole backend of the End Credits dashboard and of the owner's "money is held" notification.
+**Summary.** End Credits is an AI agent that pays the open-source packages a Claude Code session
+used, and MultiBaas deploys and indexes its escrow so that saved event queries and one webhook are the
+whole backend of its money dashboard and of the owner's "money is held" notification.
 
 ### How MultiBaas is used
 
@@ -316,9 +317,29 @@ the whole backend of the End Credits dashboard and of the owner's "money is held
 | Webhook `endcredits` on `event.emitted`: HMAC over the exact body bytes, 300 s skew, de-dup by `txHash:logIndex`; a `Held` event notifies the owner of that payer | [`lib/multibaas/webhook.ts`](lib/multibaas/webhook.ts), [`app/api/webhooks/multibaas/route.ts`](app/api/webhooks/multibaas/route.ts) |
 | REST client: bearer auth, envelope unwrap, 8 s deadline, typed errors | [`lib/multibaas/client.ts`](lib/multibaas/client.ts), [`lib/multibaas/rows.ts`](lib/multibaas/rows.ts) |
 
-The settler is the AI agent (it attributes, screens, decides and pays on its own); `/dashboard` is
-the digital asset dashboard. Only package names come from our database; amounts come from
-MultiBaas. Refused credits are a count from our decision log, since refused money never moves.
+### The AI agent (Best AI Agent Project)
+
+- **Claude Code is the working agent.** The `endcredits` hooks record what it used, with no code and
+  no repo paths ([`cli/src/record.ts`](cli/src/record.ts)).
+- **It can ask for its own settlement.** `endcredits init` registers the End Credits MCP server
+  (`endcredits mcp`, [`cli/src/mcp.ts`](cli/src/mcp.ts), [`cli/src/mcp-tools.ts`](cli/src/mcp-tools.ts))
+  in `.mcp.json`. Three tools: `end_credits_status` (what this session used and the estimated
+  split), `end_credits_roll` (upload the session and request settlement), `end_credits_explain`
+  (each package's outcome with its stored reason, Basescan links, and approve links for held money).
+- **The settler is the autonomous paying agent.** It resolves payees, screens them with Intercepta,
+  decides, and pays over x402 or writes to the escrow, with no human in the loop except for held
+  money ([`lib/settle/settle.ts`](lib/settle/settle.ts), run by `pnpm worker`).
+- **The LLM never decides who gets paid.** The MCP tools read and request; the payee, the screen and
+  the matrix decide. Every tool description says so.
+
+### The dashboard (Best Digital Asset Dashboard)
+
+`/dashboard` (https://end-credits.up.railway.app/dashboard) shows USDC paid to maintainers, held
+money split into pending, approved, denied and expired, reserved USDC per package, a per-package
+table, the session count, and recent escrow and USDC events with Basescan links. Every amount comes from the MultiBaas event queries above
+([`lib/multibaas/dashboard.ts`](lib/multibaas/dashboard.ts)); only package names come from our
+database. Refused credits are a count from our decision log, since refused money never moves. The
+webhook turns each `Held` event into an owner notification.
 
 ### Team
 
