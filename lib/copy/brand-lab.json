@@ -1,0 +1,84 @@
+{
+  "title": "End Credits / Identity studies",
+  "heading": "Eight ways to give credit.",
+  "intro": "Pilih arah identitasnya. Setiap konsep punya logo persegi, cover 16:9, dan versi vector yang bisa langsung dipakai.",
+  "logo": "Logo",
+  "cover": "Cover",
+  "download": "Download semua pilihan",
+  "concepts": [
+    {
+      "slug": "frame-coin",
+      "name": "Frame Coin",
+      "description": "Evolusi logo sekarang. Bingkai session tetap, play menjadi coin dengan pahatan E.",
+      "note": "Paling dekat dengan identitas sekarang"
+    },
+    {
+      "slug": "coin-stack",
+      "name": "Coin Stack",
+      "description": "Dua keping, satu kontribusi. Siluet sederhana yang tetap terasa seperti token fisik.",
+      "note": "Paling langsung bicara credit"
+    },
+    {
+      "slug": "ec-monogram",
+      "name": "EC Monogram",
+      "description": "Huruf E dan C bertemu dalam satu bentuk geometris. Padat, tegas, mudah dikenali.",
+      "note": "Paling kuat sebagai app icon"
+    },
+    {
+      "slug": "credit-roll",
+      "name": "Credit Roll",
+      "description": "Pita credits yang terbuka menjadi huruf E. Menghubungkan nama dengan akhir sebuah session.",
+      "note": "Paling dekat dengan nama produk"
+    },
+    {
+      "slug": "source-coin",
+      "name": "Source Coin",
+      "description": "Bracket kode mengapit keping kontribusi. Dari software menuju dukungan maintainer.",
+      "note": "Paling developer-focused"
+    },
+    {
+      "slug": "shared-credit",
+      "name": "Shared Credit",
+      "description": "Tiga kontribusi bertemu di satu pusat. Bentuk modular untuk ekosistem open source.",
+      "note": "Paling cocok jadi sistem grafis"
+    },
+    {
+      "slug": "end-stamp",
+      "name": "End Stamp",
+      "description": "Tanda akhir dan bukti kontribusi dalam satu stempel. Karakter editorial yang lebih berani.",
+      "note": "Paling editorial"
+    },
+    {
+      "slug": "orbit-credit",
+      "name": "Orbit Credit",
+      "description": "Satu coin, banyak kontributor di sekelilingnya. Terbuka dan terus bergerak.",
+      "note": "Paling dinamis"
+    }
+  ],
+  "exportLabels": [
+    "END CREDITS / BRAND EXPLORATIONS",
+    "LOGO · 512 × 512",
+    "COVER · 1920 × 1080",
+    "PNG ↓",
+    "SVG ↓",
+    "SMALL-SIZE CHECK",
+    "Transparent SVG ↓",
+    "End Credits · Identity exploration",
+    "8 concepts / Original vector artwork / PNG + SVG"
+  ],
+  "coverCopy": [
+    "End Credits",
+    "Good code.",
+    "Deserves credit.",
+    "Your AI session. Their open-source work.",
+    "A contribution that connects them.",
+    "Give the code behind your AI session its credits.",
+    "Every build",
+    "has a cast.",
+    "Support the open source behind your AI sessions.",
+    "Observe the work.",
+    "Screen the payee.",
+    "Keep the receipt.",
+    "BUILT WITH OPEN SOURCE. CREDIT WHERE IT’S DUE."
+  ]
+}
