@@ -41,7 +41,7 @@ flowchart LR
   D --> E[Intercepta screen<br/>mainnet reputation]
   E --> F{Decision matrix}
   F -->|paid / capped| G[x402 USDC<br/>to maintainer]
-  F -->|held| H[EndCreditsEscrow.hold<br/>World ID release]
+  F -->|held| H[EndCreditsEscrow.hold<br/>owner-signed release]
   F -->|reserved| I[EndCreditsEscrow.reserve<br/>maintainer claims]
   F -->|refused| J[nothing sent]
   G & H & I & J --> K[Credits roll<br/>+ recordSession]
@@ -77,7 +77,7 @@ TODO(live): roll screenshot from the recorded demo session.
 |---|---|---|
 | `paid` | clean payee, paid in full | x402 transfer to the maintainer; Basescan link |
 | `capped` | clean payee, share cut to the per-package cap | x402 transfer of the capped amount; the excess went to other packages |
-| `held` | a doubt: funding address changed recently, medium risk, or screening unavailable | in escrow; released on a World-approved owner decision; refunded on deny or expiry |
+| `held` | a doubt: funding address changed recently, medium risk, or screening unavailable | in escrow; released only with the owner's approver wallet signature (EIP-712, checked on chain); refunded on deny or expiry |
 | `refused` | high risk: sanctioned, known scammer, phishing, impersonation, lookalike address, or a spam payout pattern | not sent; stays with the owner |
 | `reserved` | the package lists no wallet | in escrow under the package key until the maintainer claims |
 
@@ -280,98 +280,6 @@ Faisal, solo. GitHub [`zexoverz`](https://github.com/zexoverz).
   `Link Contract: Error during validation` and the script still exits 0. The link also runs during
   simulation, so a broadcast that fails afterwards leaves a MultiBaas address with no contract.
 
-## World ID for Agents
-
-The protected action is **releasing money an agent held**. A held tip leaves escrow only after the
-owner passes a fresh World ID verification bound to that exact tip. Code: [`lib/world/`](lib/world).
-
-### Journey
-
-1. **Sign-in, once.** `/api/auth/world/start` → World authorize (code flow, PKCE `S256`,
-   `scope=openid`) → `/api/auth/world/callback`. The first sign-in binds the owner row to
-   `(iss, sub)` ([`lib/world/oidc.ts`](lib/world/oidc.ts), [`lib/world/owner.ts`](lib/world/owner.ts)).
-2. **Request.** A tip is held on chain; MultiBaas delivers `Held` and the owner gets a notification.
-   `/approve/<tipId>` shows package, amount, payee, the reason, and "Release {amount} USDC to
-   {address} for {package}."
-3. **Completion.** **Approve with World ID** calls `POST /api/approve/{tipId}/start`, which stores a
-   pending approval and redirects to World with `max_age=0`, `prompt=login`,
-   `acr_values=https://world.org/oidc/acr/orb-v3`, PKCE and a nonce bound to the tip:
-   `base64url(sha256(canonical_json({tipId, packageKey, payee, amount, action:"release", text_version, owner_sub_hash, attempt}) || APPROVE_SALT))`
-   ([`lib/world/stepup.ts`](lib/world/stepup.ts), [`lib/world/nonce.ts`](lib/world/nonce.ts)).
-4. **Validated result.** `/api/approve/callback` exchanges the code on our server and checks the ID
-   token ([`lib/world/approve-callback.ts`](lib/world/approve-callback.ts),
-   [`lib/world/verify.ts`](lib/world/verify.ts)).
-5. **Protected action.** Only then the recorder calls `release(tipId, keccak256(nonce))` on
-   `EndCreditsEscrow`, under a row lock so a tip is released once. The credit becomes `paid` with
-   `APPROVED`.
-
-### Backend validation
-
-All checks run server side; the page never decides an outcome.
-
-| Check | Failure code |
-|---|---|
-| signature against the issuer's JWKS (RS256) | `SIG` |
-| `iss` equals `WORLD_ISSUER` | `ISS` |
-| `aud` is our client id | `AUD` |
-| `exp` not passed (30 s skew) | `EXP` |
-| `nonce` equals the one stored for this approval | `NONCE` |
-| `acr` is `https://world.org/oidc/acr/orb-v3` | `ACR` |
-| `amr` contains `pop` | `AMR` |
-| `(iss, sub)` is the owner of this hold | `WRONG_HUMAN` |
-| `auth_time` present and not before the approval started | `STALE_AUTH` |
-
-### Unsuccessful paths
-
-Each marks the approval `failed`, releases nothing and returns to `/approve/<tipId>` with its message.
-
-| Path | Code | Shown |
-|---|---|---|
-| cancelled in World App (any `error` on the callback) | `CANCELLED` | "Verification cancelled. Nothing was released." |
-| old World session, or the approval was started more than 10 min ago | `STALE_AUTH` | "A fresh verification is required. Nothing was released." |
-| a different human | `WRONG_HUMAN` | "This approval belongs to a different human." |
-| token not issued for this approval | `NONCE` | "This verification was not issued for this approval." |
-| not Orb-verified (`ACR` or `AMR`) | `ACR` | "A proof-of-human credential is required." |
-| unknown or reused `state` | `UNKNOWN_STATE` | "This verification is not for a pending approval. Nothing was released." |
-| bad signature, issuer, audience or expiry | `VERIFY_FAILED` | "The verification could not be checked. Nothing was released." |
-| owner presses **Deny** | `DENIED` | refund to the owner |
-| nobody approves before the TTL | `EXPIRED` | the expirer calls `refund` ([`lib/settle/expire.ts`](lib/settle/expire.ts)) |
-
-The denied-path tests assert the code and that `release` was never called
-([`lib/world/stepup.test.ts`](lib/world/stepup.test.ts)); each token check has its own test in
-[`lib/world/verify.test.ts`](lib/world/verify.test.ts).
-
-### CLI sign-in with the device grant
-
-`endcredits login` → `POST /api/agent/device/start` → World `device_authorization`. The terminal shows
-the code, the owner confirms in World App, and `/api/agent/device/poll` issues an agent key only when
-the ID token passes `verifyIdToken` and its `(iss, sub)` is already an owner
-([`lib/world/device.ts`](lib/world/device.ts), [`cli/src/login.ts`](cli/src/login.ts)). The device
-grant ignores `nonce`, `max_age` and `prompt`, so it is used for sign-in only, never for approvals.
-
-### Environment
-
-The issuer is `WORLD_ISSUER`; endpoints are the fixed paths from the discovery doc. The prize's dev
-environment is `https://sandbox.auth.world.org`. TODO(live): which issuer the deployed app runs
-against, and whether `WORLD_REQUIRED=true` is set in production.
-
-### Debrief
-
-Full notes: [`docs/world-debrief.md`](docs/world-debrief.md).
-
-- **Time to first success:** discovery doc to a green suite (sign-in, step-up with denied paths,
-  device grant) against a local IdP double in one session on 26 Sep. TODO(live): first real
-  sign-in, first approval released on the phone.
-- **Friction:** HTTPS-only exact-match callbacks and a pairwise `sub` per hostname mean nothing runs
-  on localhost; sign-in and approval must share one hostname. `openid-client`'s
-  `client_secret_basic` percent-encodes `_` (`app_…` becomes `app%5F…`), so we send our own Basic
-  header.
-- **Missing docs:** which claims each grant's ID token carries (`auth_time` after `max_age=0`, `acr`
-  and `amr` on the device grant), the `error` value on cancel, and `max_age` is absent from the
-  discovery doc.
-- **One improvement:** TODO(live) (candidate: document the ID token claims per grant, with an
-  example token for each).
-
 ## Attribution weights and caps
 
 These are ours, not a standard. They exist so that a prompt-injected README telling the agent to read
@@ -414,8 +322,9 @@ Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily l
    for a mainnet round, not for testnet.
 10. The dashboard is cached for 60 s to stay inside the MultiBaas free plan. Owner notifications have
     no mark-read yet.
-11. The approve page's "World required" flag reads `WORLD_REQUIRED` only; with `APPROVE_METHOD=world`
-    alone the button reads **Approve** but still goes through World.
+11. The owner signs in with `OWNER_DEV_TOKEN` in the demo deployment. A World ID sign-in and Orb
+    step-up are in [`lib/world/`](lib/world) but off (`WORLD_REQUIRED` unset); the release guard is the
+    on-chain approver signature either way.
 12. USDC sent straight to the escrow address (not through `hold` or `reserve`) is stuck. Nothing reads
     the balance, so this is left as is.
 
@@ -513,8 +422,9 @@ checks the boot set and throws `Missing required env: <NAME>` on the first read 
 | Web boot | `APP_URL`, `DATABASE_URL`, `SESSION_SECRET` |
 | Worker boot | `APP_URL`, `DATABASE_URL`, `INTERCEPTA_API_KEY`, `INTERCEPTA_BASE`, `BASE_SEPOLIA_RPC`, `USDC_ADDRESS`, `ESCROW_ADDRESS`, `PAYER_PRIVATE_KEY`, `RECORDER_PRIVATE_KEY`, `X402_FACILITATOR_URL` |
 | x402 resource | `RECEIPT_SIGNING_KEY` |
-| Owner login | `OWNER_DEV_TOKEN` (off when `WORLD_REQUIRED=true`), `WORLD_REQUIRED`, `APPROVE_METHOD` |
-| World ID (required when `WORLD_REQUIRED=true`) | `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
+| Owner login | `OWNER_DEV_TOKEN` |
+| Escrow v2 seed | `APPROVER_ADDRESS` (the owner's approver wallet, named by the payer on first seed) |
+| Optional World ID (off unless `WORLD_REQUIRED=true`) | `WORLD_REQUIRED`, `APPROVE_METHOD`, `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
 | MultiBaas | `MULTIBAAS_URL`, `MULTIBAAS_API_KEY`, `MULTIBAAS_WEBHOOK_SECRET`, `PAYER_ADDRESS` (optional) |
 | GitHub claim | `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_TOKEN_READ` (optional, rate limit) |
 | Optional | `ETH_MAINNET_RPC`, `BASE_MAINNET_RPC`, `CHECK_NO_CODE` |
@@ -537,7 +447,6 @@ pnpm --filter endcredits build          # cli/dist/endcredits.mjs
 cd cli && npm link && cd ..             # puts `endcredits` on PATH for the hooks
 endcredits init                         # hooks into ./.claude/settings.json (--global for ~/.claude)
 endcredits key <token> --api https://end-credits.up.railway.app   # key from the Owner page
-endcredits login                        # or: World ID device grant instead of a pasted key
 endcredits attribute --session <id> --dry-run   # the table and upload body, nothing sent
 ```
 
@@ -546,13 +455,13 @@ endcredits attribute --session <id> --dry-run   # the table and upload body, not
 | Command | What runs |
 |---|---|
 | `pnpm test` | unit tests; Postgres integration tests skip without `TEST_DATABASE_URL` |
-| `TEST_DATABASE_URL=<migrated db> pnpm test` | also the integration tests (settle, approve, World step-up and device grant, history, owner), one file at a time |
+| `TEST_DATABASE_URL=<migrated db> pnpm test` | also the integration tests (settle, approve, history, owner, and the optional World code), one file at a time |
 | with `anvil` on PATH and `contracts/out` built (`forge build`) | also `lib/chain/escrow.anvil.test.ts` against the real contract; `lib/settle/settle.anvil.test.ts` also needs `TEST_DATABASE_URL` |
 | `OFFLINE=1 pnpm test` | skips the mainnet `getCode` test |
 | `LIVE=1` / `INTERCEPTA_API_KEY=…` | adds the live npm registry and live Intercepta tests |
 | `cd contracts && forge test -vv` | escrow unit, fuzz and invariant tests |
 
-Mocks live only inside tests; the app calls Intercepta, MultiBaas, the facilitator and World for real.
+Mocks live only inside tests; the app calls Intercepta, MultiBaas and the x402 facilitator for real.
 
 ## AI usage
 
