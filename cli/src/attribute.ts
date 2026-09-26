@@ -11,6 +11,7 @@ import {
   type SignalUse,
 } from "../../lib/attribution/types";
 import { cliMsg } from "../../lib/messages";
+import { declaredMeta, type DeclaredRepository } from "../../lib/registry/declared";
 import { endPath, ledgerPath, startPath } from "./paths";
 import { readDeps, type StartSnapshot } from "./start";
 
@@ -19,7 +20,13 @@ export interface UploadBody {
   repoLabel?: string;
   startedAt?: string;
   endedAt: string;
-  packages: { name: string; version?: string; signals: PackageAttribution["signals"] }[];
+  packages: {
+    name: string;
+    version?: string;
+    repository?: DeclaredRepository;
+    homepage?: string;
+    signals: PackageAttribution["signals"];
+  }[];
 }
 
 const LINE_TYPES = new Set(["read", "code", "docs", "add"]);
@@ -94,6 +101,8 @@ export function buildUpload(
     packages: packages.map(({ name, version, signals }) => ({
       name,
       ...(version ? { version } : {}),
+      // only a GitHub repo and an https homepage; a local path never leaves the machine
+      ...(installed[name] ? declaredMeta(installed[name]) : {}),
       signals,
     })),
   };
