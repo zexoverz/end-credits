@@ -27,11 +27,12 @@ export interface EventQueryField {
   aggregator?: Aggregator;
 }
 
+/** A leaf compares one field; a node (`rule` + `children`) combines leaves. */
 export interface EventQueryFilter {
-  fieldType: FieldType;
+  fieldType?: FieldType;
   inputIndex?: number;
-  operator: "equal" | "notequal" | "lessthan" | "greaterthan" | "lessthanorequal" | "greaterthanorequal";
-  value: string;
+  operator?: "equal" | "notequal" | "lessthan" | "greaterthan" | "lessthanorequal" | "greaterthanorequal";
+  value?: string;
   rule?: "and" | "or";
   children?: EventQueryFilter[];
 }
@@ -83,10 +84,17 @@ const where = (block: string, tx: string, at?: string) => [
 // Reserved(packageKey, payer, amount, sessionId) Claimed(packageKey, payee, amount)
 // SessionSettled(sessionId, ownerHash, budget, paid, held, reservedAmount, refused, manifestHash)
 
-/** USDC Transfer rows from the payer. Rows, not sums: the count is needed and there is no count
- *  aggregator. The contract alias is selected so rows from any other linked token are dropped in
- *  code rather than with a nested AND filter. */
-function paidTotals(payer: string): EventQuery {
+const fromPayer = (payer: string): EventQueryFilter => ({
+  fieldType: "input",
+  inputIndex: 0,
+  operator: "equal",
+  value: getAddress(payer).toLowerCase(),
+});
+
+/** USDC Transfer rows from any owner's payer (multi-owner: one OR leaf per payer). Rows, not sums:
+ *  the count is needed and there is no count aggregator. The contract alias is selected so rows
+ *  from any other linked token are dropped in code rather than with a nested AND filter. */
+function paidTotals(payers: readonly string[]): EventQuery {
   return {
     events: [
       {
@@ -98,7 +106,7 @@ function paidTotals(payer: string): EventQuery {
           input(2, "amount"),
           ...where("block", "tx", "at"),
         ],
-        filter: { fieldType: "input", inputIndex: 0, operator: "equal", value: getAddress(payer).toLowerCase() },
+        filter: payers.length === 1 ? fromPayer(payers[0]) : { rule: "or", children: payers.map(fromPayer) },
       },
     ],
     orderBy: "block",
@@ -196,9 +204,13 @@ const recent: EventQuery = {
   order: "DESC",
 };
 
-export function savedQueries(payer: string): Record<(typeof QUERY_LABELS)[keyof typeof QUERY_LABELS], EventQuery> {
+export function savedQueries(
+  payers: string | readonly string[],
+): Record<(typeof QUERY_LABELS)[keyof typeof QUERY_LABELS], EventQuery> {
+  const list = typeof payers === "string" ? [payers] : payers;
+  if (list.length === 0) throw new Error("paid_totals needs at least one payer");
   return {
-    paid_totals: paidTotals(payer),
+    paid_totals: paidTotals(list),
     held_status: heldStatus,
     reserved_by_package: reservedByPackage,
     reserved_sessions: reservedSessions,

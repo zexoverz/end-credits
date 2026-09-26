@@ -8,6 +8,7 @@ import {
 } from "./dashboard";
 import {
   ESCROW,
+  T1,
   fakeDashboardRepo,
   fakeMultiBaas,
   K1,
@@ -28,6 +29,16 @@ describe("dashboard cards", () => {
   it("paid counts payer transfers that belong to a credit, to anyone but the escrow, on the usdc contract only", async () => {
     const d = await buildDashboard(deps());
     expect(d.cards.paid).toEqual({ amount: { micro: "300000", usdc: "0.3" }, count: 2 });
+  });
+
+  it("paid counts a second owner's payer once the repo lists it (multi-owner)", async () => {
+    const OTHER = "0x2bcfcf2c7092044d04cf6727fef2d28b924dee96";
+    const rows = { rows: [{ contract: "usdc", sender: OTHER, recipient: ESCROW.replace("11", "22"), amount: "250000", block: 12, tx: T1, at: "2026-09-26T01:00:00Z" }] };
+    const without = deps({ paid_totals: rows });
+    expect((await buildDashboard(without)).cards.paid.count).toBe(0);
+    const withOther = deps({ paid_totals: rows });
+    withOther.repo.payers = async () => [OTHER];
+    expect((await buildDashboard(withOther)).cards.paid).toEqual({ amount: { micro: "250000", usdc: "0.25" }, count: 1 });
   });
 
   it("held splits approved, denied, expired and pending by tip", async () => {
