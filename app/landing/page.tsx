@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EXPERIENCE as C } from "@/lib/copy/experience";
 import { WEBSITE as W } from "@/lib/copy/website";
+import { DESK as D } from "@/lib/copy/desk";
 import { Arrow, BrandMark } from "@/components/landing/artwork";
 import { Header, SetupCommands } from "@/components/landing/experience";
 import { TechnicalFlow } from "@/components/landing/technical-flow";
@@ -166,34 +167,49 @@ export default function Landing() {
             </div>
             <div className={s.stats}>
               <article className={s.valueCard}>
-                <span className={s.statNumber}>{C.value}</span>
-                <h3>{C.valueTitle}</h3>
-                <p>{C.valueBody}</p>
-                <a href={C.valueUrl}>{C.valueSource}</a>
-                <svg viewBox="0 0 230 180" fill="none" aria-hidden="true">
-                  <path
-                    d="M20 150 68 103l30 23 70-84 43 17M173 22l39 36-49 8"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M20 168h190M38 139v29m40-48v48m40-65v65m40-91v91m40-90v90"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                </svg>
+                <div className={s.statTop}>
+                  <span className={s.statNumber}>{C.value}</span>
+                  <svg viewBox="0 0 230 180" fill="none" aria-hidden="true">
+                    <path
+                      d="M20 150 68 103l30 23 70-84 43 17M173 22l39 36-49 8"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M20 168h190M38 139v29m40-48v48m40-65v65m40-91v91m40-90v90"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                </div>
+                <div className={s.statBody}>
+                  <h3>{C.valueTitle}</h3>
+                  <p>{C.valueBody}</p>
+                </div>
+                <footer className={s.statSource}>
+                  <a href={C.valueUrl}>{C.valueSource}</a>
+                </footer>
               </article>
               <article className={s.gapCard}>
-                <div className={s.dotGrid} aria-hidden="true">
-                  {Array.from({ length: 100 }, (_, i) => (
-                    <span key={i} className={i < 2 ? s.filledDot : undefined} />
-                  ))}
+                <div className={s.statTop}>
+                  <span className={s.statNumber}>{C.gap}</span>
+                  <div className={s.dotGrid} aria-hidden="true">
+                    {Array.from({ length: 100 }, (_, i) => (
+                      <span
+                        key={i}
+                        className={i < 2 ? s.filledDot : undefined}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <span className={s.statNumber}>{C.gap}</span>
-                <h3>{C.gapTitle}</h3>
-                <p>{C.gapBody}</p>
-                <a href={C.gapUrl}>{C.gapSource}</a>
-                <small>{C.gapNote}</small>
+                <div className={s.statBody}>
+                  <h3>{C.gapTitle}</h3>
+                  <p>{C.gapBody}</p>
+                </div>
+                <footer className={s.statSource}>
+                  <a href={C.gapUrl}>{C.gapSource}</a>
+                  <small>{C.gapNote}</small>
+                </footer>
               </article>
             </div>
           </section>
@@ -222,7 +238,11 @@ export default function Landing() {
             </div>
           </section>
           <section className={s.faq}>
-            <h2>{W.faqTitle.join(" ")}</h2>
+            <header className={s.faqIntro}>
+              <p className={s.eyebrow}>{D.faqLabel}</p>
+              <h2>{D.faqTitle}</h2>
+              <p>{D.faqBody}</p>
+            </header>
             <div>
               {W.faqs.map((f) => (
                 <details key={f.q}>
