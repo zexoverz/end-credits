@@ -301,9 +301,9 @@ function SignedIn({
           <p className="setup-kicker">{O.allowanceLabel}</p>
           <h2>{O.allowanceTitle}</h2>
           <p>{O.allowanceBody}</p>
+          <SetupArt kind="allowance" />
         </header>
         <div className="allowance-slot">
-          <SetupArt kind="allowance" />
           <div>
             <span className="allowance-status">
               {allowance?.done

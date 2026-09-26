@@ -262,7 +262,7 @@
 .setup-progress-number small {
   font-size: 25px;
   letter-spacing: -0.04em;
-  color: #6b7e5c;
+  color: #4e6243;
 }
 .setup-progress-number > span {
   font:
@@ -984,5 +984,137 @@
   }
   .owner-setup .wallet-choice {
     transition: none;
+  }
+}
+
+/* The wallet is a real control station, with room for both explicit permissions. */
+.owner-setup .allowance-slot {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.setup-allowance > header > .setup-art {
+  width: min(100%, 260px);
+  margin-top: 24px;
+}
+.allowance-slot > div {
+  min-width: 0;
+}
+.allowance-slot .product-card {
+  padding: 28px;
+  margin: 18px 0;
+}
+.budget-wallet-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.budget-wallet-content > p {
+  margin: 0;
+}
+.budget-wallet-content input,
+.budget-wallet-content select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.allowance-control {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  background: #f4f5ef;
+}
+.allowance-control + .allowance-control {
+  margin-top: 10px;
+}
+.allowance-control > label {
+  font-size: 13px;
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .setup-allowance > header > .setup-art {
+    display: none;
+  }
+  .allowance-slot .product-card {
+    padding: 20px;
+  }
+}
+
+.setup-itinerary .setup-refresh:hover:not(:disabled) {
+  background: #e2ebd5;
+  color: #293d23;
+}
+
+.allowance-balances {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.allowance-balances > div {
+  padding: 18px;
+  border: 1px solid #dce3d3;
+  border-radius: 14px;
+}
+.allowance-balances dt {
+  font-size: 12px;
+  color: #58664d;
+}
+.allowance-balances dd {
+  margin: 8px 0 0;
+  font-size: 30px;
+  letter-spacing: -0.04em;
+}
+.allowance-balances .allowance-period-summary {
+  grid-column: 1/-1;
+  background: #edf2e4;
+}
+.allowance-period-summary dd {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.allowance-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+.allowance-controls > .allowance-control {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.allowance-control h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.allowance-control p {
+  font-size: 12px;
+  color: #58664d;
+  line-height: 1.7;
+}
+.allowance-control button {
+  margin-top: auto;
+}
+.allowance-controls > button {
+  grid-column: 1/-1;
+  justify-self: start;
+}
+@media (max-width: 1100px) {
+  .allowance-controls {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 400px) {
+  .allowance-balances {
+    grid-template-columns: 1fr;
   }
 }

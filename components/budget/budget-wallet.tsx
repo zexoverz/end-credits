@@ -3,7 +3,7 @@
 // /owner: the budget wallet (EndCreditsBudget spend limits). The owner's USDC stays in their own
 // wallet; from that wallet they approve USDC to the budget contract and give our agent key an
 // allowance per period. Every transaction here is sent from the owner's wallet, never the server.
-// Unstyled beyond the shared product primitives, for the frontend to restyle.
+// Wallet calls remain explicit: approve USDC, then set or revoke the agent allowance.
 import { useCallback, useEffect, useState } from "react";
 import { encodeFunctionData, parseAbi, type Hex } from "viem";
 import { ActionNotice, useFeedback } from "@/components/product/feedback";
@@ -47,11 +47,17 @@ const ABI = parseAbi([
 const DAY = 86400;
 const PERIOD_OPTIONS = [3600, DAY, 7 * DAY];
 const periodName = (s: number) => C.PERIODS[String(s)] ?? `${s / 3600} hours`;
-const same = (a: string | null, b: string | null) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+const same = (a: string | null, b: string | null) =>
+  !!a && !!b && a.toLowerCase() === b.toLowerCase();
 const REFRESH_AFTER_MS = 4_000;
 
 /** eth_sendTransaction from the connected wallet on Base Sepolia; returns the tx hash. */
-async function send(kind: WalletKind, from: string, to: string, data: Hex): Promise<string> {
+async function send(
+  kind: WalletKind,
+  from: string,
+  to: string,
+  data: Hex,
+): Promise<string> {
   const p = await walletProvider(kind);
   try {
     await onBaseSepolia(p);
@@ -59,7 +65,10 @@ async function send(kind: WalletKind, from: string, to: string, data: Hex): Prom
     // Base Account is created for Base Sepolia already; a refused switch there is not fatal.
     if (kind === "injected") throw new Error("wrong network");
   }
-  const hash = await p.request({ method: "eth_sendTransaction", params: [{ from, to, data }] });
+  const hash = await p.request({
+    method: "eth_sendTransaction",
+    params: [{ from, to, data }],
+  });
   if (typeof hash !== "string") throw new Error("no transaction");
   return hash;
 }
@@ -67,18 +76,25 @@ async function send(kind: WalletKind, from: string, to: string, data: Hex): Prom
 export function BudgetWallet() {
   const notify = useFeedback();
   const [view, setView] = useState<BudgetView | null>(null);
-  const [wallet, setWallet] = useState<{ address: string; kind: WalletKind } | null>(null);
+  const [wallet, setWallet] = useState<{
+    address: string;
+    kind: WalletKind;
+  } | null>(null);
   const [browserWallet, setBrowserWallet] = useState(false);
   const [perPeriod, setPerPeriod] = useState("");
   const [period, setPeriod] = useState(DAY);
   const [approveAmount, setApproveAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [note, setNote] = useState<{
+    kind: "ok" | "error";
+    text: string;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     const r = await api<BudgetView>("/api/owner/budget");
     if (r.ok) setView(r.data);
-    else setNote({ kind: "error", text: fill(C.LOAD_FAILED, { error: r.error }) });
+    else
+      setNote({ kind: "error", text: fill(C.LOAD_FAILED, { error: r.error }) });
   }, []);
 
   useEffect(() => {
@@ -157,12 +173,17 @@ export function BudgetWallet() {
 
   return (
     <Card title={C.TITLE}>
-      <div className="flex flex-col gap-2 text-sm" id="allowance">
+      <div className="budget-wallet-content">
         <p className="text-muted">{C.EXPLAIN}</p>
         {view && (
           <>
             <div>
-              {C.WALLET}: {view.budgetOwner ? <Mono>{view.budgetOwner}</Mono> : <span className="text-muted">{C.NONE}</span>}
+              {C.WALLET}:{" "}
+              {view.budgetOwner ? (
+                <Mono>{view.budgetOwner}</Mono>
+              ) : (
+                <span className="text-muted">{C.NONE}</span>
+              )}
             </div>
             {view.spender && (
               <div>
@@ -170,25 +191,29 @@ export function BudgetWallet() {
               </div>
             )}
             {view.budgetOwner && view.error === null && (
-              <>
+              <dl className="allowance-balances">
                 <div>
-                  {C.BALANCE}: {view.usdcBalance}
+                  <dt>{C.BALANCE}</dt>
+                  <dd>{view.usdcBalance ?? C.UNKNOWN}</dd>
                 </div>
                 <div>
-                  {C.APPROVED}: {view.usdcAllowanceToBudget}
+                  <dt>{C.APPROVED}</dt>
+                  <dd>{view.usdcAllowanceToBudget ?? C.UNKNOWN}</dd>
                 </div>
-                <div>
-                  {C.ALLOWANCE}:{" "}
-                  {a
-                    ? fill(C.ALLOWANCE_LINE, {
-                        perPeriod: a.perPeriod,
-                        period: periodName(a.period),
-                        spent: a.spentInPeriod,
-                        remaining: a.remaining,
-                      })
-                    : C.NO_ALLOWANCE}
+                <div className="allowance-period-summary">
+                  <dt>{C.ALLOWANCE}</dt>
+                  <dd>
+                    {a
+                      ? fill(C.ALLOWANCE_LINE, {
+                          perPeriod: a.perPeriod,
+                          period: periodName(a.period),
+                          spent: a.spentInPeriod,
+                          remaining: a.remaining,
+                        })
+                      : C.NO_ALLOWANCE}
+                  </dd>
                 </div>
-              </>
+              </dl>
             )}
             {view.error && <ErrorBox>{C.RPC}</ErrorBox>}
           </>
@@ -201,11 +226,19 @@ export function BudgetWallet() {
         ) : (
           <div className="flex flex-wrap gap-2">
             {browserWallet && (
-              <Button type="button" disabled={!!busy} onClick={() => connect("injected")}>
+              <Button
+                type="button"
+                disabled={!!busy}
+                onClick={() => connect("injected")}
+              >
                 {C.CONNECT_BROWSER}
               </Button>
             )}
-            <Button type="button" disabled={!!busy} onClick={() => connect("base")}>
+            <Button
+              type="button"
+              disabled={!!busy}
+              onClick={() => connect("base")}
+            >
               {C.CONNECT}
             </Button>
           </div>
@@ -217,31 +250,58 @@ export function BudgetWallet() {
           </Button>
         )}
         {wallet && view?.budgetOwner && !isOwner && (
-          <p className="text-muted">{fill(C.WRONG_WALLET, { budgetOwner: view.budgetOwner, address: wallet.address })}</p>
+          <p className="text-muted">
+            {fill(C.WRONG_WALLET, {
+              budgetOwner: view.budgetOwner,
+              address: wallet.address,
+            })}
+          </p>
         )}
 
         {isOwner && view && (
-          <div className="flex flex-col gap-2">
-            <label className="flex flex-wrap items-center gap-2">
-              {C.APPROVE_AMOUNT}
-              <input inputMode="decimal" value={approveAmount} onChange={(e) => setApproveAmount(e.target.value)} />
+          <div className="allowance-controls">
+            <div className="allowance-control">
+              <h3>{C.APPROVE_STEP}</h3>
+              <p>{C.APPROVE_HELP}</p>
+              <label htmlFor="spend-approval">{C.APPROVE_AMOUNT}</label>
+              <input
+                id="spend-approval"
+                inputMode="decimal"
+                value={approveAmount}
+                onChange={(e) => setApproveAmount(e.target.value)}
+              />
               <Button
                 type="button"
                 disabled={!!busy}
                 onClick={() =>
                   sendFromOwner(C.APPROVE, view.usdc, () =>
-                    encodeFunctionData({ abi: ABI, functionName: "approve", args: [view.budgetAddress as Hex, amount(approveAmount)] }),
+                    encodeFunctionData({
+                      abi: ABI,
+                      functionName: "approve",
+                      args: [view.budgetAddress as Hex, amount(approveAmount)],
+                    }),
                   )
                 }
               >
                 {C.APPROVE}
               </Button>
-            </label>
-            <label className="flex flex-wrap items-center gap-2">
-              {C.PER_PERIOD}
-              <input inputMode="decimal" value={perPeriod} onChange={(e) => setPerPeriod(e.target.value)} />
-              {C.PERIOD}
-              <select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
+            </div>
+            <div className="allowance-control">
+              <h3>{C.ALLOWANCE_STEP}</h3>
+              <p>{C.ALLOWANCE_HELP}</p>
+              <label htmlFor="spend-period-amount">{C.PER_PERIOD}</label>
+              <input
+                id="spend-period-amount"
+                inputMode="decimal"
+                value={perPeriod}
+                onChange={(e) => setPerPeriod(e.target.value)}
+              />
+              <label htmlFor="spend-period">{C.PERIOD}</label>
+              <select
+                id="spend-period"
+                value={period}
+                onChange={(e) => setPeriod(Number(e.target.value))}
+              >
                 {PERIOD_OPTIONS.map((s) => (
                   <option key={s} value={s}>
                     {periodName(s)}
@@ -256,21 +316,29 @@ export function BudgetWallet() {
                     encodeFunctionData({
                       abi: ABI,
                       functionName: "setAllowance",
-                      args: [view.spender as Hex, amount(perPeriod), BigInt(period)],
+                      args: [
+                        view.spender as Hex,
+                        amount(perPeriod),
+                        BigInt(period),
+                      ],
                     }),
                   )
                 }
               >
                 {C.SET_ALLOWANCE}
               </Button>
-            </label>
+            </div>
             {a && (
               <Button
                 type="button"
                 disabled={!!busy}
                 onClick={() =>
                   sendFromOwner(C.REVOKE, view.budgetAddress, () =>
-                    encodeFunctionData({ abi: ABI, functionName: "revoke", args: [view.spender as Hex] }),
+                    encodeFunctionData({
+                      abi: ABI,
+                      functionName: "revoke",
+                      args: [view.spender as Hex],
+                    }),
                   )
                 }
               >
@@ -280,9 +348,18 @@ export function BudgetWallet() {
           </div>
         )}
 
-        {busy && <ActionNotice tone="pending">{busy === C.CONNECTING ? C.CONNECTING : C.CONFIRM}</ActionNotice>}
+        <Button type="button" disabled={!!busy} onClick={() => void refresh()}>
+          {C.REFRESH}
+        </Button>
+        {busy && (
+          <ActionNotice tone="pending">
+            {busy === C.CONNECTING ? C.CONNECTING : C.CONFIRM}
+          </ActionNotice>
+        )}
         {note?.kind === "error" && <ErrorBox>{note.text}</ErrorBox>}
-        {note?.kind === "ok" && <ActionNotice tone="success">{note.text}</ActionNotice>}
+        {note?.kind === "ok" && (
+          <ActionNotice tone="success">{note.text}</ActionNotice>
+        )}
       </div>
     </Card>
   );

@@ -30,7 +30,7 @@ export const SETUP_STEPS = [
   {
     id: "spend_allowance",
     title: "Set a spend allowance",
-    body: "Authorize the budget wallet’s spending limit when this feature is available. This is separate from saving your contribution settings.",
+    body: "Choose your budget wallet, approve USDC to the budget contract, then set the agent’s allowance per period. This is separate from saving your contribution settings.",
     action: "Open budget wallet",
     href: "/app/owner#allowance",
   },
