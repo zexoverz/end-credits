@@ -128,6 +128,8 @@ export const packages = pgTable(
     declaredDirectory: text("declared_directory"),
     declaredHomepage: text("declared_homepage"),
     repoSource: text("repo_source"),
+    // The maintainer's own x402 endpoint from FUNDING.json, when its drips payee is current.
+    x402Endpoint: text("x402_endpoint"),
   },
   (t) => [
     unique().on(t.ecosystem, t.name),
@@ -190,9 +192,11 @@ export const credits = pgTable(
     receipt: jsonb(),
     decidedAt: ts("decided_at"),
     settledAt: ts("settled_at"),
+    paidVia: text("paid_via"),
   },
   (t) => [
     unique().on(t.sessionId, t.packageId),
+    check("credits_paid_via", sql`${t.paidVia} in ('maintainer_x402','endcredits_x402')`),
     check("credits_role", sql`${t.role} in ('starring','featuring','research','thanks')`),
     check(
       "credits_outcome",

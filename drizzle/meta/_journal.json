@@ -57,6 +57,13 @@
       "when": 1790430479581,
       "tag": "0007_return_to_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790431376976,
+      "tag": "0008_maintainer_x402",
+      "breakpoints": true
     }
   ]
 }
