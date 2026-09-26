@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Button, ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
 import { ActionNotice, useFeedback } from "@/components/product/feedback";
-import { ControlArt } from "@/components/product/control-art";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
 import {
   parseSettingsForm,
   settingsErrors,
@@ -104,15 +104,8 @@ export function SettingsForm({
     { id: "daily", key: "dailyLimit", label: C.DAILY, hint: U.dailyHint },
   ] as const;
   return (
-    <section className="budget-editor">
-      <header>
-        <div>
-          <p className="control-eyebrow">{C.SETTINGS}</p>
-          <h2>{U.budgetTitle}</h2>
-          <p>{U.budgetBody}</p>
-        </div>
-        <ControlArt />
-      </header>
+    <section className="budget-editor rules-editor">
+      <p className="rules-intro">{W.rulesIntro}</p>
       <form onSubmit={save} aria-busy={status === "saving"}>
         <fieldset disabled={status === "saving"}>
           <div className="money-fields">

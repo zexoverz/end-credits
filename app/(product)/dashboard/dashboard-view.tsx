@@ -1,8 +1,10 @@
 "use client";
 // Fetches /api/dashboard on load, every 30 s and on Refresh. A failed fetch replaces the numbers
 // with the error: nothing on this page is ever a placeholder or a stale guess.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { RetainedPanel } from "@/components/product/retained-panel";
 import { DESK as D } from "@/lib/copy/desk";
 import { ActionQueue, ActivityTimeline } from "./insights";
 import { Sessions } from "../app/sessions/sessions";
@@ -35,14 +37,19 @@ type State =
   | { phase: "data"; data: Dashboard; at: number }
   | { phase: "error"; error: DashboardError };
 
+const SessionRecords = memo(Sessions);
+const DecisionRecords = memo(History);
+
 export function DashboardView({
   view = "sessions",
   outcome = "",
-}: {
-  view?: string;
-  outcome?: string;
-}) {
-  const selected = D.views.some(([key]) => key === view) ? view : "sessions";
+}: { view?: string; outcome?: string } = {}) {
+  const params = useSearchParams();
+  const currentView = params?.get("view") ?? view;
+  const selected = D.views.some(([key]) => key === currentView)
+    ? currentView
+    : "sessions";
+  const currentOutcome = params?.get("outcome") ?? outcome;
   const [state, setState] = useState<State>({ phase: "loading" });
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -116,7 +123,10 @@ export function DashboardView({
             </span>
           )}
           <button
-            onClick={() => void load()}
+            onClick={() => {
+              void load();
+              window.dispatchEvent(new Event("endcredits:refresh-records"));
+            }}
             disabled={busy}
             aria-label={busy ? C.REFRESHING : C.REFRESH}
           >
@@ -147,21 +157,37 @@ export function DashboardView({
         <section className="desk-records" aria-label={D.activity}>
           <nav className="desk-view-nav" aria-label={D.viewsLabel}>
             {D.views.map(([key, label]) => (
-              <Link
+              <a
                 key={key}
-                href={`/app?view=${key}`}
-                scroll={false}
+                href={`?view=${key}`}
+                onClick={(e) => {
+                  if (
+                    e.button !== 0 ||
+                    e.metaKey ||
+                    e.ctrlKey ||
+                    e.shiftKey ||
+                    e.altKey
+                  )
+                    return;
+                  e.preventDefault();
+                  if (selected === key) return;
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("view", key);
+                  window.history.pushState(null, "", url);
+                }}
                 aria-current={selected === key ? "page" : undefined}
               >
                 {label}
-              </Link>
+              </a>
             ))}
           </nav>
           <div className="desk-record-content">
-            {selected === "sessions" && <Sessions embedded />}
-            {selected === "decisions" && (
-              <History key={outcome} initialOutcome={outcome} />
-            )}
+            <RetainedPanel active={selected === "sessions"}>
+              <SessionRecords embedded />
+            </RetainedPanel>
+            <RetainedPanel active={selected === "decisions"}>
+              <DecisionRecords initialOutcome={currentOutcome} />
+            </RetainedPanel>
             {selected === "chain" &&
               (state.phase === "data" ? (
                 <RecentEvents

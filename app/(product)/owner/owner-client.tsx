@@ -20,7 +20,7 @@ import type { Onboarding } from "@/lib/owner/onboarding";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
 import { ONBOARDING as O } from "@/lib/copy/onboarding";
 import { AgentKeys } from "./agent-keys";
-import { Holds, Notifications } from "./holds";
+import { LiveHolds, Notifications } from "./holds";
 import { SettingsForm } from "./settings-form";
 import { SignIn } from "./sign-in";
 import { SetupChecklist } from "./setup-checklist";
@@ -154,7 +154,6 @@ function SignedIn({
       setCopyError(true);
     }
   }
-  const [now, setNow] = useState(() => Date.now());
   const refreshChecklist = useCallback(async () => {
     if (requestBusy.current) return;
     requestBusy.current = true;
@@ -185,11 +184,9 @@ function SignedIn({
     };
     window.addEventListener("focus", focus);
     const t = setInterval(focus, 30000);
-    const clock = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       window.removeEventListener("focus", focus);
       clearInterval(t);
-      clearInterval(clock);
     };
   }, []);
   const [activeControl, setActiveControl] = useState<string | null>(null);
@@ -227,8 +224,14 @@ function SignedIn({
     url.hash = "";
     url.searchParams.delete("section");
     window.history.replaceState(null, "", url);
-    void refreshChecklist();
-    onRefreshOwner();
+    if (
+      activeControl === "allowance" ||
+      activeControl === "approver" ||
+      activeControl === "identity"
+    ) {
+      void refreshChecklist();
+      onRefreshOwner();
+    }
   }
   const wallet = checklist?.steps.find((s) => s.id === "wallet_bound");
   const allowance = checklist?.steps.find((s) => s.id === "spend_allowance");
@@ -409,35 +412,39 @@ function SignedIn({
                 void refreshChecklist();
               }}
             />
-            <aside className="setup-funding">
-              <p className="setup-kicker">{O.payer}</p>
-              <span>{O.balance}</span>
-              <strong>
-                {summary.payer.error || summary.payer.usdcBalance === null
-                  ? O.balanceUnknown
-                  : usdc(summary.payer.usdcBalance)}
-              </strong>
-              <a
-                href={addressUrl(summary.payer.address)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Mono>{summary.payer.address}</Mono>
-              </a>
-              <button
-                className="owner-text-button"
-                onClick={() => void copyPayer()}
-              >
-                {U.copyAddress}
-              </button>
-              {copyError && <ErrorBox>{U.copyFailed}</ErrorBox>}
-              <p>{O.walletRoles}</p>
-              {summary.payer.error && (
-                <ErrorBox>
-                  {C.BALANCE_ERROR.replace("{error}", summary.payer.error)}
-                </ErrorBox>
-              )}
-            </aside>
+            <details className="setup-funding funding-disclosure">
+              <summary>
+                <span>{W.serverWallet}</span>
+                <strong>
+                  {summary.payer.error || summary.payer.usdcBalance === null
+                    ? O.balanceUnknown
+                    : usdc(summary.payer.usdcBalance)}
+                </strong>
+                <span aria-hidden="true">+</span>
+              </summary>
+              <div className="funding-disclosure-body">
+                <a
+                  href={addressUrl(summary.payer.address)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Mono>{summary.payer.address}</Mono>
+                </a>
+                <button
+                  className="owner-text-button"
+                  onClick={() => void copyPayer()}
+                >
+                  {U.copyAddress}
+                </button>
+                {copyError && <ErrorBox>{U.copyFailed}</ErrorBox>}
+                <p>{O.walletRoles}</p>
+                {summary.payer.error && (
+                  <ErrorBox>
+                    {C.BALANCE_ERROR.replace("{error}", summary.payer.error)}
+                  </ErrorBox>
+                )}
+              </div>
+            </details>
           </div>
         </section>
       </ControlSheet>
@@ -531,7 +538,10 @@ function SignedIn({
             <p>{O.holdsBody}</p>
           </header>
           <div className="setup-holds-content">
-            <Holds holds={summary.pendingHolds} now={now} />
+            <LiveHolds
+              holds={summary.pendingHolds}
+              active={activeControl === "holds"}
+            />
           </div>
         </section>
       </ControlSheet>

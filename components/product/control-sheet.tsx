@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, type ReactNode } from "react";
+import { RetainedPanel } from "./retained-panel";
 import { WORKSPACE as C } from "@/lib/copy/workspace";
 export function ControlSheet({
   id,
@@ -43,7 +44,9 @@ export function ControlSheet({
           ×
         </button>
       </header>
-      <div className="control-sheet-body">{children}</div>
+      <div className="control-sheet-body">
+        <RetainedPanel active={open}>{children}</RetainedPanel>
+      </div>
     </dialog>
   );
 }

@@ -28,6 +28,15 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
       ? initialOutcome
       : "",
   );
+  useEffect(() => {
+    // Sync an explicit URL outcome filter, including back/forward.
+    setOutcome(
+      E.outcomes.includes(initialOutcome as (typeof E.outcomes)[number])
+        ? initialOutcome
+        : "",
+    );
+    setPage(0);
+  }, [initialOutcome]);
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {
@@ -49,6 +58,10 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
   }, []);
   useEffect(() => {
     void load();
+    const refresh = () => void load();
+    window.addEventListener("endcredits:refresh-records", refresh);
+    return () =>
+      window.removeEventListener("endcredits:refresh-records", refresh);
   }, [load]);
   const search = query.trim().toLowerCase();
   const items =

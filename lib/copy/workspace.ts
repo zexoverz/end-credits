@@ -1,4 +1,6 @@
 export const WORKSPACE = {
+  serverWallet: "Server wallet details",
+  rulesIntro: "Set the limits your agent follows.",
   ownerTitle: "Your control desk.",
   ownerBody: "A small set of rules. A clear record of what happens next.",
   activityTitle: "The work. And its credits.",
