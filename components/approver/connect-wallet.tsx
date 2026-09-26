@@ -49,6 +49,13 @@ export async function connectWallet(
   return firstAccount(await p.request({ method: "eth_requestAccounts" }));
 }
 
+/** Opens the wallet's account picker even when a site is already connected, so the user can switch. */
+export async function chooseWallet(kind: WalletKind = "injected"): Promise<string | null> {
+  const p = await walletProvider(kind);
+  await p.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+  return firstAccount(await p.request({ method: "eth_accounts" }));
+}
+
 const CHAIN_HEX = `0x${baseSepolia.id.toString(16)}`;
 
 /** Browser wallets refuse typed data whose chainId is not the active chain; switch (or add) first. */
