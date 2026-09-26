@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MESSAGES, cliMsg, msg } from "./messages";
+import { MESSAGES, cliMsg, msg, sessionsLabel } from "./messages";
 
 describe("msg", () => {
   it("fills every placeholder", () => {
@@ -33,5 +33,12 @@ describe("cliMsg", () => {
       "End Credits: rolling credits at https://x/credits/1",
     );
     expect(() => cliMsg("ROLLING", {})).toThrow("Missing message var: url in ROLLING");
+  });
+});
+
+describe("sessionsLabel", () => {
+  it("reads 1 session and 2 sessions", () => {
+    expect(sessionsLabel(1)).toBe("1 session");
+    expect(sessionsLabel(2)).toBe("2 sessions");
   });
 });
