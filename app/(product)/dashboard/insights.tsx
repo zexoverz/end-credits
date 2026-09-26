@@ -1,5 +1,9 @@
 "use client";
 import Link from "next/link";
+import { DeskAsset, PackageMark } from "@/components/product/desk-assets";
+import { Pager } from "@/components/product/pager";
+import { inboxItems } from "@/components/product/action-inbox";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
 import { useState, type CSSProperties } from "react";
 import type {
   Action,
@@ -25,60 +29,117 @@ const hour = (iso: string) =>
     hour12: false,
   });
 export function ActionQueue({ actions }: { actions?: Action[] }) {
-  if (!actions)
-    return (
-      <section id="actions" className="action-queue">
-        <header>
-          <h2>{C.actions}</h2>
-        </header>
-        <p className="action-empty">{C.actionsUnavailable}</p>
-      </section>
-    );
+  const [filter, setFilter] = useState("all"),
+    [page, setPage] = useState(0);
+  const grouped = inboxItems(actions ?? []);
+  const holds = grouped.filter(
+    (x) => x.action.kind !== "reserve_waiting",
+  ).length;
+  const visible = grouped.filter(
+    (x) =>
+      filter === "all" ||
+      (filter === "claim") === (x.action.kind === "reserve_waiting"),
+  );
+  const pages = Math.ceil(visible.length / 3),
+    current = Math.min(page, Math.max(0, pages - 1));
   return (
-    <section id="actions" className="action-queue">
+    <section id="actions" className="action-inbox" aria-label={W.inbox}>
       <header>
         <div>
-          <p className="control-eyebrow">{C.actions}</p>
-          <h2>{actions.length ? C.actionsBody : C.noActions}</h2>
+          <span className="desk-eyebrow">{W.inbox}</span>
+          <h2>{W.inboxBody}</h2>
         </div>
-        <span className="action-count">{actions.length}</span>
+        <DeskAsset kind="hold" compact />
       </header>
-      {actions.length === 0 ? (
-        <p className="action-empty">{C.noActionsBody}</p>
+      {!actions ? (
+        <p className="inbox-empty">{C.actionsUnavailable}</p>
       ) : (
-        <ul>
-          {actions.map((a, i) => (
-            <li
-              key={`${a.kind}-${a.tipId ?? a.packageKey ?? i}`}
-              data-kind={a.kind}
-            >
-              <span className="action-kind">{C.actionKind[a.kind]}</span>
-              <div>
-                <Link href={a.href}>{a.title}</Link>
-                {a.detail && <p>{a.detail}</p>}
-                <small>
-                  {C.source}: {a.source}
-                  {a.expiresAt && (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <time dateTime={a.expiresAt}>
-                        {new Date(a.expiresAt).toLocaleString()}
-                      </time>
-                    </>
-                  )}
-                </small>
-              </div>
-              <Link className="action-review" href={a.href}>
-                {a.kind === "reserve_waiting"
-                  ? a.package
-                    ? C.claimReserve
-                    : C.findPackage
-                  : C.reviewHold}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="inbox-filters" role="group" aria-label={W.inbox}>
+            {[
+              ["all", W.all, grouped.length],
+              ["sign", W.sign, holds],
+              ["claim", W.claim, grouped.length - holds],
+            ].map(([id, label, count]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={filter === id}
+                onClick={() => {
+                  setFilter(String(id));
+                  setPage(0);
+                }}
+              >
+                {label}
+                <span>{count}</span>
+              </button>
+            ))}
+          </div>
+          {visible.length === 0 ? (
+            <div className="inbox-empty">
+              <h3>{W.noActions}</h3>
+              <p>{W.noActionsBody}</p>
+            </div>
+          ) : (
+            <ul>
+              {visible
+                .slice(current * 3, current * 3 + 3)
+                .map(({ action: a, warning }, i) => (
+                  <li
+                    key={`${a.kind}-${a.tipId ?? a.packageKey ?? i}`}
+                    data-kind={a.kind}
+                  >
+                    <div className="inbox-item-heading">
+                      <PackageMark name={a.package ?? ""} />
+                      <div>
+                        <Link href={a.href}>
+                          {a.package ??
+                            (a.kind === "reserve_waiting"
+                              ? W.unknownPackage
+                              : W.unknownTip)}
+                        </Link>
+                        <span>
+                          {warning ? W.expiring : C.actionKind[a.kind]}
+                        </span>
+                      </div>
+                      <strong>
+                        {a.amount.usdc}
+                        <small>{W.unit}</small>
+                      </strong>
+                    </div>
+                    <div className="inbox-item-footer">
+                      <details>
+                        <summary>{W.evidence}</summary>
+                        {warning && warning !== a && <p>{warning.title}</p>}
+                        <p>{a.title}</p>
+                        {a.detail && <p>{a.detail}</p>}
+                        <small>
+                          {W.source}: {a.source}
+                          {a.expiresAt && (
+                            <>
+                              {" "}
+                              · {W.expires}{" "}
+                              <time dateTime={a.expiresAt}>
+                                {new Date(a.expiresAt).toLocaleString()}
+                              </time>
+                            </>
+                          )}
+                        </small>
+                      </details>
+                      <Link href={a.href}>
+                        {a.kind === "reserve_waiting"
+                          ? a.package
+                            ? C.claimReserve
+                            : C.findPackage
+                          : C.reviewHold}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          )}
+          <Pager page={current} pages={pages} onPage={setPage} />
+        </>
       )}
     </section>
   );

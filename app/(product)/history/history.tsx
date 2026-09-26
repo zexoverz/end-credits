@@ -1,6 +1,7 @@
 "use client";
 import { STUDIO as S } from "@/lib/copy/studio";
-import { StudioArtwork } from "@/components/product/artwork";
+import { DeskAsset } from "@/components/product/desk-assets";
+import { Pager } from "@/components/product/pager";
 import { useCallback, useEffect, useState } from "react";
 import { Button, ErrorBox } from "@/components/ui";
 import { api } from "@/components/product/request";
@@ -21,6 +22,7 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
     loading: true,
   });
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   const [outcome, setOutcome] = useState<string>(
     E.outcomes.includes(initialOutcome as (typeof E.outcomes)[number])
       ? initialOutcome
@@ -58,6 +60,8 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
             .toLowerCase()
             .includes(search)),
     ) ?? [];
+  const pages = Math.ceil(items.length / 5),
+    current = Math.min(page, Math.max(0, pages - 1));
   return (
     <div className="space-y-5">
       <div className="dashboard-toolbar">
@@ -75,12 +79,18 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
           aria-label={E.decisionSearch}
           placeholder={E.decisionSearch}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
         />
         <select
           aria-label={C.COLS.outcome}
           value={outcome}
-          onChange={(e) => setOutcome(e.target.value)}
+          onChange={(e) => {
+            setOutcome(e.target.value);
+            setPage(0);
+          }}
         >
           <option value="">{E.all}</option>
           {E.outcomes.map((o) => (
@@ -100,7 +110,7 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
       )}
       {state.items?.length === 0 && (
         <div className="studio-history-empty">
-          <StudioArtwork kind="screen" />
+          <DeskAsset kind="signature" />
           <h2>{S.decisionEmptyTitle}</h2>
           <p>{S.decisionEmptyBody}</p>
         </div>
@@ -119,10 +129,11 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
         </div>
       )}
       <div className="history-list">
-        {items.map((item) => (
+        {items.slice(current * 5, current * 5 + 5).map((item) => (
           <HistoryRow key={item.creditId} item={item} />
         ))}
       </div>
+      <Pager page={current} pages={pages} onPage={setPage} />
     </div>
   );
 }
