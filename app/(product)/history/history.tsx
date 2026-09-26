@@ -28,6 +28,15 @@ export function History({ initialOutcome = "" }: { initialOutcome?: string }) {
       ? initialOutcome
       : "",
   );
+  useEffect(() => {
+    // Sync an explicit URL outcome filter, including back/forward.
+    setOutcome(
+      E.outcomes.includes(initialOutcome as (typeof E.outcomes)[number])
+        ? initialOutcome
+        : "",
+    );
+    setPage(0);
+  }, [initialOutcome]);
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {

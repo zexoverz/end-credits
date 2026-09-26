@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { StudioArtwork } from "@/components/product/artwork";
 import { Card, Mono } from "@/components/ui";
 import { countdown } from "@/lib/client/approve";
@@ -98,4 +99,25 @@ export function Notifications({
       </ul>
     </Card>
   );
+}
+
+export function LiveHolds({
+  holds,
+  active,
+}: {
+  holds: PendingHold[];
+  active: boolean;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [active]);
+  return <Holds holds={holds} now={now} />;
 }
