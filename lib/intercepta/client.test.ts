@@ -1,6 +1,6 @@
 // Unit tests for the Intercepta client. fetch is a spy here; product code always calls the real API.
 import { describe, expect, it, vi } from "vitest";
-import { createIntercepta } from "./client";
+import { SIMULATION_FROM, createIntercepta } from "./client";
 import { BASE_USDC } from "./mapping";
 import { memoryRepo } from "./__fixtures__/memory-repo";
 import { NO_HISTORY_BODY } from "./no-history";
@@ -178,6 +178,33 @@ describe("simulateTransfer", () => {
     expect(body.transaction.to).toBe(BASE_USDC);
     expect(body.transaction.data.startsWith("0xa9059cbb")).toBe(true);
     expect(body.transaction.data).toContain(PAYEE.slice(2).toLowerCase());
+  });
+});
+
+describe("simulatePayment", () => {
+  const sim = { detectors: [], assetsMovement: { send: [], receive: [] } };
+
+  it("sends the exact transfer from the funded holder and notes the payer it stands in for", async () => {
+    const f = router({ "/simulation/transaction": () => json(sim) });
+    const { c, rows } = client(f);
+    const r = await c.simulatePayment({ payer: PAYER, payee: PAYEE, amount: BigInt(250000) });
+    expect(r.ok).toBe(true);
+    const body = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body.transaction.from).toBe(SIMULATION_FROM);
+    expect(body.transaction.to).toBe(BASE_USDC);
+    expect(body.transaction.data).toBe(
+      "0xa9059cbb000000000000000000000000abcdef0000000000000000000000000000001234000000000000000000000000000000000000000000000000000000000003d090",
+    );
+    expect(rows[0]).toMatchObject({ kind: "simulation", subject: `${PAYEE.toLowerCase()}/250000`, chainId: 8453 });
+    expect(rows[0].mappedFrom).toContain(`payer ${PAYER.toLowerCase()} simulated as ${SIMULATION_FROM.toLowerCase()}`);
+  });
+
+  it("does not reuse a simulation of a different amount to the same payee", async () => {
+    const f = router({ "/simulation/transaction": () => json(sim) });
+    const { c } = client(f);
+    await c.simulatePayment({ payer: PAYER, payee: PAYEE, amount: BigInt(250000) });
+    await c.simulatePayment({ payer: PAYER, payee: PAYEE, amount: BigInt(100000) });
+    expect(f).toHaveBeenCalledTimes(2);
   });
 });
 
