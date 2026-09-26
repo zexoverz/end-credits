@@ -1,0 +1,563 @@
+# End Credits
+
+**Your AI agent pays every open-source project it used, and never pays the scammers pretending to be
+them.**
+
+ETHGlobal Tokyo 2026. Solo build by Faisal ([`zexoverz`](https://github.com/zexoverz)).
+
+| | |
+|---|---|
+| App | https://end-credits.up.railway.app |
+| Dashboard (MultiBaas) | https://end-credits.up.railway.app/dashboard |
+| Decision history | https://end-credits.up.railway.app/history |
+| `EndCreditsEscrow` on Basescan | https://sepolia.basescan.org/address/0x63047583FbCe241D72d71137C940aa27BBdC60f1#code |
+| `EndCreditsEscrow` on Sourcify (`exact_match`) | https://repo.sourcify.dev/84532/0x63047583FbCe241D72d71137C940aa27BBdC60f1 |
+
+## Why
+
+- Open source software is worth $8.8T on the demand side and would cost $4.15B to recreate
+  ([Hoffmann, Nagle, Zhou, HBS Working Paper 24-038](https://www.hbs.edu/faculty/Pages/item.aspx?num=65230)).
+- "Traffic to our docs is down about 40% from early 2023 despite Tailwind being more popular than
+  ever", and "75% of the people on our engineering team lost their jobs"
+  ([Adam Wathan, 7 Jan 2026, tailwindlabs/tailwindcss.com#2388](https://github.com/tailwindlabs/tailwindcss.com/pull/2388)).
+  Agents read the docs and the source, and never reach the page that asks for support.
+- Of the top 1,000 npm packages, 41.6% publish some funding metadata but only 2.1% publish a wallet an
+  agent could pay ([our measurement](#measurement), 25 Sep 2026).
+
+## Not a paywall
+
+End Credits is opt-in for whoever runs the agent. Packages stay free for everyone.
+
+Nothing changes for anyone who does not install the hook. Money flows one way: from an owner who set
+a budget to the maintainers of what their agent used.
+
+## How it works
+
+```mermaid
+flowchart LR
+  A[Claude Code hook<br/>endcredits record] --> B[Attribution<br/>per package score]
+  B --> C[Split<br/>budget, cap, dust]
+  C --> D[Payee<br/>claim, FUNDING.json, tea.yaml, npm]
+  D --> E[Intercepta screen<br/>mainnet reputation]
+  E --> F{Decision matrix}
+  F -->|paid / capped| G[x402 USDC<br/>to maintainer]
+  F -->|held| H[EndCreditsEscrow.hold<br/>World ID release]
+  F -->|reserved| I[EndCreditsEscrow.reserve<br/>maintainer claims]
+  F -->|refused| J[nothing sent]
+  G & H & I & J --> K[Credits roll<br/>+ recordSession]
+```
+
+1. **Hook.** `endcredits init` adds `SessionStart`, `PostToolUse` and `SessionEnd` hooks to
+   `.claude/settings.json` ([`cli/src/init.ts`](cli/src/init.ts)). `record` appends one ledger line
+   per relevant tool call, always exits 0 and prints nothing ([`cli/src/record.ts`](cli/src/record.ts)).
+2. **Attribution.** At session end the CLI scores each installed package from imports, installs,
+   docs fetches and reads ([`lib/attribution/score.ts`](lib/attribution/score.ts)) and uploads
+   package names, signal types and counts. No code, no repo paths.
+3. **Split.** The settler recomputes scores server side ([`lib/settle/scores.ts`](lib/settle/scores.ts))
+   and water-fills the session budget under the per-package cap; shares under 0.01 USDC are `dust`
+   ([`lib/allocation/split.ts`](lib/allocation/split.ts)). The daily limit applies first.
+4. **Payee.** First hit wins: our on-chain claim, Drips `FUNDING.json`, `tea.yaml`, an address in the
+   npm `funding` field ([`lib/payee/resolve.ts`](lib/payee/resolve.ts)). The repo's `package.json`
+   must publish the same name, else the share is reserved as `SPOOF_REPO`
+   ([`lib/payee/spoof.ts`](lib/payee/spoof.ts)). Address changes are judged from our own observation
+   times and GitHub push times, never commit dates ([`lib/payee/change.ts`](lib/payee/change.ts),
+   [`lib/payee/push.ts`](lib/payee/push.ts)).
+5. **Screen.** Every payee is screened by Intercepta before anything is signed (see
+   [Intercepta](#intercepta)).
+6. **Decide and execute.** The matrix below picks one outcome; the decision is stored before any
+   signature ([`lib/settle/settle.ts#L228-L250`](lib/settle/settle.ts#L228-L250)).
+7. **Roll.** `/credits/<id>` lists every package with its badge, reason and Basescan link; the
+   recorder emits one `SessionSettled` event per session with a manifest hash.
+
+TODO(live): roll screenshot from the recorded demo session.
+
+### Outcomes
+
+| Badge | Meaning | Money |
+|---|---|---|
+| `paid` | clean payee, paid in full | x402 transfer to the maintainer; Basescan link |
+| `capped` | clean payee, share cut to the per-package cap | x402 transfer of the capped amount; the excess went to other packages |
+| `held` | a doubt: funding address changed recently, medium risk, or screening unavailable | in escrow; released on a World-approved owner decision; refunded on deny or expiry |
+| `refused` | high risk: sanctioned, known scammer, phishing, impersonation, lookalike address, or a spam payout pattern | not sent; stays with the owner |
+| `reserved` | the package lists no wallet | in escrow under the package key until the maintainer claims |
+
+Shares under 0.01 USDC are `dust` and never sent. A payee lookup that fails (registry, GitHub or RPC
+down twice) is `refused` with `RESOLVE_FAILED`, so the money stays with the owner.
+
+### Decision matrix, as built
+
+[`lib/decision/matrix.ts`](lib/decision/matrix.ts). First match wins. Thresholds are ours.
+
+| # | Condition | Outcome | Message code |
+|---|---|---|---|
+| 1 | no payee | `reserved` (screened later, at claim) | `RESERVED` |
+| 2 | payment token is not Base Sepolia USDC | `refused` | `TOKEN_PIN` |
+| 2 | Intercepta token risks `action == block` | `refused` | detector text |
+| 3 | screen timeout, HTTP error or unparsable body | `held` | `SCREEN_UNAVAILABLE` |
+| 4 | a critical trait (`sanction_address`, `known_scammer`, `blacklist`, `fake_phishing_transfer`, or a simulation detector naming the recipient) | `refused` | `REFUSED_TRAIT`, Intercepta's description verbatim |
+| 4 | `toxicScore > 50` | `refused` | `REFUSED_TRAIT` |
+| 4 | Intercepta impersonation check says address poisoning | `refused` | `IMPERSONATION` |
+| 4 | our lookalike rule: same first 4 and last 4 hex as another known payee, different address | `refused` | `LOOKALIKE` (labelled as ours) |
+| 4 | our spam rule: same payee for 5+ packages in the session, each new or under 1,000 weekly downloads | `refused` | `SPAM` |
+| 5 | funding address changed in the last 30 days | `held` | `HELD_CHANGED` |
+| 6 | `20 <= toxicScore <= 50`, or token `action == warn` | `held` | `HELD_MEDIUM` |
+| 7 | contract on Ethereum with no code on Base (only with `CHECK_NO_CODE=true`) | `held` | `HELD_NO_CODE` |
+| 8 | otherwise | `capped` if the split capped it, else `paid` | `CAPPED` / `PAID` |
+
+Every decision made on a successful screen also carries `SCREENED_AS`: "Screened as its mainnet
+equivalent (Base, chain 8453)." All user-facing text is in [`lib/messages.ts`](lib/messages.ts).
+
+## Intercepta
+
+Every payee is screened live before a payment is signed or a hold is sent, and the result picks the
+outcome. We pay on Base Sepolia, but the payees are the real addresses maintainers published, so
+their **mainnet** reputation is what gets screened.
+
+### Where the API is called
+
+| File | What |
+|---|---|
+| [`lib/intercepta/client.ts#L59-L73`](lib/intercepta/client.ts#L59-L73) | the one HTTP call: `X-API-KEY`, 8 s deadline, every call stored in `screens` with its latency |
+| [`lib/intercepta/client.ts#L85-L91`](lib/intercepta/client.ts#L85-L91) | `quickScan`: `GET /api/public/v2/extension/account/{address}/quick-scan` |
+| [`lib/intercepta/client.ts#L93-L98`](lib/intercepta/client.ts#L93-L98) | `checkImpersonation`: `GET /api/public/v1/extension/poisoning-attack/check-address/{address}` |
+| [`lib/intercepta/client.ts#L101-L108`](lib/intercepta/client.ts#L101-L108) | `tokenRisks`: `GET /api/public/v2/extension/token-intelligence/token/{address}/risks?chainId=8453` |
+| [`lib/intercepta/client.ts#L110-L123`](lib/intercepta/client.ts#L110-L123) | `simulateTransfer`: `POST /api/public/v1/extension/simulation/transaction?chainId=8453`, fallback when quick scan fails |
+| [`lib/intercepta/client.ts#L127-L162`](lib/intercepta/client.ts#L127-L162) | `screenPayee`: quick scan, impersonation and token risks in parallel; any failure sets `Screen.error` |
+| [`lib/settle/settle.ts#L227-L239`](lib/settle/settle.ts#L227-L239) | the settler screens the payee, then calls `decide` with the result |
+| [`lib/settle/settle.ts#L309-L315`](lib/settle/settle.ts#L309-L315) | a screen that throws becomes `error: "HTTP"`, so it holds |
+| [`lib/decision/matrix.ts#L50-L95`](lib/decision/matrix.ts#L50-L95) | how the screen decides: token block, screen error, traits, score, impersonation |
+| [`lib/claim/env.ts#L38-L39`](lib/claim/env.ts#L38-L39) | a maintainer's claim wallet is quick-scanned before `setClaim` |
+| [`lib/intercepta/cache.ts`](lib/intercepta/cache.ts) | reuse: address screens 5 min, token screens 1 h, only status-200 rows that parse |
+
+Timeout or error from Intercepta means hold, never pay. The x402 route also refuses to quote a credit
+whose payee has no successful address screen from the last 10 minutes.
+
+### Testnet to mainnet mapping
+
+Intercepta has no testnet chain ids. [`lib/intercepta/mapping.ts`](lib/intercepta/mapping.ts):
+
+| We pay with | Screened as |
+|---|---|
+| Base Sepolia, chain `84532` | Base, chain `8453` |
+| Base Sepolia USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| payee address | the same address; quick scan and impersonation take no chain id |
+
+Every screened result on the roll and in `/history` carries `SCREENED_AS`, so nobody reads a testnet
+payment as a mainnet one. Separately, a local pin refuses any payment token that is not Base Sepolia
+USDC (`TOKEN_PIN`).
+
+### Paid, held and refused in the demo
+
+The held and refused rows come from our own `@endcredits-demo/*` fixtures (see
+[Demo fixtures](#demo-fixtures)).
+
+| Package | Payee | Outcome | Reason shown |
+|---|---|---|---|
+| TODO(live): a real package with a wallet | TODO(live) | `paid` / `capped` | TODO(live): tx link |
+| `@endcredits-demo/left-padder-pro` | `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (OFAC SDN) | `refused` | TODO(live): Intercepta's trait text, verbatim |
+| `@endcredits-demo/moved-payout` | `0xeF4509C258107F5A37fb7e76af4F99a7DD3c6aa2` | `held` | `HELD_CHANGED` |
+| `@endcredits-demo/unclaimed-utils` | none | `reserved` | `RESERVED` |
+
+TODO(live): session id and roll link for the recorded run.
+
+### What we learned from the docs
+
+- The docs index at `https://docs.web3antivirus.io/llms.txt`, with the OpenAPI JSON behind each
+  reference page plus `.md`, was enough to write the client and its schemas before the key arrived.
+- There is a dedicated impersonation endpoint (`/poisoning-attack/check-address/{address}`), so an
+  address-poisoning payee is refused on Intercepta's word, before our own lookalike rule runs.
+- No endpoint takes a testnet chain id, hence the mapping above.
+- `/quick-scan` and `/toxic-score` return the same `{toxicScore, traits}` shape and take no chain id.
+- Signature analysis covers the Permit family, not EIP-3009 `TransferWithAuthorization`, which is
+  what x402 signs. We screen the payee and the token instead of the signature.
+
+### Feedback on the API
+
+- Time to first call: TODO(live)
+- What confused us: TODO(live)
+- What was missing: TODO(live)
+- What worked well: TODO(live)
+
+## x402
+
+Paid and capped credits go straight to the maintainer over x402 v2: `@x402/core`, `@x402/evm`,
+`@x402/fetch` pinned `~2.27.0`, `exact` scheme (EIP-3009) on `eip155:84532`, facilitator
+`https://x402.org/facilitator`. Direct payments never touch the escrow.
+
+**Resource.** `GET /api/x402/credit/{creditId}`
+([`app/api/x402/credit/[creditId]/route.ts`](app/api/x402/credit/%5BcreditId%5D/route.ts),
+[`lib/x402/server.ts#L116-L133`](lib/x402/server.ts#L116-L133)) answers 409 `NOT_PAYABLE` unless the
+credit is `paid` or `capped` with a fresh screen of that payee. It builds the 402 challenge itself,
+re-checks the signed payment against the credit, then calls the facilitator's `verify` and `settle`
+with its own requirements. The response is a receipt signed with `RECEIPT_SIGNING_KEY`.
+
+**Pre-sign checks** in the settler's client
+([`lib/x402/client.ts#L39-L54`](lib/x402/client.ts#L39-L54), hooked in with
+`onBeforePaymentCreation` at [`#L63`](lib/x402/client.ts#L63)) run before the signer:
+
+| Check | Refusal |
+|---|---|
+| `payTo` equals the address that was screened | `PAYTO_MISMATCH` |
+| `asset` equals pinned Base Sepolia USDC | `TOKEN_PIN` |
+| network `eip155:84532`, amount within the allocation, `extra` is `{name:"USDC", version:"2"}`, timeout 1 to 120 s | `CHALLENGE_MISMATCH` |
+| the credit has no stored `paid` / `capped` decision | `NOT_PAYABLE` |
+
+The library's own spend controls are off, so our hook is the only gate and refusals carry our codes.
+
+**The clipper answer.** The September 2025 npm compromise of `chalk` and `debug` shipped code that
+rewrote payment destinations to lookalike attacker addresses
+([Aikido, 8 Sep 2025](https://www.aikido.dev/blog/npm-debug-and-chalk-packages-compromised)). Here
+the address in the 402 challenge must equal the address Intercepta screened, checked at the moment
+of signing: "Refused: the payment request names a different address than the one screened."
+
+**Smoke payment.** 0.01 USDC from the payer through the public facilitator,
+[`0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1`](https://sepolia.basescan.org/tx/0x41558f81e02bab8ae2300a64a588d381facf0a6d90dbba7069747b16839e5df1)
+(block 47293505, [`scripts/x402-smoke.ts`](scripts/x402-smoke.ts)).
+
+## Curvegrid MultiBaas
+
+**Summary.** MultiBaas deploys and indexes `EndCreditsEscrow`, and its event queries and webhook are
+the whole backend of the End Credits dashboard and of the owner's "money is held" notification.
+
+### How MultiBaas is used
+
+| Use | Where |
+|---|---|
+| Deploy through the MultiBaas Forge plugin (`curvegrid/forge-multibaas`), linked as label `endcredits_escrow`, alias `escrow` | [`contracts/script/Deploy.s.sol`](contracts/script/Deploy.s.sol) |
+| Link Base Sepolia USDC (a contract we did not deploy) as `usdc` with the ERC-20 ABI, so the payer's x402 `Transfer`s are indexed next to the escrow events | [`scripts/multibaas-setup.ts`](scripts/multibaas-setup.ts) |
+| Six saved event queries: `paid_totals`, `held_status`, `reserved_by_package`, `reserved_sessions`, `sessions`, `recent` | [`lib/multibaas/queries.ts`](lib/multibaas/queries.ts) |
+| `/api/dashboard` builds every amount and count from those queries (60 s cache) | [`lib/multibaas/dashboard.ts`](lib/multibaas/dashboard.ts), [`app/api/dashboard/route.ts`](app/api/dashboard/route.ts) |
+| Webhook `endcredits` on `event.emitted`: HMAC over the exact body bytes, 300 s skew, de-dup by `txHash:logIndex`; a `Held` event notifies the owner of that payer | [`lib/multibaas/webhook.ts`](lib/multibaas/webhook.ts), [`app/api/webhooks/multibaas/route.ts`](app/api/webhooks/multibaas/route.ts) |
+| REST client: bearer auth, envelope unwrap, 8 s deadline, typed errors | [`lib/multibaas/client.ts`](lib/multibaas/client.ts), [`lib/multibaas/rows.ts`](lib/multibaas/rows.ts) |
+
+The settler is the AI agent (it attributes, screens, decides and pays on its own); `/dashboard` is
+the digital asset dashboard. Only package names come from our database; amounts come from
+MultiBaas. Refused credits are a count from our decision log, since refused money never moves.
+
+### Team
+
+Faisal, solo. GitHub [`zexoverz`](https://github.com/zexoverz).
+
+### Setup and testing (MultiBaas part)
+
+1. Create a MultiBaas deployment on Base Sepolia and an API key in the admin group.
+2. Deploy and link the escrow (the plugin needs `python3`):
+   ```sh
+   cd contracts
+   USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e \
+   RECORDER_ADDRESS=<recorder> CHANGE_DELAY=259200 \
+   MULTIBAAS_URL=<deployment url> MULTIBAAS_API_KEY=<key> \
+   forge script script/Deploy.s.sol --rpc-url <base sepolia rpc> --account <keystore> --broadcast --ffi
+   ```
+   Read the log for `Link Contract: Error` (see below). To re-link after a failed broadcast, set
+   `MULTIBAAS_ALLOW_UPDATE_ADDRESS=true`.
+3. With `MULTIBAAS_URL`, `MULTIBAAS_API_KEY`, `APP_URL`, `ESCROW_ADDRESS` and `PAYER_ADDRESS` set,
+   `pnpm tsx scripts/multibaas-setup.ts` links USDC, saves the six queries, creates the webhook,
+   writes its secret to a local file (mode 600) and runs each query once. It is idempotent.
+4. Set `MULTIBAAS_URL`, `MULTIBAAS_API_KEY` and `MULTIBAAS_WEBHOOK_SECRET` on the app and open
+   `/dashboard`.
+5. `pnpm test lib/multibaas` covers query shapes, row parsing, dashboard math, and the webhook's
+   signature, skew and de-dup.
+
+### Experience with MultiBaas
+
+- **Win:** the Forge plugin deployed and linked the escrow in one `forge script` run, and saved
+  queries plus one webhook gave us the dashboard backend without writing an indexer. Linking USDC,
+  a contract we did not deploy, put the x402 payments on the same dashboard as the escrow events.
+- **Linking needs bytecode.** The API rejects a contract without it, even when only linking an
+  existing address; we upload the ERC-20 ABI with `bin: "0x"`.
+- **`PUT /queries/{label}` answers without `result`,** unlike reads, so an envelope check that
+  requires `result` fails on a successful write.
+- **`limit` is capped at 50;** a larger value is a 400 "invalid request". We page 50 at a time.
+- **bytes32 values in saved-query results come back as a byte-array string** (`"[193, 60, …]"`),
+  not hex. [`lib/multibaas/rows.ts`](lib/multibaas/rows.ts) parses both.
+- **No per-event webhook filter.** `event.emitted` delivers every event of every linked contract, so
+  with USDC linked most deliveries are unrelated USDC transfers. We drop them after the signature
+  check, before any database call.
+- **No count aggregator.** Every count is taken from rows, which is why there is a separate
+  `reserved_sessions` query.
+- **The Forge plugin hides link failures and links before broadcast.** A bad URL logs
+  `Link Contract: Error during validation` and the script still exits 0. The link also runs during
+  simulation, so a broadcast that fails afterwards leaves a MultiBaas address with no contract.
+
+## World ID for Agents
+
+The protected action is **releasing money an agent held**. A held tip leaves escrow only after the
+owner passes a fresh World ID verification bound to that exact tip. Code: [`lib/world/`](lib/world).
+
+### Journey
+
+1. **Sign-in, once.** `/api/auth/world/start` → World authorize (code flow, PKCE `S256`,
+   `scope=openid`) → `/api/auth/world/callback`. The first sign-in binds the owner row to
+   `(iss, sub)` ([`lib/world/oidc.ts`](lib/world/oidc.ts), [`lib/world/owner.ts`](lib/world/owner.ts)).
+2. **Request.** A tip is held on chain; MultiBaas delivers `Held` and the owner gets a notification.
+   `/approve/<tipId>` shows package, amount, payee, the reason, and "Release {amount} USDC to
+   {address} for {package}."
+3. **Completion.** **Approve with World ID** calls `POST /api/approve/{tipId}/start`, which stores a
+   pending approval and redirects to World with `max_age=0`, `prompt=login`,
+   `acr_values=https://world.org/oidc/acr/orb-v3`, PKCE and a nonce bound to the tip:
+   `base64url(sha256(canonical_json({tipId, packageKey, payee, amount, action:"release", text_version, owner_sub_hash, attempt}) || APPROVE_SALT))`
+   ([`lib/world/stepup.ts`](lib/world/stepup.ts), [`lib/world/nonce.ts`](lib/world/nonce.ts)).
+4. **Validated result.** `/api/approve/callback` exchanges the code on our server and checks the ID
+   token ([`lib/world/approve-callback.ts`](lib/world/approve-callback.ts),
+   [`lib/world/verify.ts`](lib/world/verify.ts)).
+5. **Protected action.** Only then the recorder calls `release(tipId, keccak256(nonce))` on
+   `EndCreditsEscrow`, under a row lock so a tip is released once. The credit becomes `paid` with
+   `APPROVED`.
+
+### Backend validation
+
+All checks run server side; the page never decides an outcome.
+
+| Check | Failure code |
+|---|---|
+| signature against the issuer's JWKS (RS256) | `SIG` |
+| `iss` equals `WORLD_ISSUER` | `ISS` |
+| `aud` is our client id | `AUD` |
+| `exp` not passed (30 s skew) | `EXP` |
+| `nonce` equals the one stored for this approval | `NONCE` |
+| `acr` is `https://world.org/oidc/acr/orb-v3` | `ACR` |
+| `amr` contains `pop` | `AMR` |
+| `(iss, sub)` is the owner of this hold | `WRONG_HUMAN` |
+| `auth_time` present and not before the approval started | `STALE_AUTH` |
+
+### Unsuccessful paths
+
+Each marks the approval `failed`, releases nothing and returns to `/approve/<tipId>` with its message.
+
+| Path | Code | Shown |
+|---|---|---|
+| cancelled in World App (any `error` on the callback) | `CANCELLED` | "Verification cancelled. Nothing was released." |
+| old World session, or the approval was started more than 10 min ago | `STALE_AUTH` | "A fresh verification is required. Nothing was released." |
+| a different human | `WRONG_HUMAN` | "This approval belongs to a different human." |
+| token not issued for this approval | `NONCE` | "This verification was not issued for this approval." |
+| not Orb-verified (`ACR` or `AMR`) | `ACR` | "A proof-of-human credential is required." |
+| unknown or reused `state` | `UNKNOWN_STATE` | "This verification is not for a pending approval. Nothing was released." |
+| bad signature, issuer, audience or expiry | `VERIFY_FAILED` | "The verification could not be checked. Nothing was released." |
+| owner presses **Deny** | `DENIED` | refund to the owner |
+| nobody approves before the TTL | `EXPIRED` | the expirer calls `refund` ([`lib/settle/expire.ts`](lib/settle/expire.ts)) |
+
+The denied-path tests assert the code and that `release` was never called
+([`lib/world/stepup.test.ts`](lib/world/stepup.test.ts)); each token check has its own test in
+[`lib/world/verify.test.ts`](lib/world/verify.test.ts).
+
+### CLI sign-in with the device grant
+
+`endcredits login` → `POST /api/agent/device/start` → World `device_authorization`. The terminal shows
+the code, the owner confirms in World App, and `/api/agent/device/poll` issues an agent key only when
+the ID token passes `verifyIdToken` and its `(iss, sub)` is already an owner
+([`lib/world/device.ts`](lib/world/device.ts), [`cli/src/login.ts`](cli/src/login.ts)). The device
+grant ignores `nonce`, `max_age` and `prompt`, so it is used for sign-in only, never for approvals.
+
+### Environment
+
+The issuer is `WORLD_ISSUER`; endpoints are the fixed paths from the discovery doc. The prize's dev
+environment is `https://sandbox.auth.world.org`. TODO(live): which issuer the deployed app runs
+against, and whether `WORLD_REQUIRED=true` is set in production.
+
+### Debrief
+
+Full notes: [`docs/world-debrief.md`](docs/world-debrief.md).
+
+- **Time to first success:** discovery doc to a green suite (sign-in, step-up with denied paths,
+  device grant) against a local IdP double in one session on 26 Sep. TODO(live): first real
+  sign-in, first approval released on the phone.
+- **Friction:** HTTPS-only exact-match callbacks and a pairwise `sub` per hostname mean nothing runs
+  on localhost; sign-in and approval must share one hostname. `openid-client`'s
+  `client_secret_basic` percent-encodes `_` (`app_…` becomes `app%5F…`), so we send our own Basic
+  header.
+- **Missing docs:** which claims each grant's ID token carries (`auth_time` after `max_age=0`, `acr`
+  and `amr` on the device grant), the `error` value on cancel, and `max_age` is absent from the
+  discovery doc.
+- **One improvement:** TODO(live) (candidate: document the ID token claims per grant, with an
+  example token for each).
+
+## Attribution weights and caps
+
+These are ours, not a standard. They exist so that a prompt-injected README telling the agent to read
+one package 1,000 times moves at most 10 points.
+
+| Signal | Captured from | Weight | Cap per package per session |
+|---|---|---|---|
+| `dep_added` | `package.json` dependency diff between session start and end, or an `npm/pnpm/yarn/bun add` | 5 | once |
+| `import` | `import` / `require` / `export … from` in written or edited files | 3 per distinct file | 5 files |
+| `docs` | a fetched URL that maps to an installed package (homepage, repo, npm page, unpkg, jsdelivr) | 2 per distinct URL | 5 URLs |
+| `read` | a read under `node_modules/<pkg>/` | 1 per distinct file | 10 files |
+
+`score = Σ weight × min(distinct items, cap)`. A package counts only if it is installed at settle
+time; `import` and `dep_added` also require a direct dependency, so transitive packages earn nothing
+unless the agent read them. Code: [`lib/attribution/score.ts`](lib/attribution/score.ts),
+[`lib/attribution/specifier.ts`](lib/attribution/specifier.ts); the server recomputes with
+[`lib/settle/scores.ts`](lib/settle/scores.ts) and does not trust the CLI's numbers.
+
+Demo defaults: 2.00 USDC per session, 0.25 USDC cap per package, 20 USDC daily limit, 24 h hold TTL.
+
+## Honest limits
+
+1. Attribution is a proxy. What the agent read and wrote is evidence of use, not a measure of value.
+2. Transitive dependencies earn nothing unless the agent read them. Deep infrastructure is
+   under-credited; this is a deliberate trade against farming.
+3. The payee is whatever the repo publishes. A compromised repo can change it; we hold on change and
+   screen before signing, but cannot prove who wrote the file beyond "it is on the default branch".
+4. `tea.yaml` addresses come from a scheme that was farmed; they are screened like every other.
+5. The payer key is server-held for the demo and everything moves on Base Sepolia. What is screened
+   is the payees' real mainnet addresses.
+6. The claim needs a merged PR; orgs that restrict OAuth apps use the prefilled "new file" link, whose
+   `filename` and `value` parameters are known from use, not from GitHub's docs. We ask for
+   `public_repo`, which GitHub's docs contradict each other on for writing contents.
+7. The public Base Sepolia RPC is load-balanced over nodes that lag each other. Writes re-simulate on
+   a revert to cover it; reads such as `tipOf` or `reserved` right after a receipt can still be a
+   block or two behind.
+8. The last commit touching `FUNDING.json` may be a formatting change, which then reads as an address
+   change and holds. The cost is a hold, not a payment.
+9. Rule 7 (contract on Ethereum with no code on Base) only runs with `CHECK_NO_CODE=true`; it matters
+   for a mainnet round, not for testnet.
+10. The dashboard is cached for 60 s to stay inside the MultiBaas free plan. Owner notifications have
+    no mark-read yet.
+11. The approve page's "World required" flag reads `WORLD_REQUIRED` only; with `APPROVE_METHOD=world`
+    alone the button reads **Approve** but still goes through World.
+12. USDC sent straight to the escrow address (not through `hold` or `reserve`) is stuck. Nothing reads
+    the balance, so this is left as is.
+
+## Measurement
+
+[`scripts/measure-funding.py`](scripts/measure-funding.py), run 25 Sep 2026 on the top 1,000 npm
+packages by downloads (`npm-high-impact@1.13.0`, as `top1000.json` next to the script).
+
+Method: for each name, read `funding` and `repository` from the registry's `latest`; for each distinct
+GitHub repo, fetch `FUNDING.json` (Drips), `funding.json`, `tea.yaml` and `.github/FUNDING.yml` at
+`HEAD`. A package is payable when any of those, or its npm `funding` field, contains a `0x` address.
+Percentages are over all 1,000 names; 929 were read from the registry (71 stayed rate-limited), 928
+resolved to a GitHub repo (640 distinct).
+
+| Metadata | Share |
+|---|---|
+| Any funding metadata (npm `funding` field or any funding file) | **41.6%** |
+| npm `funding` field | 27.9% |
+| `.github/FUNDING.yml` | 27.2% |
+| **A payable wallet address anywhere** | **2.1%** (21 packages: 17 via Drips `FUNDING.json`, 4 via `tea.yaml`) |
+
+The 21 payable packages are 10 repositories (`vitest` alone is 9 packages). Four in ten top packages
+ask for money; one in fifty can receive it from an agent. The rest is reserved until its maintainer
+claims.
+
+## Deployed
+
+All on Base Sepolia (chain `84532`). Testnet keys only.
+
+| Role | Address |
+|---|---|
+| `EndCreditsEscrow` | [`0x63047583FbCe241D72d71137C940aa27BBdC60f1`](https://sepolia.basescan.org/address/0x63047583FbCe241D72d71137C940aa27BBdC60f1#code), Sourcify `exact_match`, `changeDelay` 3 days |
+| Payer (x402 signatures, `hold`, `reserve`) | [`0xaf4C41858EDdb5Cf99c277Ee7755D918a0639Bb6`](https://sepolia.basescan.org/address/0xaf4C41858EDdb5Cf99c277Ee7755D918a0639Bb6) |
+| Recorder (`release`, `refund`, `setClaim`, `claim`, `recordSession`) | [`0xc8e1Bc6B6c1AD5275935B313288b2c6FF45472A8`](https://sepolia.basescan.org/address/0xc8e1Bc6B6c1AD5275935B313288b2c6FF45472A8) |
+| Receipt signer (x402 credit receipts, signs off chain) | `0xCD5f2A9eB66463aea82a6E41E03D42b798cD6725` |
+| Deployer | [`0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13`](https://sepolia.basescan.org/address/0xfa064a16bDeD4C82aa6b3D4c656a640CeD547A13) |
+| USDC | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+Deploy tx
+[`0x3ddf9e353bcef632cf5d77543d957aa323b0cbc8241622d951d3e176560e6ed8`](https://sepolia.basescan.org/tx/0x3ddf9e353bcef632cf5d77543d957aa323b0cbc8241622d951d3e176560e6ed8),
+sent through the forge-multibaas plugin. The MultiBaas deployment (free plan, Base Sepolia) links the
+escrow as `escrow` and USDC as `usdc`, holds the six saved queries, and posts to
+`/api/webhooks/multibaas` through the webhook `endcredits`. Live checks on 26 Sep: hold then refund
+round trips indexed by MultiBaas, `Held` and `Refunded` delivered by the webhook, owner notifications
+created.
+
+The contract is in [`contracts/src/EndCreditsEscrow.sol`](contracts/src/EndCreditsEscrow.sol). Every
+guard has a test that asserts its custom error selector; deleting each guard in turn makes its named
+test fail (the mutation table is in [`docs/plan/decisions.md`](docs/plan/decisions.md)).
+
+## Demo fixtures
+
+The held and refused rows in the demo are always our own packages under `@endcredits-demo`, never a
+real package. Each README starts with "Demo fixture for End Credits (ETHGlobal Tokyo 2026). Not a real
+library." Sources are in [`fixtures/`](fixtures), addresses in
+[`fixtures/ADDRESSES.md`](fixtures/ADDRESSES.md).
+
+| Package | Repo | `FUNDING.json` | Outcome |
+|---|---|---|---|
+| `@endcredits-demo/moved-payout` | [endcredits-fixture-moved-payout](https://github.com/zexoverz/endcredits-fixture-moved-payout) | A, then B | `held`, `ADDRESS_CHANGED` |
+| `@endcredits-demo/left-padder-pro` | [endcredits-fixture-left-padder-pro](https://github.com/zexoverz/endcredits-fixture-left-padder-pro) | an OFAC SDN address | `refused` by Intercepta |
+| `@endcredits-demo/unclaimed-utils` | [endcredits-fixture-unclaimed-utils](https://github.com/zexoverz/endcredits-fixture-unclaimed-utils) | none | `reserved`, claimed live in the judged demo |
+| `@endcredits-demo/unclaimed-rehearsal-1..3` | [1](https://github.com/zexoverz/endcredits-fixture-unclaimed-rehearsal-1), [2](https://github.com/zexoverz/endcredits-fixture-unclaimed-rehearsal-2), [3](https://github.com/zexoverz/endcredits-fixture-unclaimed-rehearsal-3) | none | `reserved`, claimed in a rehearsal |
+| `@endcredits-demo/unclaimed-finalist` | [endcredits-fixture-unclaimed-finalist](https://github.com/zexoverz/endcredits-fixture-unclaimed-finalist) | none | `reserved`, claimed in the finalist run |
+
+Why they exist: a refusal needs an address Intercepta flags for a reason nobody disputes
+(`0x098B716B8Aaf21512996dC57EB0615e2383E2f96`, Lazarus Group / Ronin, SDN.CSV entry 27307), and a
+hold needs an address that changed during the hackathon. Pointing either at a real package would
+label a real maintainer as suspicious. A claim is one-shot (after the merge the package is payable),
+so every rehearsal gets its own unclaimed package. If a real package's payee comes back medium or
+high risk during prep, that package is left out of the demo session.
+
+The demo app is [zexoverz/endcredits-demo-reports](https://github.com/zexoverz/endcredits-demo-reports)
+(Next.js, `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`, plus the fixtures).
+TODO(live): confirm the fixtures are published to npm (`scripts/publish-fixtures.sh`).
+
+## Setup and testing
+
+Node 20+, pnpm 10, Postgres, Foundry.
+
+```sh
+git clone --recurse-submodules https://github.com/zexoverz/end-credits
+cd end-credits
+pnpm install
+```
+
+### Environment
+
+Names only; values go in `.env` (gitignored) or the Railway service. [`lib/env.ts`](lib/env.ts)
+checks the boot set and throws `Missing required env: <NAME>` on the first read of anything else.
+
+| Group | Variables |
+|---|---|
+| Web boot | `APP_URL`, `DATABASE_URL`, `SESSION_SECRET` |
+| Worker boot | `APP_URL`, `DATABASE_URL`, `INTERCEPTA_API_KEY`, `INTERCEPTA_BASE`, `BASE_SEPOLIA_RPC`, `USDC_ADDRESS`, `ESCROW_ADDRESS`, `PAYER_PRIVATE_KEY`, `RECORDER_PRIVATE_KEY`, `X402_FACILITATOR_URL` |
+| x402 resource | `RECEIPT_SIGNING_KEY` |
+| Owner login | `OWNER_DEV_TOKEN` (off when `WORLD_REQUIRED=true`), `WORLD_REQUIRED`, `APPROVE_METHOD` |
+| World ID (required when `WORLD_REQUIRED=true`) | `WORLD_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `APPROVE_SALT` |
+| MultiBaas | `MULTIBAAS_URL`, `MULTIBAAS_API_KEY`, `MULTIBAAS_WEBHOOK_SECRET`, `PAYER_ADDRESS` (optional) |
+| GitHub claim | `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_TOKEN_READ` (optional, rate limit) |
+| Optional | `ETH_MAINNET_RPC`, `BASE_MAINNET_RPC`, `CHECK_NO_CODE` |
+| CLI | `ENDCREDITS_HOME`, `ENDCREDITS_NO_OPEN` |
+| Tests | `TEST_DATABASE_URL`, `LIVE`, `OFFLINE` |
+
+### Run
+
+```sh
+pnpm drizzle-kit migrate      # DATABASE_URL
+pnpm seed                     # demo owner; --write-config also writes a dev agent key
+pnpm dev                      # web
+pnpm worker                   # settler every 2 s, expirer every 30 s
+```
+
+### CLI
+
+```sh
+pnpm --filter endcredits build          # cli/dist/endcredits.mjs
+cd cli && npm link && cd ..             # puts `endcredits` on PATH for the hooks
+endcredits init                         # hooks into ./.claude/settings.json (--global for ~/.claude)
+endcredits key <token> --api https://end-credits.up.railway.app   # key from the Owner page
+endcredits login                        # or: World ID device grant instead of a pasted key
+endcredits attribute --session <id> --dry-run   # the table and upload body, nothing sent
+```
+
+### Tests
+
+| Command | What runs |
+|---|---|
+| `pnpm test` | unit tests; Postgres integration tests skip without `TEST_DATABASE_URL` |
+| `TEST_DATABASE_URL=<migrated db> pnpm test` | also the integration tests (settle, approve, World step-up and device grant, history, owner), one file at a time |
+| with `anvil` on PATH and `contracts/out` built (`forge build`) | also `lib/chain/escrow.anvil.test.ts` against the real contract; `lib/settle/settle.anvil.test.ts` also needs `TEST_DATABASE_URL` |
+| `OFFLINE=1 pnpm test` | skips the mainnet `getCode` test |
+| `LIVE=1` / `INTERCEPTA_API_KEY=…` | adds the live npm registry and live Intercepta tests |
+| `cd contracts && forge test -vv` | escrow unit, fuzz and invariant tests |
+
+Mocks live only inside tests; the app calls Intercepta, MultiBaas, the facilitator and World for real.
+
+## AI usage
+
+The plan was written before any code, with Claude, from the builder's research: [`docs/plan/`](docs/plan)
+(`SPEC.md`, `DESIGN.md`, `TICKETS.md`, `storyboard.html`). Choices made during the build, each with
+its source, are in [`docs/plan/decisions.md`](docs/plan/decisions.md). Code was written ticket by
+ticket with Claude Code; [`AI_USAGE.md`](AI_USAGE.md) lists, per ticket, the files the agent wrote or
+changed and what the builder reviewed. [`AGENTS.md`](AGENTS.md) holds the rules every agent run
+followed.
