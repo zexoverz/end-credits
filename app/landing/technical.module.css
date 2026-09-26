@@ -81,7 +81,7 @@
 }
 .narration {
   padding: 30px 34px 32px;
-  animation: chapterIn 0.15s both;
+  animation: chapterIn 0.5s both;
   align-self: center;
 }
 .chapterNumber {
@@ -144,7 +144,7 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  animation: sceneIn 0.18s both;
+  animation: sceneIn 0.6s both;
 }
 .visual:before {
   content: "";
@@ -240,7 +240,7 @@
   gap: 8px;
   font: 10px/2.3 var(--font-geist-mono);
   color: #d5e2cf;
-  animation: signalIn 0.75s calc(var(--i) * 0.06s) infinite;
+  animation: signalIn 3.8s calc(var(--i) * 0.45s) infinite;
 }
 .signalLines p > span {
   margin-left: auto;
@@ -267,7 +267,7 @@
   width: 8px;
   background: #5c956b;
   border-radius: 50%;
-  animation: packet 0.75s linear infinite;
+  animation: packet 2.2s linear infinite;
 }
 .pipe i:nth-child(2) {
   animation-delay: 0.7s;
@@ -304,7 +304,7 @@
   color: #346d43;
   font-size: 16px;
   display: inline-block;
-  animation: checkIn 0.75s calc(var(--i, 0) * 0.06s) infinite;
+  animation: checkIn 3.8s calc(var(--i, 0) * 0.45s) infinite;
 }
 .hook > .check {
   margin-left: auto;
@@ -382,7 +382,7 @@
   background: #8f77b5;
   border-radius: 20px;
   transform-origin: left;
-  animation: barFill 0.75s calc(var(--i) * 0.04s) infinite;
+  animation: barFill 3.8s calc(var(--i) * 0.25s) infinite;
 }
 .scoreRow:nth-child(2) i {
   background: #76a681;
@@ -466,7 +466,7 @@
   height: 1px;
   background: #a2f4bc;
   box-shadow: 0 -8px 20px 5px #a2f4bc14;
-  animation: scan 0.75s infinite;
+  animation: scan 3.8s infinite;
 }
 .signatureGate {
   display: flex;
@@ -519,7 +519,7 @@
   bottom: 0;
   background: #497453;
   border-radius: 50%;
-  animation: packet 0.75s infinite;
+  animation: packet 2.5s infinite;
   left: 16.6%;
 }
 .branchLines > i:nth-of-type(2) {
@@ -541,7 +541,7 @@
   border-radius: 14px;
   padding: 20px 10px;
   text-align: center;
-  animation: routeLift 0.75s calc(var(--i) * 0.06s) infinite;
+  animation: routeLift 4s calc(var(--i) * 0.6s) infinite;
 }
 .routeCards [data-tone="mint"] {
   background: #b9f2c5;
@@ -637,7 +637,7 @@
   border-radius: 50%;
   background: #e8e1f2;
   font: 9px var(--font-geist-mono);
-  animation: stepPulse 0.75s calc(var(--i) * 0.06s) infinite;
+  animation: stepPulse 4s calc(var(--i) * 0.6s) infinite;
 }
 .resolveCard footer {
   display: flex;
@@ -671,7 +671,7 @@
   background: #508455;
   border-radius: 50%;
   margin-left: auto;
-  animation: stepPulse 0.75s infinite;
+  animation: stepPulse 2s infinite;
 }
 .eventSource :global(.partner-logo-curvegrid) {
   width: 128px;
@@ -735,7 +735,7 @@
   padding: 13px 0;
   align-items: center;
   font-size: 11px;
-  animation: receiptIn 0.75s calc(var(--i, 0) * 0.06s) infinite;
+  animation: receiptIn 3.8s calc(var(--i, 0) * 0.5s) infinite;
 }
 .receiptTable > div:first-child {
   animation: none;
@@ -797,7 +797,7 @@
   inset: 0;
   background: #468155;
   transform-origin: left;
-  animation: chapterTime 1s linear forwards;
+  animation: chapterTime 4s linear forwards;
   animation-play-state: paused;
 }
 .theater[data-running="true"] .chapterProgress {
@@ -1463,7 +1463,7 @@
   animation: none;
 }
 .signalLines i {
-  animation: signalIn 0.75s calc(var(--i) * 0.06s) infinite;
+  animation: signalIn 3.8s calc(var(--i) * 0.45s) infinite;
 }
 @keyframes receiptIn {
   0%,

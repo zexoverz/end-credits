@@ -95,7 +95,7 @@ export function SettingsForm({
   }
   const moneyFields = [
     {
-      id: "budget",
+      id: "session-budget",
       key: "sessionBudget",
       label: C.BUDGET,
       hint: U.sessionHint,

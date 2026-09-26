@@ -1,5 +1,13 @@
 // Copy for the budget wallet component (components/budget/*, EndCreditsBudget; AGENTS.md rule 14).
 export const BUDGET_COPY = {
+  UNKNOWN: "Unavailable",
+  APPROVE_STEP: "01 / Approve your USDC",
+  APPROVE_HELP:
+    "Let the budget contract access this amount. Your USDC stays in your wallet until a session spends it.",
+  ALLOWANCE_STEP: "02 / Limit the agent",
+  ALLOWANCE_HELP:
+    "Choose how much the agent can spend each period. You can lower or revoke this permission.",
+  REFRESH: "Check budget wallet",
   TITLE: "Budget wallet",
   EXPLAIN:
     "Your USDC stays in your own wallet. You approve USDC to the budget contract and let our agent key pull at most a set amount per period. Each session pulls exactly what it spends, once, before anything is paid. Lower or revoke it any time.",
@@ -10,7 +18,8 @@ export const BUDGET_COPY = {
   BALANCE: "USDC in the wallet",
   APPROVED: "USDC approved to the budget contract",
   ALLOWANCE: "Allowance",
-  ALLOWANCE_LINE: "{perPeriod} USDC per {period}, {spent} spent this period, {remaining} left",
+  ALLOWANCE_LINE:
+    "{perPeriod} USDC per {period}, {spent} spent this period, {remaining} left",
   NO_ALLOWANCE: "No allowance yet. Nothing can be pulled.",
   RPC: "Could not read the chain right now.",
   CONNECT: "Connect wallet",
@@ -18,10 +27,14 @@ export const BUDGET_COPY = {
   CONNECTING: "Opening wallet…",
   CONNECTED: "Connected",
   USE_WALLET: "Use this wallet as the budget wallet",
-  WRONG_WALLET: "Connect the budget wallet {budgetOwner} to change its allowance; this is {address}.",
+  WRONG_WALLET:
+    "Connect the budget wallet {budgetOwner} to change its allowance; this is {address}.",
   PER_PERIOD: "Per period (USDC)",
   PERIOD: "Period",
-  PERIODS: { "3600": "hour", "86400": "day", "604800": "week" } as Record<string, string>,
+  PERIODS: { "3600": "hour", "86400": "day", "604800": "week" } as Record<
+    string,
+    string
+  >,
   APPROVE_AMOUNT: "Approve (USDC)",
   APPROVE: "Approve USDC",
   SET_ALLOWANCE: "Set allowance",

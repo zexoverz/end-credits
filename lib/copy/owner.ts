@@ -8,7 +8,7 @@ export const OWNER_COPY = {
   DEV_TOKEN: "Owner dev token",
   DEV_SIGN_IN: "Sign in with dev token",
   DEV_BAD_TOKEN: "That token is not the owner dev token.",
-  DEV_WORLD_REQUIRED: "Dev sign-in is off here. Sign in with World ID.",
+  DEV_WORLD_REQUIRED: "Dev sign-in is off here. Sign in with your wallet.",
   DEV_NO_OWNER: "No owner exists yet. Run the seed first.",
   DEV_FAILED: "Sign-in failed ({error}).",
   WORLD_STATE: "The sign-in did not match this browser. Try again.",
