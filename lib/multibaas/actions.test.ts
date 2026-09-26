@@ -161,7 +161,7 @@ describe("dashboard actions and timeline", () => {
     const older = Array.from({ length: 50 }, () => row("2026-09-20 03:00:00+00"));
     const pages = [inside, older, inside];
     const mb = fakeMultiBaas();
-    const base = mb.get.getMockImplementation()!;
+    const base = mb.get.getMockImplementation() as (path: string) => Promise<unknown>;
     mb.get.mockImplementation(async (path: string) => {
       if (!path.startsWith("/queries/recent/")) return base(path);
       const offset = Number(/offset=(\d+)/.exec(path)![1]);
