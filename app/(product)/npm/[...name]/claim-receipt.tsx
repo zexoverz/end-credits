@@ -53,7 +53,13 @@ export function Transaction({ label, hash }: { label: string; hash: string }) {
       target="_blank"
       rel="noreferrer"
     >
-      <span>
+      <span className="claim-transaction-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M6 3h8l4 4v14H6V3Z" />
+          <path d="M14 3v5h4M9 12h6M9 16h4" />
+        </svg>
+      </span>
+      <span className="claim-transaction-detail">
         <strong>{label}</strong>
         <code>{hash}</code>
       </span>
