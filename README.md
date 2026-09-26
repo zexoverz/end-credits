@@ -1,5 +1,7 @@
 # End Credits
 
+Every claim below has a transaction or page to check it against: see [VERIFY.md](VERIFY.md).
+
 **Your AI agent pays every open-source project it used, and never pays the scammers pretending to be
 them.**
 
