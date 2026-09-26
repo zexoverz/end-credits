@@ -1,0 +1,38 @@
+{
+  "title": "End Credits — Brand",
+  "eyebrow": "FINAL IDENTITY / COIN STACK · ENGRAVED E",
+  "name": "End Credits",
+  "headline": "Good code.\nDeserves credit.",
+  "description": "Support the open source behind your AI sessions.",
+  "chosen": "Coin Stack / Engraved E",
+  "logo": "Project logo",
+  "logoDetail": "512 × 512 PNG · square · opaque background",
+  "cover": "Project cover",
+  "coverDetail": "1920 × 1080 PNG · 16:9",
+  "downloadLogo": "Download logo PNG",
+  "downloadCover": "Download cover PNG",
+  "vector": "SVG original ↗",
+  "transparent": "Transparent PNG ↗",
+  "palette": "The palette",
+  "lettering": "Lettering with a little history.",
+  "letteringDescription": "A custom engraved E sits inside two stacked coins. The serif letterform brings the character of a minted coin; the mint green keeps it unmistakably End Credits.",
+  "exports": "Ready for your submission.",
+  "exportsDetail": "Upload the square logo and the 16:9 cover below to the matching ETHGlobal fields.",
+  "notes": "The E is an original vector shape. No font installation is needed for the logo.",
+  "footer": "End Credits / Final brand assets",
+  "all": "Download brand ZIP",
+  "colors": [
+    {
+      "name": "Ink",
+      "hex": "#20261F"
+    },
+    {
+      "name": "Mint",
+      "hex": "#ADF3C0"
+    },
+    {
+      "name": "Paper",
+      "hex": "#F7F7EF"
+    }
+  ]
+}
