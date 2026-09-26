@@ -5,11 +5,17 @@ import { BudgetWallet } from "@/components/budget/budget-wallet";
 import { SetApprover } from "@/components/approver/set-approver";
 import { useFeedback } from "@/components/product/feedback";
 import { CONTROL as U } from "@/lib/copy/control-room";
+import { DeskAsset } from "@/components/product/desk-assets";
+import { ControlSheet } from "@/components/product/control-sheet";
+import { WORKSPACE as W } from "@/lib/copy/workspace";
 import { SetupArt } from "@/components/product/setup-art";
 import { Button, ErrorBox, Mono, Page } from "@/components/ui";
 import { api } from "@/components/product/request";
 import { addressUrl, usdc } from "@/lib/client/format";
-import type { OwnerSummary, SettingsView } from "@/lib/client/owner";
+import type {
+  OwnerSummary as BaseOwnerSummary,
+  SettingsView,
+} from "@/lib/client/owner";
 import type { Onboarding } from "@/lib/owner/onboarding";
 import { OWNER_COPY as C } from "@/lib/copy/owner";
 import { ONBOARDING as O } from "@/lib/copy/onboarding";
@@ -18,6 +24,10 @@ import { Holds, Notifications } from "./holds";
 import { SettingsForm } from "./settings-form";
 import { SignIn } from "./sign-in";
 import { SetupChecklist } from "./setup-checklist";
+
+type OwnerSummary = BaseOwnerSummary & {
+  budget?: import("@/lib/owner/budget").BudgetView | null;
+};
 
 type Load =
   | { state: "loading" }
@@ -61,16 +71,12 @@ export function OwnerClient({
   }
   return (
     <Page>
-      <div className="owner-setup">
+      <div className="owner-setup owner-desk">
         <header className="owner-setup-heading">
           <div>
             <p className="setup-kicker">{O.eyebrow}</p>
-            <h1>
-              {O.title.split("\n").map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </h1>
-            <p>{O.subtitle}</p>
+            <h1>{W.ownerTitle}</h1>
+            <p>{W.ownerBody}</p>
           </div>
           {load.state === "ok" && (
             <div className="owner-session">
@@ -186,21 +192,44 @@ function SignedIn({
       clearInterval(clock);
     };
   }, []);
+  const [activeControl, setActiveControl] = useState<string | null>(null);
   useEffect(() => {
-    const jump = () => {
+    const open = () => {
       let id = window.location.hash.slice(1);
       if (!id && new URL(window.location.href).searchParams.has("section"))
-        id = initialSection === "approvals" ? "approver" : initialSection;
-      const el = id ? document.getElementById(id) : null;
-      el?.scrollIntoView({ block: "start" });
+        id = initialSection === "approvals" ? "holds" : initialSection;
+      setActiveControl(
+        [
+          "identity",
+          "budget",
+          "approver",
+          "allowance",
+          "keys",
+          "holds",
+          "notifications",
+        ].includes(id)
+          ? id
+          : null,
+      );
     };
-    const t = setTimeout(jump, 100);
-    window.addEventListener("hashchange", jump);
+    const t = setTimeout(open, 0);
+    window.addEventListener("hashchange", open);
+    window.addEventListener("popstate", open);
     return () => {
       clearTimeout(t);
-      window.removeEventListener("hashchange", jump);
+      window.removeEventListener("hashchange", open);
+      window.removeEventListener("popstate", open);
     };
   }, [initialSection]);
+  function closeControl() {
+    setActiveControl(null);
+    const url = new URL(window.location.href);
+    url.hash = "";
+    url.searchParams.delete("section");
+    window.history.replaceState(null, "", url);
+    void refreshChecklist();
+    onRefreshOwner();
+  }
   const wallet = checklist?.steps.find((s) => s.id === "wallet_bound");
   const allowance = checklist?.steps.find((s) => s.id === "spend_allowance");
   const first = checklist?.steps.find((s) => s.id === "first_session");
@@ -212,162 +241,307 @@ function SignedIn({
         busy={checking}
         onRefresh={() => void refreshChecklist()}
       />
-      <nav className="owner-section-links" aria-label={O.sections}>
-        {[
-          ["budget", O.budget],
-          ["approver", O.approver],
-          ["allowance", O.allowance],
-          ["keys", O.keys],
-          ["holds", O.holds],
-        ].map(([id, label]) => (
-          <a key={id} href={`#${id}`}>
-            {label}
-            <span aria-hidden="true">↘</span>
-          </a>
-        ))}
-      </nav>
-      <section id="identity" className="owner-bound-identity">
-        <div>
-          <h2>{O.identity}</h2>
-          <p>{O.bound}</p>
-          {wallet?.done && wallet.detail ? (
-            <Mono>{wallet.detail}</Mono>
-          ) : (
-            <p>{checkError ? O.unknown : wallet ? O.unbound : O.checking}</p>
-          )}
-        </div>
-        {wallet && !wallet.done && (
-          <SignIn
-            bindOnly
-            onSignedIn={() => {
-              void refreshChecklist();
-              onRefreshOwner();
-            }}
-          />
-        )}
-      </section>
-      <section id="budget" className="setup-workstation">
-        <header>
-          <p className="setup-kicker">{O.budgetLabel}</p>
-          <h2>{O.budgetTitle}</h2>
-          <p>{O.budgetBody}</p>
-        </header>
-        <div className="setup-budget-content">
-          <SettingsForm
-            initial={summary.settings}
-            onSaved={(s) => {
-              onSettings(s);
-              void refreshChecklist();
-            }}
-          />
-          <aside className="setup-funding">
-            <p className="setup-kicker">{O.payer}</p>
-            <span>{O.balance}</span>
+      <div className="owner-desk-grid">
+        <a className="owner-tile owner-budget-tile" href="#budget">
+          <div className="tile-heading">
+            <div>
+              <span className="desk-eyebrow">01 / {W.budget}</span>
+              <h2>{W.budgetBody}</h2>
+            </div>
+            <DeskAsset kind="budget" />
+          </div>
+          <dl className="budget-readout">
+            {[
+              [W.session, summary.settings.sessionBudget],
+              [W.package, summary.settings.packageCap],
+              [W.daily, summary.settings.dailyLimit],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>
+                  {value}
+                  <small>{W.unit}</small>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <div className="tile-footer">
+            <span>{W.editBudget}</span>
+            <span aria-hidden="true">↗</span>
+          </div>
+        </a>
+        <a className="owner-tile owner-permission-tile" href="#allowance">
+          <div className="tile-heading">
+            <div>
+              <span className="desk-eyebrow">02 / {W.allowance}</span>
+              <h2>{W.allowanceBody}</h2>
+            </div>
+            <DeskAsset kind="wallet" />
+          </div>
+          <div className="permission-readout">
             <strong>
-              {summary.payer.error || summary.payer.usdcBalance === null
-                ? O.balanceUnknown
-                : usdc(summary.payer.usdcBalance)}
+              {summary.budget?.error
+                ? "—"
+                : (summary.budget?.allowance?.remaining ?? "—")}
+              <small>{W.unit}</small>
             </strong>
-            <a
-              href={addressUrl(summary.payer.address)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Mono>{summary.payer.address}</Mono>
-            </a>
-            <button
-              className="owner-text-button"
-              onClick={() => void copyPayer()}
-            >
-              {U.copyAddress}
-            </button>
-            {copyError && <ErrorBox>{U.copyFailed}</ErrorBox>}
-            <p>{O.walletRoles}</p>
-            {summary.payer.error && (
-              <ErrorBox>
-                {C.BALANCE_ERROR.replace("{error}", summary.payer.error)}
-              </ErrorBox>
-            )}
-          </aside>
-        </div>
-      </section>
-      <section id="approver" className="setup-workstation setup-approver">
-        <header>
-          <p className="setup-kicker">{O.approverLabel}</p>
-          <h2>{O.approverTitle}</h2>
-          <p>{O.approverBody}</p>
-          <SetupArt kind="signature" />
-        </header>
-        <SetApprover />
-      </section>
-      <section id="allowance" className="setup-workstation setup-allowance">
-        <header>
-          <p className="setup-kicker">{O.allowanceLabel}</p>
-          <h2>{O.allowanceTitle}</h2>
-          <p>{O.allowanceBody}</p>
-          <SetupArt kind="allowance" />
-        </header>
-        <div className="allowance-slot">
+            <div>
+              <span>{W.left}</span>
+              <p>
+                {allowance?.detail ??
+                  (checkError ? O.unknown : !checklist ? O.checking : W.notSet)}
+              </p>
+            </div>
+          </div>
+          <div className="tile-footer">
+            <span>{W.editAllowance}</span>
+            <span aria-hidden="true">↗</span>
+          </div>
+        </a>
+        <a className="owner-tile owner-signature-tile" href="#approver">
+          <DeskAsset kind="signature" />
           <div>
-            <span className="allowance-status">
-              {allowance?.done
-                ? O.done
-                : allowance?.detail === "coming soon"
-                  ? O.soon
-                  : O.unknown}
+            <span className="desk-eyebrow">03 / {W.approver}</span>
+            <h2>{W.approverBody}</h2>
+            <p className="tile-value">
+              {checklist?.steps.find((s) => s.id === "approver_set")?.detail ??
+                (checkError ? O.unknown : !checklist ? O.checking : W.notSet)}
+            </p>
+            <span className="tile-link">{W.editApprover} ↗</span>
+          </div>
+        </a>
+        <a className="owner-tile owner-agent-tile" href="#keys">
+          <DeskAsset kind="agent" />
+          <div>
+            <span className="desk-eyebrow">04 / {W.agent}</span>
+            <h2>
+              {checklist?.steps.find((s) => s.id === "agent_key")?.done
+                ? W.connected
+                : W.connect}
+            </h2>
+            <p>{W.agentBody}</p>
+            <span className="tile-link">{W.editAgent} ↗</span>
+          </div>
+        </a>
+      </div>
+      <div className="owner-desk-bottom">
+        <a href="#holds" className="owner-holds-strip">
+          <DeskAsset kind="hold" compact />
+          <div>
+            <h2>
+              {W.held} <span>{summary.pendingHolds.length}</span>
+            </h2>
+            <p>{summary.pendingHolds.length ? W.heldBody : W.noHolds}</p>
+          </div>
+          <span aria-hidden="true">↗</span>
+        </a>
+        <div className="owner-desk-meta">
+          <a href="#identity">
+            {W.identity}
+            <span>
+              {wallet?.done && wallet.detail
+                ? `${wallet.detail.slice(0, 6)}…${wallet.detail.slice(-4)}`
+                : O.todo}{" "}
+              ↗
             </span>
-            {allowance?.detail && (
-              <p className="allowance-server-detail">{allowance.detail}</p>
+          </a>
+          <a href="#notifications">
+            {W.notifications}
+            <span>{summary.notifications.unread} ↗</span>
+          </a>
+        </div>
+      </div>
+      <ControlSheet
+        id="identity"
+        title={O.identity}
+        open={activeControl === "identity"}
+        onClose={closeControl}
+      >
+        <section id="identity" className="owner-bound-identity">
+          <div>
+            <h2>{O.identity}</h2>
+            <p>{O.bound}</p>
+            {wallet?.done && wallet.detail ? (
+              <Mono>{wallet.detail}</Mono>
+            ) : (
+              <p>{checkError ? O.unknown : wallet ? O.unbound : O.checking}</p>
             )}
-            <BudgetWallet />
-            <a href="#keys">{O.continueKeys}</a>
           </div>
-        </div>
-      </section>
-      <section id="keys" className="setup-workstation setup-agent">
-        <header>
-          <p className="setup-kicker">{O.keysLabel}</p>
-          <h2>{O.keysTitle}</h2>
-          <p>{O.keysBody}</p>
-        </header>
-        <div className="setup-agent-content">
-          <div className="setup-terminal">
-            <SetupArt kind="agent" />
-            <ol>
-              <li>
-                <span>{O.commandOne}</span>
-                <code>{O.keyCommand}</code>
-                <p>{O.keyPlaceholder}</p>
-              </li>
-              <li>
-                <span>{O.commandTwo}</span>
-                <code>{O.initCommand}</code>
-                <p>{O.initHint}</p>
-              </li>
-            </ol>
-            <a href={O.installHref} target="_blank" rel="noreferrer">
-              {O.install}
-            </a>
+          {wallet && !wallet.done && (
+            <SignIn
+              bindOnly
+              onSignedIn={() => {
+                void refreshChecklist();
+                onRefreshOwner();
+              }}
+            />
+          )}
+        </section>
+      </ControlSheet>
+      <ControlSheet
+        id="budget"
+        title={W.budget}
+        open={activeControl === "budget"}
+        onClose={closeControl}
+      >
+        <section id="budget" className="setup-workstation">
+          <header>
+            <p className="setup-kicker">{O.budgetLabel}</p>
+            <h2>{O.budgetTitle}</h2>
+            <p>{O.budgetBody}</p>
+          </header>
+          <div className="setup-budget-content">
+            <SettingsForm
+              initial={summary.settings}
+              onSaved={(s) => {
+                onSettings(s);
+                void refreshChecklist();
+              }}
+            />
+            <aside className="setup-funding">
+              <p className="setup-kicker">{O.payer}</p>
+              <span>{O.balance}</span>
+              <strong>
+                {summary.payer.error || summary.payer.usdcBalance === null
+                  ? O.balanceUnknown
+                  : usdc(summary.payer.usdcBalance)}
+              </strong>
+              <a
+                href={addressUrl(summary.payer.address)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Mono>{summary.payer.address}</Mono>
+              </a>
+              <button
+                className="owner-text-button"
+                onClick={() => void copyPayer()}
+              >
+                {U.copyAddress}
+              </button>
+              {copyError && <ErrorBox>{U.copyFailed}</ErrorBox>}
+              <p>{O.walletRoles}</p>
+              {summary.payer.error && (
+                <ErrorBox>
+                  {C.BALANCE_ERROR.replace("{error}", summary.payer.error)}
+                </ErrorBox>
+              )}
+            </aside>
           </div>
-          <AgentKeys onChanged={() => void refreshChecklist()} />
-        </div>
-        {first?.done && first.href && (
-          <Link className="setup-first-session" href={first.href}>
-            {O.recordSession} ↗
-          </Link>
-        )}
-      </section>
-      <section id="holds" className="setup-workstation setup-holds">
-        <header>
-          <p className="setup-kicker">{O.holdsLabel}</p>
-          <h2>{O.holdsTitle}</h2>
-          <p>{O.holdsBody}</p>
-        </header>
-        <div className="setup-holds-content">
-          <Holds holds={summary.pendingHolds} now={now} />
-          <Notifications notifications={summary.notifications} />
-        </div>
-      </section>
+        </section>
+      </ControlSheet>
+      <ControlSheet
+        id="approver"
+        title={W.approver}
+        open={activeControl === "approver"}
+        onClose={closeControl}
+      >
+        <section id="approver" className="setup-workstation setup-approver">
+          <header>
+            <p className="setup-kicker">{O.approverLabel}</p>
+            <h2>{O.approverTitle}</h2>
+            <p>{O.approverBody}</p>
+            <SetupArt kind="signature" />
+          </header>
+          <SetApprover />
+        </section>
+      </ControlSheet>
+      <ControlSheet
+        id="allowance"
+        title={W.allowance}
+        open={activeControl === "allowance"}
+        onClose={closeControl}
+      >
+        <section id="allowance" className="setup-workstation setup-allowance">
+          <header>
+            <p className="setup-kicker">{O.allowanceLabel}</p>
+            <h2>{O.allowanceTitle}</h2>
+            <p>{O.allowanceBody}</p>
+            <SetupArt kind="allowance" />
+          </header>
+          <div className="allowance-slot">
+            <div>
+              <span className="allowance-status">
+                {allowance?.done
+                  ? O.done
+                  : allowance?.detail === "coming soon"
+                    ? O.soon
+                    : O.unknown}
+              </span>
+              {allowance?.detail && (
+                <p className="allowance-server-detail">{allowance.detail}</p>
+              )}
+              <BudgetWallet />
+              <a href="#keys">{O.continueKeys}</a>
+            </div>
+          </div>
+        </section>
+      </ControlSheet>
+      <ControlSheet
+        id="keys"
+        title={W.agent}
+        open={activeControl === "keys"}
+        onClose={closeControl}
+      >
+        <section id="keys" className="setup-workstation setup-agent">
+          <header>
+            <p className="setup-kicker">{O.keysLabel}</p>
+            <h2>{O.keysTitle}</h2>
+            <p>{O.keysBody}</p>
+          </header>
+          <div className="setup-agent-content">
+            <div className="setup-terminal">
+              <SetupArt kind="agent" />
+              <ol>
+                <li>
+                  <span>{O.commandOne}</span>
+                  <code>{O.keyCommand}</code>
+                  <p>{O.keyPlaceholder}</p>
+                </li>
+                <li>
+                  <span>{O.commandTwo}</span>
+                  <code>{O.initCommand}</code>
+                  <p>{O.initHint}</p>
+                </li>
+              </ol>
+              <a href={O.installHref} target="_blank" rel="noreferrer">
+                {O.install}
+              </a>
+            </div>
+            <AgentKeys onChanged={() => void refreshChecklist()} />
+          </div>
+          {first?.done && first.href && (
+            <Link className="setup-first-session" href={first.href}>
+              {O.recordSession} ↗
+            </Link>
+          )}
+        </section>
+      </ControlSheet>
+      <ControlSheet
+        id="holds"
+        title={W.held}
+        open={activeControl === "holds"}
+        onClose={closeControl}
+      >
+        <section id="holds" className="setup-workstation setup-holds">
+          <header>
+            <p className="setup-kicker">{O.holdsLabel}</p>
+            <h2>{O.holdsTitle}</h2>
+            <p>{O.holdsBody}</p>
+          </header>
+          <div className="setup-holds-content">
+            <Holds holds={summary.pendingHolds} now={now} />
+          </div>
+        </section>
+      </ControlSheet>
+      <ControlSheet
+        id="notifications"
+        title={W.notifications}
+        open={activeControl === "notifications"}
+        onClose={closeControl}
+      >
+        <Notifications notifications={summary.notifications} />
+      </ControlSheet>
     </>
   );
 }
