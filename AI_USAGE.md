@@ -70,3 +70,4 @@ ETHGlobal asks projects to document where AI tools were used. Each ticket in
 | live fixes (26 Sep) | `scripts/multibaas-setup.ts`, `lib/multibaas/client.ts`, `lib/multibaas/rows.ts` (+tests), `lib/intercepta/cache.ts` (+test), `lib/sessions/view.ts`, `lib/attribution/score.ts`, `lib/client/roll.ts`, `vitest.config.ts`, `eslint.config.mjs`, `app/dashboard/dashboard-view.tsx`; each found by running against the live deployment | pending review |
 | frontend base | `app/layout.tsx`, `app/globals.css`, `components/ui.tsx`, `lib/client/api.ts`, `lib/client/format.ts`, `next.config.ts` | pending review |
 | T12.1 | `fixtures/*` (7 packages, `ADDRESSES.md`), `scripts/check-fixtures.ts`, `scripts/publish-fixtures.sh`, `docs/plan/decisions.md` (E12 fixtures); the seven `zexoverz/endcredits-fixture-*` repos and `zexoverz/endcredits-demo-reports` | pending review |
+| T12.5 draft | `README.md` | pending review |
