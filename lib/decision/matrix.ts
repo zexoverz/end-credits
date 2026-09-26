@@ -84,7 +84,9 @@ export function decide(i: DecideInput): Decision {
 
   // 5. Recently changed funding address.
   if (i.change.changed) {
-    const text = msg("HELD_CHANGED", { package: i.pkg, days: i.change.days ?? 0 });
+    const days = i.change.days ?? 0;
+    const when = days === 0 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`;
+    const text = msg("HELD_CHANGED", { package: i.pkg, when });
     return withNote({ outcome: "held", holdReason: "ADDRESS_CHANGED", reasons: [{ source: "payee", code: "HELD_CHANGED", text }] });
   }
 
