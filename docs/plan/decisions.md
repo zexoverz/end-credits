@@ -741,3 +741,32 @@ payment. Found while wiring E7.
   `Refunded` delivered by the webhook, owner notifications created; a CLI-recorded session
   uploaded to production and shown on the roll before settlement.
 - Postgres has a Railway TCP proxy so migrations and the seed run from the laptop.
+
+## E12 fixtures (26 Sep)
+
+Seven `@endcredits-demo/*` packages under `fixtures/`, each also pushed at the root of its own public
+repo so the anti-spoof check finds the same name in the root `package.json` and resolution reads
+`FUNDING.json` at `HEAD`. Checked with `pnpm tsx scripts/check-fixtures.ts` (spoof ok on all seven).
+
+| Package | Repo | FUNDING.json | Outcome |
+|---|---|---|---|
+| `moved-payout` | https://github.com/zexoverz/endcredits-fixture-moved-payout | A | held, `ADDRESS_CHANGED` once it moves to B |
+| `left-padder-pro` | https://github.com/zexoverz/endcredits-fixture-left-padder-pro | SDN address | refused by Intercepta |
+| `unclaimed-utils` | https://github.com/zexoverz/endcredits-fixture-unclaimed-utils | none | reserved, claimed live in the judged demo |
+| `unclaimed-rehearsal-1` | https://github.com/zexoverz/endcredits-fixture-unclaimed-rehearsal-1 | none | reserved, claimed in a rehearsal |
+| `unclaimed-rehearsal-2` | https://github.com/zexoverz/endcredits-fixture-unclaimed-rehearsal-2 | none | same |
+| `unclaimed-rehearsal-3` | https://github.com/zexoverz/endcredits-fixture-unclaimed-rehearsal-3 | none | same |
+| `unclaimed-finalist` | https://github.com/zexoverz/endcredits-fixture-unclaimed-finalist | none | reserved, claimed in the finalist run |
+
+- **Addresses** (`fixtures/ADDRESSES.md`): A `0x52DBDeaDd4ED42877dC6099A3B1C02c79876B551`, B
+  `0xeF4509C258107F5A37fb7e76af4F99a7DD3c6aa2`, both from `cast wallet new`; only the addresses were
+  kept. They only receive.
+- **Why the SDN address:** `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` is on the OFAC SDN list
+  (Lazarus Group / Ronin, SDN.CSV entry 27307). A refusal needs an address Intercepta flags for a
+  reason nobody disputes, and rule 9 forbids pointing that at a real package, so the fixture's own
+  README says on line 2 that the address is deliberate.
+- **npm:** `scripts/publish-fixtures.sh` publishes after `npm login` and creating the
+  `endcredits-demo` org; it skips versions already on npm. Not run yet.
+- **Demo repo:** https://github.com/zexoverz/endcredits-demo-reports, Next.js with a static
+  `/reports` page and `zod`, `date-fns`, `@tanstack/react-query`, `react-day-picker`. The fixtures
+  are added after publish; `DEMO.md` there has the command and the session prompt.

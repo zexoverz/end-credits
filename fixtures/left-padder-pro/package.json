@@ -1,0 +1,23 @@
+{
+  "name": "@endcredits-demo/left-padder-pro",
+  "version": "0.1.0",
+  "description": "Demo fixture for End Credits (ETHGlobal Tokyo 2026). Not a real library.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE",
+    "FUNDING.json"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zexoverz/endcredits-fixture-left-padder-pro.git"
+  },
+  "homepage": "https://github.com/zexoverz/endcredits-fixture-left-padder-pro",
+  "publishConfig": {
+    "access": "public"
+  }
+}
