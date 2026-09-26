@@ -34,6 +34,13 @@ contract EndCreditsEscrow {
         bool changed;
     }
 
+    /// @dev `pending` replaces `current` once `block.timestamp >= activeAt`.
+    struct Approver {
+        address current;
+        address pending;
+        uint64 activeAt;
+    }
+
     IERC20 public immutable usdc;
     address public immutable recorder;
     uint64 public immutable changeDelay;
@@ -43,6 +50,7 @@ contract EndCreditsEscrow {
     mapping(bytes32 => Tip) public tips;
     mapping(bytes32 => uint256) public reserved;
     mapping(bytes32 => Claim) public claims;
+    mapping(address payer => Approver) public approvers;
     uint256 public totalPending;
     uint256 public totalReserved;
 
@@ -60,6 +68,7 @@ contract EndCreditsEscrow {
     event Reserved(bytes32 indexed packageKey, address indexed payer, uint256 amount, bytes32 indexed sessionId);
     event ClaimSet(bytes32 indexed packageKey, address indexed payee, address previous, bytes32 evidence);
     event Claimed(bytes32 indexed packageKey, address indexed payee, uint256 amount);
+    event ApproverSet(address indexed payer, address indexed approver, uint64 activeAt);
     event SessionSettled(
         bytes32 indexed sessionId,
         bytes32 indexed ownerHash,
@@ -82,6 +91,7 @@ contract EndCreditsEscrow {
     error NoClaim(bytes32 packageKey);
     error NothingReserved(bytes32 packageKey);
     error ClaimCoolingDown(bytes32 packageKey, uint64 until);
+    error ZeroApprover();
 
     modifier onlyRecorder() {
         if (msg.sender != recorder) revert NotRecorder();
@@ -92,6 +102,26 @@ contract EndCreditsEscrow {
         usdc = usdc_;
         recorder = recorder_;
         changeDelay = changeDelay_;
+    }
+
+    /// @notice Set the caller's approver, the key that must sign each release of the caller's
+    /// held tips. The first set is immediate; a later change takes effect after `changeDelay`.
+    function setApprover(address approver) external {
+        if (approver == address(0)) revert ZeroApprover();
+
+        _promote(msg.sender);
+        Approver storage a = approvers[msg.sender];
+        if (a.current == approver) return;
+
+        uint64 activeAt = uint64(block.timestamp);
+        if (a.current == address(0)) {
+            a.current = approver;
+        } else {
+            activeAt += changeDelay;
+            a.pending = approver;
+            a.activeAt = activeAt;
+        }
+        emit ApproverSet(msg.sender, approver, activeAt);
     }
 
     /// @notice Pull `amount` from the caller and hold it for `payee` until released or refunded.
@@ -207,6 +237,22 @@ contract EndCreditsEscrow {
         bytes32 manifestHash
     ) external onlyRecorder {
         emit SessionSettled(sessionId, ownerHash, budget, paid, held, reservedAmount, refused, manifestHash);
+    }
+
+    /// @notice The approver in force for `payer` now, with any due pending change applied.
+    function approverOf(address payer) public view returns (address) {
+        Approver memory a = approvers[payer];
+        if (a.pending != address(0) && block.timestamp >= a.activeAt) return a.pending;
+        return a.current;
+    }
+
+    function _promote(address payer) internal {
+        Approver storage a = approvers[payer];
+        if (a.pending != address(0) && block.timestamp >= a.activeAt) {
+            a.current = a.pending;
+            a.pending = address(0);
+            a.activeAt = 0;
+        }
     }
 
     function claimOf(bytes32 packageKey) external view returns (address) {
