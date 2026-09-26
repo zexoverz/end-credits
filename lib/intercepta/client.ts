@@ -7,7 +7,7 @@ import type { z } from "zod";
 import type { Address, Screen, ScreenError } from "../decision/types";
 import { readEnv } from "../env";
 import { freshScreen, type ScreenKey, type ScreenRepo } from "./cache";
-import { timedJson } from "./http";
+import { timedJson, transient } from "./http";
 import { isNoHistory } from "./no-history";
 import { BASE_SEPOLIA, BASE_SEPOLIA_USDC, BASE_USDC, mapChain, mapToken } from "./mapping";
 import {
@@ -22,6 +22,9 @@ import {
 } from "./schemas";
 
 export const TIMEOUT_MS = 8000;
+export const RETRY_DELAY_MS = 500;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // A quick scan of an address Intercepta has never seen on mainnet (decisions.md, 26 Sep).
 const NO_HISTORY_SCAN: QuickScanResult = { toxicScore: 0, traits: [], noHistory: true };
@@ -35,7 +38,8 @@ export type InterceptaConfig = {
   apiKey: string;
   repo: ScreenRepo;
   fetch?: typeof fetch;
-  timeoutMs?: number;
+  timeoutMs?: number; // per attempt
+  retryDelayMs?: number; // pause before the one retry
   clock?: () => number; // ms, for latency
   now?: () => Date; // for cache freshness
 };
@@ -45,6 +49,7 @@ type Request = { path: string; method: "GET" | "POST"; body?: unknown };
 export function createIntercepta(cfg: InterceptaConfig) {
   const fetchFn = cfg.fetch ?? fetch;
   const timeoutMs = cfg.timeoutMs ?? TIMEOUT_MS;
+  const retryDelayMs = cfg.retryDelayMs ?? RETRY_DELAY_MS;
   const clock = cfg.clock ?? (() => performance.now());
   const now = cfg.now ?? (() => new Date());
   const base = cfg.base.replace(/\/+$/, "");
@@ -65,6 +70,22 @@ export function createIntercepta(cfg: InterceptaConfig) {
       const parsed = schema.safeParse(cached.response);
       if (parsed.success) return { ok: true, data: parsed.data, screenId: cached.id };
     }
+    // One retry on a transient failure; both attempts are stored, only the last one decides.
+    let last = await attempt(key, mappedFrom, req, noHistory !== undefined);
+    if (transient(last.res)) {
+      await sleep(retryDelayMs);
+      last = await attempt(key, mappedFrom, req, noHistory !== undefined);
+    }
+    const { res, fresh, screenId } = last;
+    if (fresh && noHistory !== undefined) return { ok: true, data: noHistory, screenId };
+    if (!res.ok) return { ok: false, error: res.error, screenId };
+    const parsed = schema.safeParse(res.body);
+    if (!parsed.success) return { ok: false, error: "PARSE", screenId };
+    return { ok: true, data: parsed.data, screenId };
+  }
+
+  // One HTTP attempt, stored in `screens` whatever the outcome. `fresh` is the no-history 404.
+  async function attempt(key: ScreenKey, mappedFrom: string | null, req: Request, readsNoHistory: boolean) {
     const started = clock();
     const res = await timedJson(
       fetchFn,
@@ -81,14 +102,10 @@ export function createIntercepta(cfg: InterceptaConfig) {
       timeoutMs,
     );
     const latencyMs = Math.max(0, Math.round(clock() - started));
-    const fresh = noHistory !== undefined && !res.ok && isNoHistory(res.status, res.raw);
+    const fresh = readsNoHistory && !res.ok && isNoHistory(res.status, res.raw);
     const response = fresh && !res.ok ? res.raw : res.body;
     const screenId = await cfg.repo.insert({ ...key, mappedFrom, response, status: res.status, latencyMs });
-    if (fresh) return { ok: true, data: noHistory, screenId };
-    if (!res.ok) return { ok: false, error: res.error, screenId };
-    const parsed = schema.safeParse(res.body);
-    if (!parsed.success) return { ok: false, error: "PARSE", screenId };
-    return { ok: true, data: parsed.data, screenId };
+    return { res, fresh, screenId };
   }
 
   const payeeFrom = mapChain(BASE_SEPOLIA).mappedFrom;
