@@ -9,6 +9,8 @@ import {
 } from "@x402/core/http";
 import type { FacilitatorClient } from "@x402/core/server";
 import type { PaymentPayload, PaymentRequired, PaymentRequirements } from "@x402/core/types";
+import { CRITICAL, REFUSE_ABOVE } from "../decision/matrix";
+import type { ScreenError } from "../decision/types";
 import { msg } from "../messages";
 import {
   MAX_TIMEOUT_SECONDS,
@@ -37,13 +39,21 @@ export interface CreditRepo {
   /** Time of the newest successful `address` screen of this address, any case. */
   latestAddressScreenAt(address: string): Promise<Date | null>;
   saveSettlement(id: string, tx: string, receipt: Receipt): Promise<void>;
+  /** Appends a `screens` row id to the credit's screen_ids (the payer screen), once. */
+  addScreenId(id: string, screenId: string): Promise<void>;
 }
+
+/** Intercepta quick scan of the paying wallet (lib/intercepta/client.ts quickScan). */
+export type PayerScreen =
+  | { ok: true; data: { toxicScore: number; traits: { name: string; description: string }[]; noHistory?: true }; screenId: string }
+  | { ok: false; error: ScreenError; screenId?: string };
 
 export type ServerDeps = {
   repo: CreditRepo;
   facilitator: Pick<FacilitatorClient, "verify" | "settle">;
   usdc: string;
   receiptSigner: LocalAccount;
+  screenPayer(address: string): Promise<PayerScreen>;
   now?: () => Date;
 };
 
@@ -113,6 +123,27 @@ function decode(header: string): PaymentPayload | null {
   }
 }
 
+// The paid side screens who pays (decisions.md, screen the payer): a flagged wallet gets 403, a
+// failed screen 503, and neither reaches the facilitator. A wallet with no mainnet history passes.
+async function screenPayer(creditId: string, payment: PaymentPayload, deps: ServerDeps): Promise<Response | null> {
+  const from = (payment.payload?.authorization as { from?: unknown } | undefined)?.from;
+  if (typeof from !== "string" || !isAddress(from, { strict: false })) {
+    return Response.json({ code: "INVALID_PAYMENT" }, { status: 400 });
+  }
+  const screen: PayerScreen = await deps.screenPayer(from).catch(() => ({ ok: false as const, error: "HTTP" as const }));
+  if (screen.screenId) await deps.repo.addScreenId(creditId, screen.screenId);
+  if (!screen.ok) {
+    const message = msg("PAYER_SCREEN_UNAVAILABLE", { error: screen.error });
+    return Response.json({ code: "PAYER_SCREEN_UNAVAILABLE", message }, { status: 503 });
+  }
+  const { toxicScore, traits } = screen.data;
+  const critical = traits.filter((t) => CRITICAL.has(t.name));
+  if (critical.length === 0 && toxicScore <= REFUSE_ABOVE) return null;
+  const named = critical.length > 0 ? critical : traits;
+  const description = named.length > 0 ? named.map((t) => t.description).join(" ") : `Toxic score ${toxicScore}.`;
+  return Response.json({ code: "PAYER_REFUSED", message: msg("PAYER_REFUSED", { description }) }, { status: 403 });
+}
+
 export async function handleCreditRequest(req: CreditRequest, deps: ServerDeps): Promise<Response> {
   const loaded = await deps.repo.loadCredit(req.creditId);
   if (!loaded) return Response.json({ code: "NOT_FOUND" }, { status: 404 });
@@ -127,6 +158,9 @@ export async function handleCreditRequest(req: CreditRequest, deps: ServerDeps):
   if (!payment) return paymentRequired(challenge, "INVALID_PAYMENT");
   const required = challenge.accepts[0];
   if (!matchesCredit(payment, required)) return paymentRequired(challenge, "CHALLENGE_MISMATCH");
+
+  const refusal = await screenPayer(c.id, payment, deps);
+  if (refusal) return refusal;
 
   const verified = await deps.facilitator.verify(payment, required);
   if (!verified.isValid) return paymentRequired(challenge, verified.invalidReason ?? "INVALID_PAYMENT");
