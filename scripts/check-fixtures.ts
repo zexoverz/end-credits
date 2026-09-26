@@ -4,11 +4,11 @@
 // the full resolvePayee with no claim and an in-memory store.
 //
 //   pnpm tsx scripts/check-fixtures.ts
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fetchRepoFile } from "../lib/payee/github";
 import type { ObservationStore } from "../lib/payee/observe";
-import { parseFundingJson } from "../lib/payee/parse";
+import { parseFundingJson, parseX402Endpoint } from "../lib/payee/parse";
 import { resolvePayee } from "../lib/payee/resolve";
 import { repoPublishes } from "../lib/payee/spoof";
 import { parseRepository } from "../lib/registry/npm";
@@ -38,8 +38,14 @@ async function check(dir: string): Promise<boolean> {
   );
   const payee = res.address ? `${res.address} (${res.source})` : `none${res.reason ? ` ${res.reason}` : ""}`;
   const file = funding === null ? "no FUNDING.json" : `FUNDING.json -> ${parsed?.address ?? "none"}`;
-  console.log(`${pkg.name}  repo=${repo.fullName}  spoof=${spoofOk ? "ok" : "FAIL"}  ${file}  payee=${payee}`);
-  return spoofOk;
+  // A local FUNDING.json with an x402 endpoint must reach resolution with the same endpoint.
+  const localFunding = join(FIXTURES, dir, "FUNDING.json");
+  const wantEndpoint = existsSync(localFunding) ? parseX402Endpoint(readFileSync(localFunding, "utf8")) : null;
+  const endpoint = res.address ? (res.x402Endpoint ?? null) : null;
+  const endpointOk = endpoint === wantEndpoint;
+  const x402 = endpoint || wantEndpoint ? `  x402=${endpoint ?? "none"}${endpointOk ? "" : ` (want ${wantEndpoint})`}` : "";
+  console.log(`${pkg.name}  repo=${repo.fullName}  spoof=${spoofOk ? "ok" : "FAIL"}  ${file}  payee=${payee}${x402}`);
+  return spoofOk && endpointOk;
 }
 
 async function main() {
