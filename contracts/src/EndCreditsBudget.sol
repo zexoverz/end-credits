@@ -28,10 +28,15 @@ contract EndCreditsBudget {
 
     event AllowanceSet(address indexed owner, address indexed spender, uint128 perPeriod, uint64 period);
     event AllowanceRevoked(address indexed owner, address indexed spender);
+    event Pulled(
+        address indexed owner, address indexed spender, uint256 amount, uint128 spentInPeriod, uint64 periodStart
+    );
 
     error ZeroSpender();
     error ZeroAmount();
     error PeriodOutOfRange(uint64 period);
+    error NoAllowance(address owner, address spender);
+    error OverPeriodCap(uint256 remaining);
 
     constructor(IERC20 usdc_) {
         usdc = usdc_;
@@ -63,8 +68,52 @@ contract EndCreditsBudget {
         emit AllowanceRevoked(msg.sender, spender);
     }
 
+    /// @notice Move `amount` of `owner`'s USDC to the caller, within the caller's allowance for the
+    /// current window. `owner` must have approved this contract on USDC for at least `amount`.
+    function pull(address owner, uint256 amount) external {
+        Allowance storage a = allowances[owner][msg.sender];
+        if (a.perPeriod == 0) revert NoAllowance(owner, msg.sender);
+        if (amount == 0) revert ZeroAmount();
+
+        (uint64 start, uint128 spent) = _window(a);
+        uint256 left = _left(a.perPeriod, spent);
+        if (amount > left) revert OverPeriodCap(left);
+
+        spent += uint128(amount);
+        a.periodStart = start;
+        a.spentInPeriod = spent;
+
+        emit Pulled(owner, msg.sender, amount, spent, start);
+        usdc.safeTransferFrom(owner, msg.sender, amount);
+    }
+
+    /// @notice What `spender` can still pull from `owner` in the current window.
+    function remaining(address owner, address spender) external view returns (uint256) {
+        Allowance storage a = allowances[owner][spender];
+        if (a.perPeriod == 0) return 0;
+        (, uint128 spent) = _window(a);
+        return _left(a.perPeriod, spent);
+    }
+
     /// @notice The stored allowance, without rolling an elapsed window forward.
     function allowanceOf(address owner, address spender) external view returns (Allowance memory) {
         return allowances[owner][spender];
+    }
+
+    /// @dev The current window. Once a window has ended the start moves forward by whole periods,
+    /// so window edges never drift from the first one, and the spent amount starts again at zero.
+    function _window(Allowance storage a) internal view returns (uint64 start, uint128 spent) {
+        start = a.periodStart;
+        spent = a.spentInPeriod;
+        uint64 period = a.period;
+        if (block.timestamp >= uint256(start) + period) {
+            start += uint64((block.timestamp - start) / period) * period;
+            spent = 0;
+        }
+    }
+
+    /// @dev Spent can exceed the cap after the owner lowers it; nothing is left then.
+    function _left(uint128 perPeriod, uint128 spent) internal pure returns (uint256) {
+        return perPeriod > spent ? perPeriod - spent : 0;
     }
 }
